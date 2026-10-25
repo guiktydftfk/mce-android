@@ -125,7 +125,12 @@ object ThreadDetailParser {
         root.select("a[href*=mod=attachment]").forEach { a ->
             val href = a.attr("href")
             val text = a.text()
-            if (imageExtRegex.containsMatchIn(text) || imageExtRegex.containsMatchIn(href)) {
+            val looksImage = imageExtRegex.containsMatchIn(text) || imageExtRegex.containsMatchIn(href)
+            // 附件常以「图标 + 链接」呈现；图标为 image.gif 即为图片附件
+            val hasImageIcon = a.parents().any { parent ->
+                parent.selectFirst("img[src*=filetype/image]") != null
+            } || a.selectFirst("img[src*=filetype/image]") != null
+            if (looksImage || hasImageIcon) {
                 result.add(absolutize(decode(href)))
             }
         }

@@ -4,8 +4,7 @@ param(
     [switch]$ToDesktop
 )
 # MCE Android one-click build.
-#   -Bump       : increment patch version (0.0.1 -> 0.0.2) and versionCode +1 before build
-#   -ToDesktop  : also copy the APK to the Windows desktop
+#   -Bump : increment version. Rule: patch carries to minor at 10  (0.1.9 -> 0.2.0)
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path $PSScriptRoot -Parent
@@ -18,7 +17,6 @@ $gradle     = (Get-ChildItem (Join-Path $devRoot 'gradle') -Directory | Select-O
 $sdk        = Join-Path $devRoot 'sdk'
 $gradleHome = Join-Path $devRoot 'gradle-home'
 
-# ---------- version bump ----------
 $lines = [System.IO.File]::ReadAllLines($propsFile)
 function Get-Prop([string]$key) {
     $line = $lines | Where-Object { $_ -match "^$key=" } | Select-Object -First 1
@@ -30,8 +28,13 @@ $curCode = [int](Get-Prop 'MCE_VERSION_CODE')
 
 if ($Bump) {
     $parts = $curName.Split('.')
+    $major = [int]$parts[0]
+    $minor = [int]$parts[1]
     $patch = [int]$parts[2] + 1
-    $newName = "$($parts[0]).$($parts[1]).$patch"
+    # 每 10 进 1：补丁位满 10 进位到次版本，余数保留（0.1.9 -> 0.2.0，0.0.9 -> 0.1.0）
+    if ($patch -ge 10) { $minor += [math]::Floor($patch / 10); $patch = $patch % 10 }
+    if ($minor -ge 10) { $major += [math]::Floor($minor / 10); $minor = $minor % 10 }
+    $newName = "$major.$minor.$patch"
     $newCode = $curCode + 1
     $lines = $lines | ForEach-Object {
         if ($_ -match '^MCE_VERSION_NAME=') { "MCE_VERSION_NAME=$newName" }
@@ -54,7 +57,7 @@ $log = Join-Path $projectRoot 'build.log'
 cmd /c "`"$gradle\bin\gradle.bat`" --project-dir `"$projectRoot`" --gradle-user-home `"$gradleHome`" :app:assembleDebug --no-daemon --console=plain > `"$log`" 2>&1"
 $code = $LASTEXITCODE
 Write-Host "[build] gradle exit = $code"
-Get-Content $log -Tail 15
+Get-Content $log -Tail 12
 
 $apk = Join-Path $projectRoot 'app\build\outputs\apk\debug\app-debug.apk'
 if ($code -ne 0 -or -not (Test-Path $apk)) {

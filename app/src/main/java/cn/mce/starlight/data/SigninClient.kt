@@ -30,15 +30,19 @@ object SigninClient {
         val html = GenericPageClient.get(SIGN_PAGE)
         val doc = Jsoup.parse(html, SIGN_PAGE)
 
-        // stats blocks: <div class="item"><div>label</div><div>value</div></div>
-        val stats = mutableMapOf<String, String>()
-        doc.select("div.info div.item").forEach { item ->
-            val label = item.select("div").firstOrNull()?.text()?.trim().orEmpty()
-            if (label.isNotEmpty()) {
-                val digits = Regex("""\d+""").find(item.text().replace(label, ""))?.value
-                if (digits != null) stats[label] = digits
-            }
+        // stats: parse numbers next to labels from whole page text (most robust)
+        val pageText = doc.text()
+        fun pick(label: String, unit: String = ""): String? {
+            val p1 = Regex("""$label\s*[:：]?\s*(?:第\s*)?(\d+)""").find(pageText)
+            if (p1 != null) return p1.groupValues[1]
+            val p2 = Regex("""$label[^\d]{0,8}(\d+)""").find(pageText)
+            return p2?.groupValues?.get(1)
         }
+        val stats = mapOf(
+            "\u4eca\u65e5\u6392\u540d" to pick("\u4eca\u65e5\u6392\u540d"),
+            "\u8fde\u7eed\u7b7e\u5230" to pick("\u8fde\u7eed\u7b7e\u5230"),
+            "\u7d2f\u8ba1\u7b7e\u5230" to pick("\u7d2f\u8ba1\u7b7e\u5230"),
+        )
 
         fun stat(vararg keys: String): String? =
             stats.entries.firstOrNull { entry -> keys.any { entry.key.contains(it) } }?.value

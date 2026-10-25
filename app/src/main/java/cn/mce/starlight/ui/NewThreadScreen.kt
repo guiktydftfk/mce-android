@@ -45,7 +45,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.data.Boards
 import cn.mce.starlight.data.PostActions
@@ -82,7 +84,7 @@ fun NewThreadScreen(
     var formError by remember { mutableStateOf<String?>(null) }
 
     var subject by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
+    var contentField by remember { mutableStateOf(TextFieldValue("")) }
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -132,8 +134,22 @@ fun NewThreadScreen(
         }
     }
 
-    fun insert(mark: (String) -> String, placeholder: String) {
-        content = content + mark(placeholder)
+    // 在光标处插入 BBCode（有选区则包裹选区，否则插入占位文本并把光标放到标签中间）
+    fun wrap(open: String, close: String, placeholder: String) {
+        val tv = contentField
+        val start = tv.selection.min
+        val end = tv.selection.max
+        val selected = tv.text.substring(start, end).ifBlank { placeholder }
+        val newText = tv.text.replaceRange(start, end, open + selected + close)
+        val cursor = start + open.length + selected.length
+        contentField = TextFieldValue(newText, TextRange(cursor))
+    }
+
+    fun insertText(text: String) {
+        val tv = contentField
+        val start = tv.selection.min
+        val newText = tv.text.replaceRange(start, tv.selection.max, text)
+        contentField = TextFieldValue(newText, TextRange(start + text.length))
     }
 
     suspend fun submit(draft: Boolean) {
@@ -142,7 +158,7 @@ fun NewThreadScreen(
         val r = PostActions.newThread(
             fid = fid,
             subject = subject.trim(),
-            message = content.trim(),
+            message = contentField.text.trim(),
             typeid = selectedCategory?.id,
             aids = uploaded.map { it.second },
             options = PostActions.Options(
@@ -240,21 +256,21 @@ fun NewThreadScreen(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            ToolButton("B") { insert({ "[b]$it[/b]" }, "加粗文字") }
-            ToolButton("I") { insert({ "[i]$it[/i]" }, "斜体文字") }
-            ToolButton("U") { insert({ "[u]$it[/u]" }, "下划线") }
-            ToolButton("颜色") { insert({ "[color=#ff0000]$it[/color]" }, "彩色文字") }
-            ToolButton("链接") { insert({ "[url]$it[/url]" }, "https://") }
-            ToolButton("图片") { insert({ "[img]$it[/img]" }, "图片链接") }
-            ToolButton("引用") { insert({ "[quote]$it[/quote]" }, "引用内容") }
-            ToolButton("代码") { insert({ "[code]$it[/code]" }, "代码") }
-            ToolButton("隐藏") { insert({ "[hide]$it[/hide]" }, "隐藏内容（回复可见）") }
-            ToolButton("@" ) { content = content + "@" }
+            ToolButton("B") { wrap("[b]", "[/b]", "加粗文字") }
+            ToolButton("I") { wrap("[i]", "[/i]", "斜体文字") }
+            ToolButton("U") { wrap("[u]", "[/u]", "下划线文字") }
+            ToolButton("颜色") { wrap("[color=#ff0000]", "[/color]", "彩色文字") }
+            ToolButton("链接") { wrap("[url]", "[/url]", "https://") }
+            ToolButton("图片") { wrap("[img]", "[/img]", "图片链接") }
+            ToolButton("引用") { wrap("[quote]", "[/quote]", "引用内容") }
+            ToolButton("代码") { wrap("[code]", "[/code]", "代码") }
+            ToolButton("隐藏") { wrap("[hide]", "[/hide]", "隐藏内容（回复可见）") }
+            ToolButton("@") { insertText("@") }
         }
 
         OutlinedTextField(
-            value = content,
-            onValueChange = { content = it },
+            value = contentField,
+            onValueChange = { contentField = it },
             label = { Text("内容（支持 BBCode）") },
             minLines = 8,
             modifier = Modifier
@@ -357,13 +373,13 @@ fun NewThreadScreen(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                enabled = !sending && subject.isNotBlank() && content.isNotBlank(),
+                enabled = !sending && subject.isNotBlank() && contentField.text.isNotBlank(),
                 onClick = { scope.launch { submit(false) } },
                 modifier = Modifier.weight(1f),
             ) { Text(if (sending) "提交中…" else "发布") }
 
             TextButton(
-                enabled = !sending && content.isNotBlank(),
+                enabled = !sending && contentField.text.isNotBlank(),
                 onClick = { scope.launch { submit(true) } },
             ) { Text("存草稿") }
         }
