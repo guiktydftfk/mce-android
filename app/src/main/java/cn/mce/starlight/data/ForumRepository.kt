@@ -38,6 +38,7 @@ data class Post(
     val contentHtml: String,
     val contentText: String,
     val images: List<String>,
+    val blocks: List<ContentBlock> = emptyList(),
     val floorLabel: String?,
     val dateText: String?,
     val isOp: Boolean,

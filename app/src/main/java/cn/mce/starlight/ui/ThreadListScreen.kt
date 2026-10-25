@@ -180,8 +180,8 @@ fun ThreadListScreen(
                     ),
                 ) {
                     items(s.threads, key = { it.id }) { thread ->
-                        ThreadRow(thread) { onOpenThread(thread) }
-                        HorizontalDivider(Modifier.padding(start = 14.dp))
+                        FeedCard(thread = thread, onClick = { onOpenThread(thread) })
+                        CardDivider()
                     }
                     if (loadingMore) {
                         item {
@@ -261,69 +261,5 @@ fun ThreadListScreen(
             onClick = { refreshKeepPosition() },
             modifier = Modifier.align(Alignment.BottomEnd),
         )
-    }
-}
-
-@Composable
-private fun ThreadRow(thread: ThreadSummary, onClick: () -> Unit) {
-    var thumb by remember(thread.id) { mutableStateOf<String?>(null) }
-    LaunchedEffect(thread.id) { thumb = ThreadImageCache.firstImage(thread.id) }
-
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-    ) {
-        Box(
-            Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            val avatar = thread.avatarUrl
-            if (!avatar.isNullOrBlank()) {
-                AsyncImage(model = avatar, contentDescription = null, modifier = Modifier.fillMaxSize())
-            }
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = thread.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                thread.typeLabel?.let { label ->
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(
-                    text = listOfNotNull(thread.author, thread.metaText).joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        thumb?.let { url ->
-            Spacer(Modifier.width(10.dp))
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(66.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-            )
-        }
     }
 }

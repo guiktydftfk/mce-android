@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.data.HttpForumRepository
 import cn.mce.starlight.data.Post
+import cn.mce.starlight.data.ContentBlock
 import cn.mce.starlight.data.PostActions
 import cn.mce.starlight.data.RateClient
 import cn.mce.starlight.data.ThreadDetail
@@ -349,27 +351,22 @@ private fun PostItem(post: Post, onReply: () -> Unit, onRate: () -> Unit) {
             TextButton(onClick = onReply) { Text("回复", style = MaterialTheme.typography.labelSmall) }
         }
         Spacer(Modifier.height(8.dp))
-        if (post.contentText.isNotBlank()) {
-            Text(text = post.contentText, style = MaterialTheme.typography.bodyMedium)
-        }
-        post.images.take(6).forEach { image ->
-            Spacer(Modifier.height(8.dp))
-            AsyncImage(
-                model = image,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(240.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-            )
-        }
-        if (post.images.size > 6) {
-            Text(
-                "还有 ${post.images.size - 6} 张图片未显示",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        post.blocks.forEach { block ->
+            when (block) {
+                is ContentBlock.Text -> Text(
+                    text = block.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                is ContentBlock.Image -> AsyncImage(
+                    model = block.url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 380.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                )
+            }
         }
     }
 }

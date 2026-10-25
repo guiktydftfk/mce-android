@@ -47,6 +47,8 @@ private enum class Dest(val label: String) {
     SignIn("签到"),
     Tasks("任务中心"),
     Search("搜索"),
+    Ranklist("排行榜"),
+    Notice("消息提醒"),
     Compose("发帖"),
     Settings("设置"),
 }
@@ -149,6 +151,12 @@ fun MceApp() {
                 DrawerItem("搜索", dest == Dest.Search) {
                     dest = Dest.Search; stack = emptyList(); closeDrawer()
                 }
+                DrawerItem("排行榜", dest == Dest.Ranklist) {
+                    dest = Dest.Ranklist; stack = emptyList(); closeDrawer()
+                }
+                DrawerItem("消息提醒", dest == Dest.Notice) {
+                    dest = Dest.Notice; stack = emptyList(); closeDrawer()
+                }
                 DrawerItem("设置", dest == Dest.Settings) {
                     dest = Dest.Settings; stack = emptyList(); closeDrawer()
                 }
@@ -205,6 +213,7 @@ fun MceApp() {
 
                 Dest.Profile -> ProfileScreen(
                     onMenu = ::openDrawer,
+                    reloadKey = dataVersion,
                     onLogin = { showLogin = true },
                     onLogout = {
                         scope.launch {
@@ -225,6 +234,20 @@ fun MceApp() {
                 Dest.Tasks -> TaskScreen(onMenu = ::openDrawer, reloadKey = dataVersion)
 
                 Dest.Search -> SearchScreen(
+                    onMenu = ::openDrawer,
+                    onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+                )
+
+                Dest.Ranklist -> NativePageScreen(
+                    initialUrl = "$BASE/misc.php?mod=ranklist",
+                    fallbackTitle = "排行榜",
+                    onMenu = ::openDrawer,
+                    onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+                )
+
+                Dest.Notice -> NativePageScreen(
+                    initialUrl = "$BASE/home.php?mod=space&do=notice",
+                    fallbackTitle = "消息提醒",
                     onMenu = ::openDrawer,
                     onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
                 )
