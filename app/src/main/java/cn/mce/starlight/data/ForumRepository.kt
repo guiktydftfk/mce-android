@@ -33,6 +33,7 @@ data class ForumPage(
 /** 楼层/帖子 */
 data class Post(
     val pid: Int,
+    val uid: Int? = null,
     val author: String,
     val avatarUrl: String?,
     val contentHtml: String,

@@ -1,5 +1,8 @@
 package cn.mce.starlight.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -31,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import cn.mce.starlight.core.Diagnostics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.core.SessionStore
@@ -44,6 +48,7 @@ fun SettingsScreen(
     onMenu: () -> Unit,
     onLogin: () -> Unit,
     onLogout: () -> Unit,
+    onOpenImageDiag: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var message by remember { mutableStateOf<String?>(null) }
@@ -159,6 +164,43 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+
+            SectionTitle("诊断")
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "自检报告（点击复制到剪贴板）",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        val report = Diagnostics.build(context)
+                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("MCE 自检报告", report))
+                        message = "自检报告已复制到剪贴板"
+                    }
+                    .padding(vertical = 12.dp),
+            )
+            Text(
+                "图片自检（帖子图片看不到时用）",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenImageDiag() }
+                    .padding(vertical = 12.dp),
+            )
+            Text(
+                "输入帖子 ID，逐个探测正文图片请求，输出失败原因",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Text(
+                "包含版本、设备、登录态（不含 Cookie 值）、设置与最近抓取页面，可直接粘贴反馈",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
 

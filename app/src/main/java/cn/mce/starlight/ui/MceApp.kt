@@ -14,6 +14,8 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -49,6 +51,8 @@ sealed interface Route {
     data object ProfileEdit : Route
     data object Medals : Route
     data object Friends : Route
+    data class User(val uid: Int?, val name: String) : Route
+    data object ImageDiag : Route
     data class GenericList(val title: String, val path: String) : Route
 }
 
@@ -99,7 +103,12 @@ fun MceApp() {
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            ModalDrawerSheet(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 340.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
                 Column(Modifier.padding(start = 20.dp, top = 28.dp, bottom = 10.dp)) {
                     Text("MCE星光班", style = MaterialTheme.typography.titleLarge)
                     Text(
@@ -200,6 +209,7 @@ fun MceApp() {
                 fallbackTitle = current.title,
                 onMenu = ::openDrawer,
                 reloadKey = dataVersion,
+                onOpenUser = { uid, name -> push(Route.User(if (uid > 0) uid else null, name)) },
             )
 
             is Route.Page -> NativePageScreen(
@@ -238,13 +248,20 @@ fun MceApp() {
                 onSaved = { dataVersion += 1; pop() },
             )
 
+            is Route.ImageDiag -> ImageDiagScreen(onMenu = ::openDrawer)
+
+            is Route.User -> UserProfileScreen(
+                uid = current.uid,
+                onMenu = ::openDrawer,
+                onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+                onOpenPage = { url, title -> push(Route.Page(url, title)) },
+            )
+
             is Route.Medals -> MedalsScreen(onMenu = ::openDrawer)
 
             is Route.Friends -> FriendsScreen(
                 onMenu = ::openDrawer,
-                onOpenUser = { uid, title ->
-                    push(Route.Page("$BASE/home.php?mod=space&uid=$uid", title))
-                },
+                onOpenUser = { uid, title -> push(Route.User(uid, title)) },
             )
 
             is Route.GenericList -> GenericListScreen(
@@ -252,9 +269,7 @@ fun MceApp() {
                 path = current.path,
                 onMenu = ::openDrawer,
                 onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
-                onOpenUser = { uid, title ->
-                    push(Route.Page("$BASE/home.php?mod=space&uid=$uid", title))
-                },
+                onOpenUser = { uid, name -> push(Route.User(uid, name)) },
             )
 
             is Route.Notices -> NoticesScreen(
@@ -338,6 +353,7 @@ fun MceApp() {
 
                 Dest.Settings -> SettingsScreen(
                     onMenu = ::openDrawer,
+                    onOpenImageDiag = { push(Route.ImageDiag) },
                     onLogin = { showLogin = true },
                     onLogout = {
                         scope.launch {

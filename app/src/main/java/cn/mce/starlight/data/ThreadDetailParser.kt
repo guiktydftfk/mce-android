@@ -68,6 +68,7 @@ object ThreadDetailParser {
             ?: el.selectFirst(".view_authi")
             ?: el.selectFirst(".plc .pi")
 
+        val authorLink = authi?.selectFirst("span.view_author a, a[href*=space][href*=uid=]")
         val author = authi?.selectFirst("span.view_author a")?.text()?.trim()
             ?: authi?.select("a[href*=space]")?.firstOrNull { it.text().isNotBlank() }?.text()?.trim()
             ?: "\u533f\u540d"
@@ -75,8 +76,21 @@ object ThreadDetailParser {
         val avatar = authi?.selectFirst("a.avatars img, img")?.attr("src")
             ?.takeIf { it.isNotBlank() }?.let(::absolutize)
 
+        val authorUid = Regex("""uid=(\d+)""").find(authorLink?.attr("href").orEmpty())
+            ?.groupValues?.get(1)?.toIntOrNull()
         val message = el.selectFirst("div.message") ?: el.selectFirst(".message")
-        val blocks = message?.let { parseBlocks(it) }.orEmpty()
+
+        // 关键修复：相册图/附件图不在 div.message 里，而在同级的 .attach_list / .img_item 中，
+        // 只扫 message 会整张丢失（历史上"部分帖子图片看不到"的通病）。
+        val contentBlocks = message?.let { parseBlocks(it) }.orEmpty()
+        val outsideImages = collectImagesOutsideMessage(el, message)
+        val blocks = (contentBlocks + outsideImages.map { ContentBlock.Image(it) })
+            .distinctBy { block ->
+                when (block) {
+                    is ContentBlock.Text -> "t:" + block.text
+                    is ContentBlock.Image -> "i:" + block.url
+                }
+            }
 
         val plainText = blocks.filterIsInstance<ContentBlock.Text>()
             .joinToString("\n\n") { it.text }
@@ -86,6 +100,7 @@ object ThreadDetailParser {
 
         return Post(
             pid = pid,
+            uid = authorUid,
             author = author,
             avatarUrl = avatar,
             contentHtml = message?.html().orEmpty(),
@@ -172,6 +187,37 @@ object ThreadDetailParser {
             href.contains("mod=image")
         if (!internal) return false
         return imageExtRegex.containsMatchIn(href) || imageExtRegex.containsMatchIn(label)
+    }
+
+    /**
+     * 收集帖子容器里、message 之外的图片（相册/附件/图床等）。
+     * 头像、表情、占位图、模板图标会被 imageUrlOf 的规则过滤掉。
+     */
+    private fun collectImagesOutsideMessage(container: Element, message: Element?): List<String> {
+        val result = LinkedHashSet<String>()
+
+        container.select("img").forEach { img ->
+            // message 内的图片已经按块解析过，这里跳过避免重复
+            val insideMessage = message != null && img.parents().any { it === message } ||
+                (message != null && img.parents().contains(message))
+            if (insideMessage) return@forEach
+            imageUrlOf(img)?.let { result.add(it) }
+        }
+
+        container.select("a[href]").forEach { a ->
+            val insideMessage = message != null && (a.parents().contains(message) || a.parents().any { it === message })
+            if (insideMessage) return@forEach
+            val href = a.attr("href").replace("&amp;", "&")
+            if (isImageAttachmentLink(href, a.text()) || imageExtRegex.containsMatchIn(href)) {
+                // 只收站内图，避免把普通外链当成配图
+                if (href.contains("mod=image") || href.contains("mod=attachment") ||
+                    href.contains("data/attachment") || href.contains("from=album")
+                ) {
+                    result.add(absolutize(href))
+                }
+            }
+        }
+        return result.toList()
     }
 
     /** Flat image list (used by list thumbnails). */

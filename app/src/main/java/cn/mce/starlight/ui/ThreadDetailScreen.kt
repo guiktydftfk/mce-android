@@ -66,6 +66,7 @@ fun ThreadDetailScreen(
     modifier: Modifier = Modifier,
     onMenu: () -> Unit,
     reloadKey: Int = 0,
+    onOpenUser: (Int, String) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
     val repo = remember { HttpForumRepository() }
@@ -177,6 +178,7 @@ fun ThreadDetailScreen(
                             replyTo = post
                             toast = "正在回复 ${post.author}（${post.floorLabel}）"
                         },
+                        onOpenUser = { onOpenUser(post.uid ?: 0, post.author ?: "") },
                         onRate = {
                             scope.launch {
                                 val f = RateClient.loadForm(tid, post.pid)
@@ -317,14 +319,20 @@ private fun RateDialog(
 }
 
 @Composable
-private fun PostItem(post: Post, onReply: () -> Unit, onRate: () -> Unit) {
+private fun PostItem(
+    post: Post,
+    onReply: () -> Unit,
+    onRate: () -> Unit,
+    onOpenUser: () -> Unit,
+) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(onClick = onOpenUser),
             ) {
                 val url = post.avatarUrl
                 if (!url.isNullOrBlank()) {
@@ -337,7 +345,7 @@ private fun PostItem(post: Post, onReply: () -> Unit, onRate: () -> Unit) {
                 }
             }
             Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).clickable(onClick = onOpenUser)) {
                 Text(post.author, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                 Text(
                     listOfNotNull(post.floorLabel, post.dateText).joinToString(" · "),
