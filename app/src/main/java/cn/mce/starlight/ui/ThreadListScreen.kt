@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.HorizontalDivider
@@ -34,9 +35,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import cn.mce.starlight.data.ThreadImageCache
 import cn.mce.starlight.data.ThreadSummary
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
@@ -132,6 +135,12 @@ fun ThreadListScreen(
 
 @Composable
 private fun ThreadRow(thread: ThreadSummary, onClick: () -> Unit) {
+    // 帖子配图：列表 HTML 里没有缩略图，按需抓取首图并缓存
+    var thumb by remember(thread.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(thread.id) {
+        thumb = ThreadImageCache.firstImage(thread.id)
+    }
+
     Row(
         Modifier
             .fillMaxWidth()
@@ -176,6 +185,17 @@ private fun ThreadRow(thread: ThreadSummary, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+        thumb?.let { url ->
+            Spacer(Modifier.width(10.dp))
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(66.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+            )
         }
     }
 }

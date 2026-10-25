@@ -166,18 +166,15 @@ fun MceApp() {
                     onOpenThread = { push(Route.Thread(it.id, it.title)) },
                 )
 
-                Dest.SignIn -> NativePageScreen(
-                    initialUrl = "$BASE/plugin.php?id=k_misign:sign",
-                    fallbackTitle = "签到",
+                Dest.SignIn -> SigninScreen(
                     onMenu = ::openDrawer,
-                    onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+                    reloadKey = dataVersion,
+                    onNeedLogin = { showLogin = true },
                 )
 
-                Dest.Tasks -> NativePageScreen(
-                    initialUrl = "$BASE/home.php?mod=task",
-                    fallbackTitle = "任务中心",
+                Dest.Tasks -> TaskScreen(
                     onMenu = ::openDrawer,
-                    onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+                    reloadKey = dataVersion,
                 )
 
                 Dest.Search -> SearchScreen(
