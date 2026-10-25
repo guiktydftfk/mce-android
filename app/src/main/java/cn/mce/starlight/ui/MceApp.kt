@@ -47,6 +47,8 @@ sealed interface Route {
     data object Favorites : Route
     data object Notices : Route
     data object ProfileEdit : Route
+    data object Medals : Route
+    data object Friends : Route
     data class GenericList(val title: String, val path: String) : Route
 }
 
@@ -236,6 +238,15 @@ fun MceApp() {
                 onSaved = { dataVersion += 1; pop() },
             )
 
+            is Route.Medals -> MedalsScreen(onMenu = ::openDrawer)
+
+            is Route.Friends -> FriendsScreen(
+                onMenu = ::openDrawer,
+                onOpenUser = { uid, title ->
+                    push(Route.Page("$BASE/home.php?mod=space&uid=$uid", title))
+                },
+            )
+
             is Route.GenericList -> GenericListScreen(
                 title = current.title,
                 path = current.path,
@@ -288,8 +299,8 @@ fun MceApp() {
                             url.contains("do=favorite") -> push(Route.Favorites)
                             url.contains("do=notice") -> push(Route.Notices)
                             url.contains("spacecp") && url.contains("ac=profile") -> push(Route.ProfileEdit)
-                            url.contains("do=medal") -> push(Route.GenericList("我的勋章", "home.php?mod=space&do=medal"))
-                            url.contains("do=friend") -> push(Route.GenericList("我的好友", "home.php?mod=space&do=friend"))
+                            url.contains("do=medal") -> push(Route.Medals)
+                            url.contains("do=friend") -> push(Route.Friends)
                             url.contains("mod=magic") -> push(Route.GenericList("道具中心", "home.php?mod=magic"))
                             else -> push(Route.Page(url, url))
                         }

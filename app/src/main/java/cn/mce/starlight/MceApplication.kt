@@ -2,6 +2,7 @@ package cn.mce.starlight
 
 import android.app.Application
 import cn.mce.starlight.core.CookieJar
+import cn.mce.starlight.core.DebugDump
 import cn.mce.starlight.core.WebCookies
 import cn.mce.starlight.core.SettingsStore
 import coil.ImageLoader
@@ -20,6 +21,7 @@ class MceApplication : Application(), ImageLoaderFactory {
         super.onCreate()
         SettingsStore.init(this)
         CookieJar.init(this)
+        DebugDump.init(this)
     }
 
     override fun newImageLoader(): ImageLoader {

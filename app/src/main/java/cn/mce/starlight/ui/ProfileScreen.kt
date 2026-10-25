@@ -196,10 +196,14 @@ fun ProfileScreen(
                                 .padding(vertical = 4.dp),
                         ) {
                             listOf(
-                                "\u7f16\u8f91\u8d44\u6599" to "spacecp&ac=profile",
+                                "\u6211\u7684\u4e3b\u9898" to "do=thread&view=me",
+                                "\u6211\u7684\u56de\u590d" to "do=thread&type=reply",
+                                "\u6211\u7684\u6536\u85cf" to "do=favorite",
+                                "\u6d88\u606f\u63d0\u9192" to "do=notice",
                                 "\u6211\u7684\u52cb\u7ae0" to "do=medal",
                                 "\u6211\u7684\u597d\u53cb" to "do=friend",
                                 "\u9053\u5177\u4e2d\u5fc3" to "mod=magic",
+                                "\u7f16\u8f91\u8d44\u6599" to "spacecp&ac=profile",
                             ).forEach { (label, path) ->
                                 Text(
                                     label,
