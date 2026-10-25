@@ -1,5 +1,7 @@
 package cn.mce.starlight.ui
 
+import android.app.Activity
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -18,11 +20,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.core.SessionStore
 import cn.mce.starlight.data.AuthClient
@@ -42,6 +46,8 @@ sealed interface Route {
     data object MyReplies : Route
     data object Favorites : Route
     data object Notices : Route
+    data object ProfileEdit : Route
+    data class GenericList(val title: String, val path: String) : Route
 }
 
 /** 抽屉一级目的地 */
@@ -67,6 +73,9 @@ fun MceApp() {
     var dataVersion by remember { mutableIntStateOf(0) }
     var showLogin by remember { mutableStateOf(false) }
     var expandedGroups by remember { mutableStateOf(setOf("全国交流")) }
+
+    val context = LocalContext.current
+    var lastBackAt by remember { mutableLongStateOf(0L) }
 
     fun openDrawer() { scope.launch { drawerState.open() } }
     fun closeDrawer() { scope.launch { drawerState.close() } }
@@ -171,6 +180,17 @@ fun MceApp() {
             if (stack.isNotEmpty()) pop() else dest = Dest.Feed
         }
 
+        // 根页面：双击返回退出应用
+        BackHandler(enabled = stack.isEmpty() && dest == Dest.Feed) {
+            val now = System.currentTimeMillis()
+            if (now - lastBackAt < 2000L) {
+                (context as? Activity)?.finish()
+            } else {
+                lastBackAt = now
+                Toast.makeText(context, "\u518d\u6309\u4e00\u6b21\u9000\u51fa", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         val current = stack.lastOrNull()
         when (current) {
             is Route.Thread -> ThreadDetailScreen(
@@ -209,6 +229,21 @@ fun MceApp() {
             is Route.Favorites -> FavoritesScreen(
                 onMenu = ::openDrawer,
                 onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+            )
+
+            is Route.ProfileEdit -> ProfileEditScreen(
+                onMenu = ::openDrawer,
+                onSaved = { dataVersion += 1; pop() },
+            )
+
+            is Route.GenericList -> GenericListScreen(
+                title = current.title,
+                path = current.path,
+                onMenu = ::openDrawer,
+                onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+                onOpenUser = { uid, title ->
+                    push(Route.Page("$BASE/home.php?mod=space&uid=$uid", title))
+                },
             )
 
             is Route.Notices -> NoticesScreen(
@@ -252,6 +287,10 @@ fun MceApp() {
                             url.contains("do=thread") -> push(Route.MyThreads)
                             url.contains("do=favorite") -> push(Route.Favorites)
                             url.contains("do=notice") -> push(Route.Notices)
+                            url.contains("spacecp") && url.contains("ac=profile") -> push(Route.ProfileEdit)
+                            url.contains("do=medal") -> push(Route.GenericList("我的勋章", "home.php?mod=space&do=medal"))
+                            url.contains("do=friend") -> push(Route.GenericList("我的好友", "home.php?mod=space&do=friend"))
+                            url.contains("mod=magic") -> push(Route.GenericList("道具中心", "home.php?mod=magic"))
                             else -> push(Route.Page(url, url))
                         }
                     },
@@ -268,11 +307,10 @@ fun MceApp() {
                 Dest.Search -> SearchScreen(
                     onMenu = ::openDrawer,
                     onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+                    onOpenUser = { url, title -> push(Route.Page(url, title)) },
                 )
 
-                Dest.Ranklist -> NativePageScreen(
-                    initialUrl = "$BASE/misc.php?mod=ranklist",
-                    fallbackTitle = "排行榜",
+                Dest.Ranklist -> RanklistScreen(
                     onMenu = ::openDrawer,
                     onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
                 )

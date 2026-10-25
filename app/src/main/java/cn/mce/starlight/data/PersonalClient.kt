@@ -71,8 +71,10 @@ object PersonalClient {
                 ?.let { Regex("""[^<]{4,30}""").find(it)?.value?.trim() }
             val noteBlock = li.selectFirst("div.notice_note")
             val note = noteBlock?.text()?.trim()
+            val liHtml = li.html()
             val href = noteBlock?.selectFirst("a[href]")?.attr("href").orEmpty()
             val tid = Regex("""(?:ptid|tid)=(\d+)""").find(href)?.groupValues?.get(1)?.toIntOrNull()
+                ?: Regex("""(?:ptid|tid)=(\d+)""").find(liHtml)?.groupValues?.get(1)?.toIntOrNull()
             val author = noteBlock?.selectFirst("a[href*=space]")?.text()?.trim()
             NoticeItem(avatar, author, time, note, tid)
         }

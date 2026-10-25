@@ -163,7 +163,10 @@ fun ProfileScreen(
                                     .padding(vertical = 14.dp),
                                 horizontalArrangement = Arrangement.SpaceEvenly,
                             ) {
-                                p.stats.entries.take(3).forEach { (label, value) ->
+                                val preferred = listOf("主题", "回帖", "积分")
+                                val ordered = preferred.mapNotNull { key -> p.stats[key]?.let { key to it } }
+                                    .ifEmpty { p.stats.entries.take(3).map { it.key to it.value } }
+                                ordered.forEach { (label, value) ->
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text(
                                             value,
@@ -177,6 +180,35 @@ fun ProfileScreen(
                                         )
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    // 常用入口
+                    item {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    RoundedCornerShape(12.dp),
+                                )
+                                .padding(vertical = 4.dp),
+                        ) {
+                            listOf(
+                                "\u7f16\u8f91\u8d44\u6599" to "spacecp&ac=profile",
+                                "\u6211\u7684\u52cb\u7ae0" to "do=medal",
+                                "\u6211\u7684\u597d\u53cb" to "do=friend",
+                                "\u9053\u5177\u4e2d\u5fc3" to "mod=magic",
+                            ).forEach { (label, path) ->
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onOpenPage(path, label) }
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                )
                             }
                         }
                     }
@@ -211,7 +243,7 @@ fun ProfileScreen(
 
                     // 入口
                     if (p.entries.isNotEmpty()) {
-                        items(p.entries) { (name, url) ->
+                        items(p.entries.filterNot { it.second.contains("do=thread") || it.second.contains("do=favorite") || it.second.contains("do=notice") || it.second.contains("do=friend") }) { (name, url) ->
                             Text(
                                 name,
                                 style = MaterialTheme.typography.bodyLarge,
