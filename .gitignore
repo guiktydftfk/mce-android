@@ -5,3 +5,10 @@ local.properties
 .idea/
 .DS_Store
 captures/
+
+# 构建与运行产物
+build.log
+test.log
+.kotlin/
+dist/
+*.apk
