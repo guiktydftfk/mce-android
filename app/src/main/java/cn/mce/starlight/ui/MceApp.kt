@@ -58,6 +58,7 @@ fun MceApp() {
     var stack by remember { mutableStateOf(listOf<Route>()) }
     var dataVersion by remember { mutableIntStateOf(0) }
     var showLogin by remember { mutableStateOf(false) }
+    var expandedGroups by remember { mutableStateOf(setOf("全国交流")) }
 
     fun openDrawer() { scope.launch { drawerState.open() } }
     fun closeDrawer() { scope.launch { drawerState.close() } }
@@ -108,13 +109,25 @@ fun MceApp() {
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = 20.dp, top = 6.dp, bottom = 2.dp),
                 )
-                Boards.all.forEach { board ->
-                    val selected = dest == Dest.Feed && stack.firstOrNull()
-                        ?.let { it is Route.Board && it.fid == board.fid } == true
-                    DrawerItem(board.name, selected) {
-                        dest = Dest.Feed
-                        stack = listOf(Route.Board(board.fid, board.name))
-                        closeDrawer()
+                Boards.groups.forEach { (groupName, groupBoards) ->
+                    val expanded = groupName in expandedGroups
+                    DrawerItem(
+                        label = (if (expanded) "\u25be " else "\u25b8 ") + groupName,
+                        selected = false,
+                    ) {
+                        expandedGroups = if (expanded) expandedGroups - groupName
+                        else expandedGroups + groupName
+                    }
+                    if (expanded) {
+                        groupBoards.forEach { board ->
+                            val selected = dest == Dest.Feed && stack.firstOrNull()
+                                ?.let { it is Route.Board && it.fid == board.fid } == true
+                            DrawerItem(label = "    " + board.name, selected = selected) {
+                                dest = Dest.Feed
+                                stack = listOf(Route.Board(board.fid, board.name))
+                                closeDrawer()
+                            }
+                        }
                     }
                 }
 

@@ -25,13 +25,22 @@ class MceApplication : Application(), ImageLoaderFactory {
     override fun newImageLoader(): ImageLoader {
         val cookieInterceptor = Interceptor { chain ->
             val request = chain.request()
-            val cookie = WebCookies.cookieHeader(request.url.toString())
-            val newRequest = if (!cookie.isNullOrBlank() && request.url.host.contains("mce.msi.cn")) {
-                request.newBuilder().header("Cookie", cookie).build()
-            } else {
-                request
+            val isSite = request.url.host.contains("mce.msi.cn")
+            val builder = request.newBuilder()
+            if (isSite) {
+                // 附件图片需要登录态 + Referer，否则服务端可能返回拒绝页
+                WebCookies.cookieHeader(request.url.toString())?.let {
+                    builder.header("Cookie", it)
+                }
+                builder.header("Referer", "https://mce.msi.cn/forum.php")
+                builder.header(
+                    "User-Agent",
+                    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) " +
+                        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 " +
+                        "Mobile/15E148 Safari/604.1",
+                )
             }
-            chain.proceed(newRequest)
+            chain.proceed(builder.build())
         }
 
         val client = OkHttpClient.Builder()

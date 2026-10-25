@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta http-equiv="Cache-control" content="no-cache" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+        <meta name="full-screen" content="yes" />
+    <meta name="x5-fullscreen" content="true" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable"content="no" />
+        <meta name="apple-touch-fullscreen" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="keywords" content="MCE星光班" />
+    <meta name="description" content="MCE星光班（MSI Campus Elite） - 大学生成长社区 ,MCE星光班" />
+    <title>手机版首页</title>
+    <base href="https://mce.msi.cn/" />
+    <link rel="stylesheet" href="template/v2_mbl20121009/touch_plus/css/vtoo.style.css?ZB8" type="text/css" media="all">
+    <link rel="stylesheet" href="template/v2_mbl20121009/touch_plus/css/style.default.css?ZB8" type="text/css" media="all">
+    <link rel="stylesheet" href="data/cache/style_0.css?ZB8" type="text/css" id="cssfile" media="all">    <style type="text/css">.message, .follow_box, .home_mess { font-size:16px;}.mm-menubottom li:after { background-color:#e64346;}.footer li a {color:#999999;}/**页头自定义背景色**/.pg_viewthread .header, .pg_view .header { background-color: #fff; border-bottom: 1px solid #f5f5f5; color:#333; }.pg_viewthread .header .new, .pg_view .header .new { background:#333; }.pg_viewthread .header a, .pg_view .header a { color:#333; }/**页头自定义背景色**/</style>
+    <link rel="apple-touch-icon-precomposed" href="https://mce.msi.cn//template/v2_mbl20121009/touch_plus/image/apple-touch-icon-57x57.png">
+    <link rel="apple-touch-icon-precomposed" sizes="114x114" href="https://mce.msi.cn//template/v2_mbl20121009/touch_plus/image/apple-touch-icon-114x114.png">
+    <link rel="apple-touch-icon-precomposed" sizes="171x171" href="https://mce.msi.cn//template/v2_mbl20121009/touch_plus/image/apple-touch-icon-171x171.png">
+    <script src="template/v2_mbl20121009/touch_plus/js/jquery.min.js?ZB8" type="text/javascript"></script>
+    <script src="template/v2_mbl20121009/touch_plus/js/cookie.min.js?ZB8" type="text/javascript"></script>    <script src="template/v2_mbl20121009/touch_plus/js/lazyload.min.js?ZB8" type="text/javascript"></script>
+    <script type="text/javascript">var STYLEID = '24', STATICURL = 'static/', IMGDIR = 'static/image/common', VERHASH = 'ZB8', charset = 'utf-8', discuz_uid = '0', cookiepre = 'l2ND_2132_', cookiedomain = '', cookiepath = '/', showusercard = '0', attackevasive = '0', disallowfloat = 'login|newthread|viewratings', creditnotice = '1|赞赏值|,2|社区值|,3|活动值|,4|实践值|,5|已使用|,6|职务值|', defaultstyle = '', REPORTURL = 'aHR0cHM6Ly9tY2UubXNpLmNuL3RvdWNoLw==', SITEURL = 'https://mce.msi.cn/', JSPATH = 'data/cache/', language = {'loading':'<i class="rotation"></i>正在加载', 'view_more': '加载更多', 'view_content': '<p>已显示全部内容</p>'};</script>
+    <script src="template/v2_mbl20121009/touch_plus/js/common_SC_UTF8.js?ZB8" type="text/javascript" charset="utf-8"></script>
+</head>
+<body class="nv_portal pg_list p_54">
+<div class="mm-page">
+<div class="content" >
+<style type="text/css">
+.index-content { background:; overflow:hidden; }	
+.header { background: #fff; color: #333; padding-left: 0px; box-shadow:0px 1px 1px rgba(0,0,0,0.03); }
+.header a.vt-menu { color: #666; font-size: 22px; font-weight: 600;}
+.logo { position: absolute; top: 0px; left: 10px; }
+
+/* 搜索 */	
+.topsearch { float: right; display: inline-block; height: 28px; margin: 10px 20px 0px 0px; padding:0px 44px 0px 13px; border-radius:14px; line-height: 29px; font-size: 14px; text-align: left; background:#f4f4f4; color: #999 !important; position: relative; overflow: hidden; }
+.topsearch:after { content: "\e005"; font-family: "vtoo_mobile"; font-size:18px; width: 22px; height: 22px; line-height:22px; text-align:center; color:#999; display: block; position:absolute; right:7px; top:3px; overflow:hidden; }
+
+/* 灯箱 */
+.slide_scroll, .slide_scroll li, .slide_scroll img { height:45vw; }
+.slide_pagination { height:8px; width:100%; padding: 1px 0px; text-align: center; position:absolute; bottom:28px; right:0px; overflow: hidden; }
+.slide_pagination span { display: inline-block; width:8px; height:8px; border-radius:4px; margin:0px 3px; background:rgba(255,255,255,0.4); cursor:pointer; overflow:hidden; }
+.slide_pagination span.swiper-pagination-bullet-active { background: #fff; width:16px; }
+.waves { bottom:-5px; }
+
+/* 菜单 */
+.trmenus { padding: 5px 3px 3px; background: #fff; overflow: hidden; }
+.trmenus li { width: 33.33333333%; float: left; text-align: center; }
+.trmenus li a { display: block; padding: 14px 12px 12px; position: relative; -webkit-tap-highlight-color:rgba(0,0,0,0.05); tap-highlight-color:rgba(0,0,0,0.05); }
+.trmenus li:nth-child(2) a:after, .trmenus li:nth-child(2) a:before { content: ""; width:1px; position: absolute; top: 13px; bottom:14px; background:#f2f2f2; }
+.trmenus li:nth-child(2) a:after { left:0px; } 
+.trmenus li:nth-child(2) a:before { right:0px; } 
+.trmenus li span { height: 24px; line-height: 24px; display: block; font-size: 18px; }
+.trmenus li p { height:20px; line-height: 20px; font-size: 12px; color: #aaa; text-overflow:ellipsis; white-space:nowrap; overflow:hidden; }
+
+/* 快讯 */
+.rollnews_box { height: 28px; line-height: 28px; padding:8px 15px 8px 58px; margin-bottom:12px; border-top: 1px solid #f5f5f5; background:#fff; position: relative; }
+.rollnews_box span { display:block; width: 34px; height:28px; position:absolute; top:8px; left:15px; background: url(./template/v2_mbl20121009/touch_plus/img/news_hot.png) no-repeat 0px 5px; background-size:auto 17px; color: #fff; font-size: 12px; }
+.rollnews_ann { height: 28px; position: relative; overflow:hidden; }
+.rollnews_wrapper { position: relative; width: 100%; height: 100%; z-index: 1; display: -webkit-box; display: -moz-box; display: -ms-flexbox; display: -webkit-flex; display: flex; -webkit-transition-property: -webkit-transform; -moz-transition-property: -moz-transform; -o-transition-property: -o-transform; -ms-transition-property: -ms-transform; transition-property: transform; -webkit-box-sizing: content-box; -moz-box-sizing: content-box; box-sizing: content-box; }
+.rollnews_wrapper li { -webkit-flex-shrink: 0; -ms-flex: 0 0 auto; flex-shrink: 0; width: 100%; height: 100%; position: relative; font-size:14px; }
+.rollnews_wrapper li a { display:block; color: #666; text-overflow:ellipsis; white-space:nowrap; overflow:hidden; }
+.rollnews_wrapper li em { float:right; font-size:12px; color:#bbb; margin-left:18px; }
+.swiper-container-vertical .rollnews_wrapper {-webkit-box-orient: vertical;-moz-box-orient: vertical;-ms-flex-direction: column;-webkit-flex-direction: column;flex-direction: column;}
+
+/* 菜单 */
+.fmenus { margin-bottom: 12px; background: #fff; overflow: hidden; }
+.fmenus li { width: 50%; height: 78px; float: left; border-top: 1px solid #f5f5f5; border-right: 1px solid #f5f5f5; -moz-box-sizing: border-box; -webkit-box-sizing: border-box; box-sizing: border-box; }
+.fmenus li:nth-child(-n+2) { border-top: none; }
+.fmenus li:nth-child(even) { border-right: none; }
+.fmenus li a { display:block; height: 50px; padding: 14px 64px 14px 14px; position: relative; -webkit-tap-highlight-color:rgba(0,0,0,0.05); tap-highlight-color:rgba(0,0,0,0.05); }
+.fmenus li span { display:block; height: 24px; line-height: 24px; font-size: 17px; margin: 5px 0px 1px; }
+.fmenus li p { height:20px; line-height: 20px; font-size: 12px; color: #aaa; text-overflow:ellipsis; white-space:nowrap; overflow:hidden; }
+.fmenus li img { width: 50px; height: 50px; position: absolute; top: 14px; right: 14px; border-radius: 50%; }
+
+    /* app */
+   .recommend { padding:0px 0px 2px; background:#fff; margin-bottom:12px; }
+.recommend ul { padding:0px 13px; overflow:hidden; }
+   .recommend li { height:46px; border-bottom:1px solid #f5f5f5; line-height:46px; font-size:15px; overflow: hidden; }
+   .recommend li:last-child{ border:none; }
+   .recommend li a { display:block; text-overflow:ellipsis; white-space:nowrap; overflow:hidden; }
+   .recommend li .type4 { float:left; display: inline-block; font-size:12px; color:#fff; border-radius:8px 0px; line-height:16px; min-width:18px; text-align:center; margin:14px 12px 0px 2px; background:#e64346;}
+   .recommend li em { float:right; font-size:12px; color:#aaa; margin-left:25px; }
+   .index-title-app { padding:10px 0px; height:28px; line-height:30px; background:#fff; border-bottom:1px solid #f5f5f5; position:relative; overflow:hidden; }
+   .index-title-app .z a { height:28px; font-size: 15px; color: #666; display:inline-block; overflow:hidden; }
+   .index-title-app .z img { height:28px; width:28px; border-radius:50%; margin-right:10px; float:left; }
+   .index-title-app .y .title-app-dl { display:inline-block; padding:0px 10px; margin-top: 1px; height:24px; line-height:26px; border-radius:14px; border:1px solid #e64346; color:#e64346 !important; overflow:hidden;}
+   .app-dl-re { height:40px; padding-top:3px; line-height:40px; text-align:center; }
+   .app-dl-re a { color:#e64346; }
+   .app-dl-re a i { font-size:12px; font-weight:bold; }
+
+   /*加载主题*/	
+.subjects_index3 { padding:15px; border-bottom: 1px solid #f3f3f3; background: #fff; }
+.subjects_index3 a { -webkit-tap-highlight-color:rgba(0,0,0,0.05); tap-highlight-color:rgba(0,0,0,0.05); }
+.subjects_index3 h1 { line-height:24px; font-size: 18px; font-weight: 600; margin-bottom: 10px; }
+.subjects_index3 h1 a { display: inline-block; }
+.subjects_index3 .thmsg { color:#999; margin-bottom: 10px; line-height: 22px; }
+.subjects_index3 .imgbox, .subjects_index3 .mediabox { margin-bottom: 15px; overflow: hidden; }
+.subjects_index3 .imgbox a { display: block; }
+.subjects_index3 .imgbox img { width: 100%; height: 50.6vw; background: #eee; vertical-align: top; }
+.subjects_index3 .mediaplayer_video { height:52.1vw; }
+.subjects_index3 .thatt { height: 18px; line-height: 18px; font-size: 13px; color: #bbb; padding-top: 2px; }
+.subjects_index3 .thatt a { color: #bbb; }	
+.subjects_index3 .thatt span { margin-right: 20px; }
+.subjects_index3 .thatt i { margin-right: 5px; font-weight: 600; position: relative; top: 1px;}
+.author_item { height:30px; padding-left: 40px;  line-height: 30px; position: relative; margin-bottom: 12px; }
+.author_item .avatars { width:30px; height: 30px; }
+.author_item .avatars img { width: 30px; height: 30px; }
+.author_item .author_name { margin-right: 5px; }
+.author_item .thdate { color: #ccc; font-size: 13px; }
+.author_item a.dialog_follow { height: 18px; line-height: 18px; padding:0px; margin-right: -2px; border: none; border-radius: 0px; top: 6px; color: #e64346; }	
+</style>
+
+<script src="./template/v2_mbl20121009/touch_plus/js/swiper.min.js?ZB8" type="text/javascript"></script>
+<style id="diy_style" type="text/css"></style>
+<div class="index-content">
+
+<!--[diy=v2_diy1]--><div id="v2_diy1" class="area"><div id="frameRuUh8s" class="frame move-span cl frame-1"><div id="frameRuUh8s_left" class="column frame-1-c"><div id="frameRuUh8s_left_temp" class="move-span temp"></div><div id="portal_block_1520" class="block move-span"><div id="portal_block_1520_content" class="dxb_bc"><div class="slide_scroll">
+    <ul class="aslide_box"><li class="aslide_item"><a href="forum.php?mod=viewthread&tid=37887"><img src="data/attachment/block/ca/ca97ff2fbf4f96d8be8fe464360d52a0.jpg" width="600" height="270" /></a></li><li class="aslide_item"><a href="forum.php?mod=viewthread&tid=37771"><img src="data/attachment/block/13/13d3a1b9aeb87cff1ec558c7906401e3.jpg" width="600" height="270" /></a></li><li class="aslide_item"><a href="forum.php?mod=viewthread&tid=37521"><img src="data/attachment/block/93/933b70b4a98f5822210d119af6341429.jpg" width="600" height="270" /></a></li><li class="aslide_item"><a href="forum.php?mod=viewthread&tid=37496"><img src="data/attachment/block/88/88087173bcfb2f4cab4be75a462819c1.jpg" width="600" height="270" /></a></li></ul>
+    <div class="slide_pagination"></div>
+<div class="waves"><div class="waves_top"></div><div class="waves_bottom"></div></div>
+</div>
+<script type="text/javascript">
+    var swiperslide = new Swiper('.slide_scroll', {
+        wrapperClass:'aslide_box',
+        slideClass:'aslide_item',
+        pagination:'.slide_pagination',
+        loop:true,
+        autoplay:5000,
+        autoplayDisableOnInteraction:false,
+        grabCursor:true,
+        paginationClickable:true,
+    });
+</script></div></div></div></div></div><!--[/diy]-->
+<!--[diy=v2_diy2]--><div id="v2_diy2" class="area"><div id="framei2Lza1" class="frame move-span cl frame-1"><div id="framei2Lza1_left" class="column frame-1-c"><div id="framei2Lza1_left_temp" class="move-span temp"></div><div id="portal_block_1521" class="block move-span"><div id="portal_block_1521_content" class="dxb_bc"><div class="portal_block_summary"><div class="trmenus">
+    <ul>
+        <li>
+            <a href="portal.php?mod=list&catid=14">
+                <span style="color: #ff5500;">了解星光班</span>
+                <p>团队介绍与活动</p>
+            </a>
+        </li>
+        <li>
+            <a href="portal.php?mod=list&catid=34">
+                <span style="color: #00ceff;">小红龙频道</span>
+                <p>科技数码资讯</p>
+            </a>
+        </li>
+        <li>
+            <a href="https://jinshuju.net/f/ANt59g">
+                <span style="color: #32cc32;">报名表</span>
+                <p>加入星光班</p>
+            </a>
+        </li>
+    </ul>
+</div></div></div></div></div></div></div><!--[/diy]-->
+<!--[diy=v2_diy3]--><div id="v2_diy3" class="area"><div id="frameaYs293" class="frame move-span cl frame-1"><div id="frameaYs293_left" class="column frame-1-c"><div id="frameaYs293_left_temp" class="move-span temp"></div><div id="portal_block_1522" class="block move-span"><div id="portal_block_1522_content" class="dxb_bc"><div class="rollnews_box">
+    <span></span>
+    <div class="rollnews_ann">
+        <ul class="rollnews_wrapper"><li class="rollnews_item"><a href="forum.php?mod=viewthread&tid=14893" title="【有奖任务】为“星”打Call，擦亮星光"><font style="font-weight: 900;color: #009900;">【有奖任务】为“星”打Call，擦亮星光</font></a></li></ul>
+    </div>
+</div>
+<script type="text/javascript">
+    $(function() {
+        var swiper = new Swiper('.rollnews_ann', {
+            wrapperClass:'rollnews_wrapper',
+            slideClass:'rollnews_item',
+            direction: 'vertical',
+            loop:true,
+            autoplay:3000,
+            autoplayDisableOnInteraction:false,
+        });
+    })
+</script>
+</div></div></div></div></div><!--[/diy]-->
+<!--[diy=v2_ad1]--><div id="v2_ad1" class="area"></div><!--[/diy]-->
+<!--[diy=v2_diy4]--><div id="v2_diy4" class="area"><div id="framew11zsG" class="frame move-span cl frame-1"><div id="framew11zsG_left" class="column frame-1-c"><div id="framew11zsG_left_temp" class="move-span temp"></div><div id="portal_block_1523" class="block move-span"><div id="portal_block_1523_content" class="dxb_bc"><div class="portal_block_summary"><div class="fmenus">
+    <ul>
+        <li class="fmenus_item">
+            <a href="forum.php?mod=viewthread&tid=11219">
+                <span style="color: #f69;">常用表单</span>
+                <p>各类申请表</p>
+                <img src="template/v2_mbl20121009/touch_plus/img/2020/sige1.png">
+            </a>
+        </li>
+        <li class="fmenus_item">
+            <a href="home.php?mod=task">
+                <span style="color: #70af18">任务中心</span>
+                <p>多做任务成长快</p>
+                <img src="template/v2_mbl20121009/touch_plus/img/2020/sige2.png">
+            </a>
+        </li>
+        <li class="fmenus_item">
+            <a href="forum.php?mod=viewthread&tid=35668">
+                <span style="color: #429bd7;">近期推荐</span>
+                <p>重要与优质内容推荐</p>
+                <img src="template/v2_mbl20121009/touch_plus/img/2020/sige3.png">
+            </a>
+        </li>
+        <li class="fmenus_item">
+            <a href="plugin.php?id=k_misign:sign">
+                <span style="color: #f90">每日签到</span>
+                <p>签到领取社区奖励</p>
+                <img src="template/v2_mbl20121009/touch_plus/img/2020/sige4.png">
+            </a>
+        </li>
+    </ul>
+</div></div></div></div></div></div></div><!--[/diy]-->
+<!--[diy=v2_ad2]--><div id="v2_ad2" class="area"><div id="frameoeRADA" class="frame move-span cl frame-1"><div id="frameoeRADA_left" class="column frame-1-c"><div id="frameoeRADA_left_temp" class="move-span temp"></div><div id="portal_block_1525" class="block move-span"><div id="portal_block_1525_content" class="dxb_bc"></div></div></div></div></div><!--[/diy]-->
+<!--[diy=v2_diy5]--><div id="v2_diy5" class="area"><div id="frameo43096" class="frame move-span cl frame-1"><div id="frameo43096_left" class="column frame-1-c"><div id="frameo43096_left_temp" class="move-span temp"></div><div id="portal_block_1524" class="block move-span"><div id="portal_block_1524_content" class="dxb_bc"><div class="recommend">
+    <ul id="list1">
+    <div class="index-title-app">
+    <span class="z"><a href="misc.php?mod=tag"><img src="template/v2_mbl20121009/touch_plus/img/2020/tuijian1.png" /><em>社区头条推荐</em></a></span>
+    <span class="y"><a href="misc.php?mod=tag" class="title-app-dl">查看更多</a></span>
+    </div></ul>
+</div>
+</div></div></div></div></div><!--[/diy]-->
+<!--[diy=v2_ad3]--><div id="v2_ad3" class="area"></div><!--[/diy]-->
+<!--[diy=v2_diy6]--><div id="v2_diy6" class="area"></div><!--[/diy]-->
+<!--[diy=v2_diy7]--><div id="v2_diy7" class="area"></div><!--[/diy]-->
+<ul id="alist" class="pagelist">        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4397&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4397&size=middle" /></a>
+<a href="home.php?mod=space&uid=4397&do=profile" class="author_name">纪念的念碑</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 4&nbsp;分钟前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4397&amp;handlekey=addfriendhk_4397" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38034">哑铃凳上的沉思者</a></h1>
+ <div class="thmsg">感情上也适用哦，小伙子and小姑娘们</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38034">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185949&size=600x330&key=4cabc5837b5e7533&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38034" class="go_reply"><i class="vt-reply"></i>0</a></span>
+ <span><i class="vt-eye"></i>0</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=2" class="y"># 综合交流 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4467&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4467&size=middle" /></a>
+<a href="home.php?mod=space&uid=4467&do=profile" class="author_name">潞绘</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 17&nbsp;分钟前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4467&amp;handlekey=addfriendhk_4467" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38033">随便发一下</a></h1>
+ <div class="thmsg">春有百花秋有月，夏有凉风冬有雪，若无闲事挂心头，便是人间极好时
+虚荣心这种东西，你得有实力 ...</div>	
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38033#ap_reply" class="go_reply"><i class="vt-reply"></i>2</a></span>
+ <span><i class="vt-eye"></i>6</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=2" class="y"># 综合交流 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4329&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4329&size=middle" /></a>
+<a href="home.php?mod=space&uid=4329&do=profile" class="author_name">zxr</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 21&nbsp;分钟前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4329&amp;handlekey=addfriendhk_4329" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38032">突然好想谈个恋爱了</a></h1>
+ 	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38032">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185947&size=600x330&key=532181fa8171604e&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38032#ap_reply" class="go_reply"><i class="vt-reply"></i>4</a></span>
+ <span><i class="vt-eye"></i>19</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=176" class="y"># 淮安 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4338&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4338&size=middle" /></a>
+<a href="home.php?mod=space&uid=4338&do=profile" class="author_name">大大小小</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 22&nbsp;分钟前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4338&amp;handlekey=addfriendhk_4338" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38031">……</a></h1>
+ <div class="thmsg">今晚晚自习摸鱼，快下晚自习了才想起来作业没写
+
+
+直接被迫加班……
+在教室独斗二十分钟后回答寝 ...</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38031">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185944&size=600x330&key=f6f0367f105b2b2e&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38031#ap_reply" class="go_reply"><i class="vt-reply"></i>3</a></span>
+ <span><i class="vt-eye"></i>6</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=2" class="y"># 综合交流 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4321&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4321&size=middle" /></a>
+<a href="home.php?mod=space&uid=4321&do=profile" class="author_name">门捷列帅</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 2&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4321&amp;handlekey=addfriendhk_4321" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38030">晚自习还要收手机</a></h1>
+ <div class="thmsg">怎么只有生科院的学生收手机吗😡</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38030">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185942&size=600x330&key=6a3ac5afe33cf948&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38030#ap_reply" class="go_reply"><i class="vt-reply"></i>6</a></span>
+ <span><i class="vt-eye"></i>23</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=176" class="y"># 淮安 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4535&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4535&size=middle" /></a>
+<a href="home.php?mod=space&uid=4535&do=profile" class="author_name">负青山</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 2&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4535&amp;handlekey=addfriendhk_4535" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38029">学校</a></h1>
+ <div class="thmsg">学校啥饭好吃😋</div>	
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38029#ap_reply" class="go_reply"><i class="vt-reply"></i>2</a></span>
+ <span><i class="vt-eye"></i>33</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=2" class="y"># 综合交流 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4535&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4535&size=middle" /></a>
+<a href="home.php?mod=space&uid=4535&do=profile" class="author_name">负青山</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 2&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4535&amp;handlekey=addfriendhk_4535" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38028">日常</a></h1>
+ <div class="thmsg">学校没有牛排饭了吗</div>	
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38028" class="go_reply"><i class="vt-reply"></i>0</a></span>
+ <span><i class="vt-eye"></i>0</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=2" class="y"># 综合交流 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4559&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4559&size=middle" /></a>
+<a href="home.php?mod=space&uid=4559&do=profile" class="author_name">lucking</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 2&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4559&amp;handlekey=addfriendhk_4559" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38027">加入星光大家庭</a></h1>
+ <div class="thmsg">╥﹏╥</div>	
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38027#ap_reply" class="go_reply"><i class="vt-reply"></i>4</a></span>
+ <span><i class="vt-eye"></i>13</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=73" class="y"># 沧州 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4556&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4556&size=middle" /></a>
+<a href="home.php?mod=space&uid=4556&do=profile" class="author_name">无忧无虑</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 2&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4556&amp;handlekey=addfriendhk_4556" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38026">新人报道</a></h1>
+ <div class="thmsg">学校的猫</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38026">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185941&size=600x330&key=5e8764df63f98450&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38026#ap_reply" class="go_reply"><i class="vt-reply"></i>5</a></span>
+ <span><i class="vt-eye"></i>18</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=130" class="y"># 新星报到厅 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4557&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4557&size=middle" /></a>
+<a href="home.php?mod=space&uid=4557&do=profile" class="author_name">小攸.</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 3&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4557&amp;handlekey=addfriendhk_4557" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38025">新生报到</a></h1>
+ <div class="thmsg">新生前来报到</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38025">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185939&size=600x330&key=bf2a12c968123d11&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38025#ap_reply" class="go_reply"><i class="vt-reply"></i>10</a></span>
+ <span><i class="vt-eye"></i>26</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=130" class="y"># 新星报到厅 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4563&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4563&size=middle" /></a>
+<a href="home.php?mod=space&uid=4563&do=profile" class="author_name">梨野</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 3&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4563&amp;handlekey=addfriendhk_4563" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38024">很高兴加入大家庭</a></h1>
+ <div class="thmsg">很高兴认识大家</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38024">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185938&size=600x330&key=5b17bee817857fa7&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38024#ap_reply" class="go_reply"><i class="vt-reply"></i>10</a></span>
+ <span><i class="vt-eye"></i>20</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=130" class="y"># 新星报到厅 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4553&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4553&size=middle" /></a>
+<a href="home.php?mod=space&uid=4553&do=profile" class="author_name">昕安勿梦</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 3&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4553&amp;handlekey=addfriendhk_4553" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38023">公元2026年10月25日，本人由温柔善良美丽伟大的老虎学姐带入社团</a></h1>
+ <div class="thmsg">公元2026年10月25日，本人由温柔善良美丽伟大的老虎学姐带入社团🌹✨✨✨ ...</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38023">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185936&size=600x330&key=a088509675117755&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38023#ap_reply" class="go_reply"><i class="vt-reply"></i>8</a></span>
+ <span><i class="vt-eye"></i>29</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=186" class="y"># 萌星营地 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4553&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4553&size=middle" /></a>
+<a href="home.php?mod=space&uid=4553&do=profile" class="author_name">昕安勿梦</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 3&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4553&amp;handlekey=addfriendhk_4553" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38022">温柔善良美丽伟大的老虎学姐带入社团</a></h1>
+ <div class="thmsg">公元2026年10月25日，本人由温柔善良美丽伟大的老虎学姐带入社团</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38022">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185935&size=600x330&key=586ee1827cfd3505&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38022#ap_reply" class="go_reply"><i class="vt-reply"></i>6</a></span>
+ <span><i class="vt-eye"></i>24</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=130" class="y"># 新星报到厅 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4562&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4562&size=middle" /></a>
+<a href="home.php?mod=space&uid=4562&do=profile" class="author_name">沧海lsc</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 3&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4562&amp;handlekey=addfriendhk_4562" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38021">大家好</a></h1>
+ <div class="thmsg">大家晚上好</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38021">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185932&size=600x330&key=ee69f8f038460572&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38021#ap_reply" class="go_reply"><i class="vt-reply"></i>4</a></span>
+ <span><i class="vt-eye"></i>12</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=130" class="y"># 新星报到厅 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4561&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4561&size=middle" /></a>
+<a href="home.php?mod=space&uid=4561&do=profile" class="author_name">白柚</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 3&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4561&amp;handlekey=addfriendhk_4561" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38020">很高兴加入大家</a></h1>
+ <div class="thmsg">这个龙真的很可爱</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38020">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185931&size=600x330&key=7b135bb6e53e3ab9&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38020#ap_reply" class="go_reply"><i class="vt-reply"></i>7</a></span>
+ <span><i class="vt-eye"></i>14</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=130" class="y"># 新星报到厅 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4560&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4560&size=middle" /></a>
+<a href="home.php?mod=space&uid=4560&do=profile" class="author_name">小小烨</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 3&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4560&amp;handlekey=addfriendhk_4560" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38019">111</a></h1>
+ <div class="thmsg">hello大家好啊，也是来到星光班了</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38019">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185930&size=600x330&key=48a494f72a94642f&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38019#ap_reply" class="go_reply"><i class="vt-reply"></i>5</a></span>
+ <span><i class="vt-eye"></i>13</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=130" class="y"># 新星报到厅 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4559&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4559&size=middle" /></a>
+<a href="home.php?mod=space&uid=4559&do=profile" class="author_name">lucking</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 3&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4559&amp;handlekey=addfriendhk_4559" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38018">星光班新生报到</a></h1>
+ <div class="thmsg">星光班</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38018">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185928&size=600x330&key=da915d12b851d996&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38018#ap_reply" class="go_reply"><i class="vt-reply"></i>3</a></span>
+ <span><i class="vt-eye"></i>7</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=130" class="y"># 新星报到厅 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4287&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4287&size=middle" /></a>
+<a href="home.php?mod=space&uid=4287&do=profile" class="author_name">Ray_Ban</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 3&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4287&amp;handlekey=addfriendhk_4287" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38017">报道</a></h1>
+ <div class="thmsg">报道</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38017">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185927&size=600x330&key=29700024f99bbc0d&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38017#ap_reply" class="go_reply"><i class="vt-reply"></i>3</a></span>
+ <span><i class="vt-eye"></i>9</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=130" class="y"># 新星报到厅 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4288&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4288&size=middle" /></a>
+<a href="home.php?mod=space&uid=4288&do=profile" class="author_name">昱昱玉玉</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 3&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4288&amp;handlekey=addfriendhk_4288" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38016">很高兴加入星光班</a></h1>
+ <div class="thmsg">大家好</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38016">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185926&size=600x330&key=f56cab45ffc865f1&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38016#ap_reply" class="go_reply"><i class="vt-reply"></i>1</a></span>
+ <span><i class="vt-eye"></i>4</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=130" class="y"># 新星报到厅 #</a>
+ </div>
+
+    </li>
+        
+    <li class="subjects_index3">
+ <div class="author_item">
+<a href="home.php?mod=space&uid=4286&do=profile" class="avatars"><img src="https://mce.msi.cn/uc_server/avatar.php?uid=4286&size=middle" /></a>
+<a href="home.php?mod=space&uid=4286&do=profile" class="author_name">复古风</a>
+<span class="thdate">&#x53D1;&#x8868;&#x4E8E; 3&nbsp;小时前</span>
+<a href="home.php?mod=spacecp&amp;ac=friend&amp;op=add&amp;uid=4286&amp;handlekey=addfriendhk_4286" class="dialog_follow">关注</a>
+ </div>		
+ <h1><a href="forum.php?mod=viewthread&amp;tid=38015">加入星光班大家庭</a></h1>
+ <div class="thmsg">加入这个大家庭</div>	
+  <div class="imgbox">
+ <a href="forum.php?mod=viewthread&amp;tid=38015">
+   <img class="lazys" src="static/image/common/none.gif" data-src="forum.php?mod=image&aid=185925&size=600x330&key=7533e2591005b138&?ZB8" />
+  </a>
+ </div>
+  <div class="thatt">
+  <span><i class="vt-fav"></i>0</span>
+  <span><a href="forum.php?mod=viewthread&amp;tid=38015#ap_reply" class="go_reply"><i class="vt-reply"></i>4</a></span>
+ <span><i class="vt-eye"></i>11</span>
+ <a href="forum.php?mod=forumdisplay&amp;fid=130" class="y"># 新星报到厅 #</a>
+ </div>
+
+    </li>
+</ul>
+<a href="https://mce.msi.cn/touch/" class="morelink" data-num="46-1"><span>加载更多</span></a>
+<script src="./template/v2_mbl20121009/touch_plus/js/ajaxpage.js?ZB8" type="text/javascript"></script>
+<!--[diy=v2_diy11]--><div id="v2_diy11" class="area"></div><!--[/diy]-->
+</div>
+
+</div>
+<div id="mask" style="display:none;"></div>
+</div>
+
+<footer>
+    <div class="footer">
+                <ul>
+            
+
+<li class="onindexs"><a href="forum.php"><i class="vt-mhome fz2"></i>首页</a></li>
+
+            
+
+<li><a href="forum.php?forumlist=1"><i class="vt-mforum fz2"></i>社区</a></li>
+
+            
+<li><div class="btn_plus btn_pop"><a href="javascript:;" class="sstbg"><i class="vt-mcube"></i></a></div></li>
+            
+
+<li><a href="forum.php?mod=guide&amp;view=newthread"><i class="vt-mfind fz2"></i>发现</a></li>
+
+            
+
+<li>
+    
+    <a href="member.php?mod=logging&amp;action=login"><i class="vt-mmuser fz2"></i>登录</a>
+    
+</li>
+
+        </ul>
+                    </div>
+</footer>
+<div class="menus_popup">
+        <ul class="menus_popup_link">
+        <li><a href="forum.php?mod=misc&action=nav" class="popurlstyle_0"><img src="template/v2_mbl20121009/touch_plus/image/popmenu_img/a.png?ZB8" /><span style="color:#f30;">发新帖</span></a></li><li><a href="forum.php?mod=guide&view=sofa" class="popurlstyle_1"><img src="template/v2_mbl20121009/touch_plus/image/popmenu_img/b.png?ZB8" /><span>抢沙发</span></a></li><li><a href="https://jinshuju.net/f/wu5hG4" class="popurlstyle_2"><img src="template/v2_mbl20121009/touch_plus/image/popmenu_img/e.png?ZB8" /><span style="color:#3c9d40;">来打Call</span></a></li><li><a href="plugin.php?id=k_misign:sign" class="popurlstyle_3"><img src="template/v2_mbl20121009/touch_plus/image/popmenu_img/c.png?ZB8" /><span style="color:#71A127;">去签到</span></a></li><li><a href="home.php?mod=spacecp&ac=credit" class="popurlstyle_4"><img src="template/v2_mbl20121009/touch_plus/image/popmenu_img/d.png?ZB8" /><span style="color:#71A127;">查积分</span></a></li>    </ul>
+    <div class="menus_popup_close"><i class="vt-menudown"></i></div>
+</div>
+<div class="close_p"></div>
+<script type="text/javascript">
+    $(document).ready(function(){
+        $('.btn_pop').click(function(){
+            $('.menus_popup').slideToggle();
+            $('.close_p').delay(300).fadeIn();
+        });
+        $('.close_p, .menus_popup_close').click(function(){
+            $('.menus_popup').slideToggle();
+            $('.close_p').hide();
+        });
+    });
+</script>
+<a href="javascript:;" class="mm-openmenu scroll_openmenu"></a>
+<style type="text/css">.scroll_plus { bottom: 127px; }</style>
+<div id="navright">
+<nav class="mm-menu mm-slideout">
+<div class="sidemenuscroll">
+<div class="sideuser sd0">
+<a href="member.php?mod=logging&amp;action=login" class="sidelogin">登录/注册</a>
+<div class="waves"></div>
+<div class="side_bgcover"></div>
+</div>
+<div class="sidesearch mtn">
+<form id="mod_thread" method="post" action="search.php?searchsubmit=yes" accept-charset="utf-8">
+<input type="hidden" id="mod_thread" name="mod" value="forum" checked="checked" />
+<input type="hidden" value="yes" name="searchsubmit">
+<input type="text" name="srchtxt" id="scbar_txt" value="" autocomplete="off" />
+<button type="submit" name="searchsubmit" id="scbar_btn" value="true" ></button>
+</form>
+</div>
+<div class="sidemenu"><ul><li><a href="touch" class="urlstyle_0" style="color:#f30;"><i style="background-image: url(template/v2_mbl20121009/touch_plus/image/side_img/home.png?ZB8);"></i>首页</a></li><li><a href="forum.php?forumlist=1" class="urlstyle_1" style="color:#f90;"><i style="background-image: url(template/v2_mbl20121009/touch_plus/image/side_img/forum.png?ZB8);"></i>社区</a></li><li><a href="forum.php?mod=guide&view=newthread" class="urlstyle_2"><i style="background-image: url(template/v2_mbl20121009/touch_plus/image/side_img/guide.png?ZB8);"></i>发现</a></li><li><a href="misc.php?mod=tag" class="urlstyle_3" style="color:#71A127;"><i style="background-image: url(template/v2_mbl20121009/touch_plus/image/side_img/tag.png?ZB8);"></i>标签</a></li></ul></div>
+</div>
+</nav>
+<div class="mm-menubottom">
+<ul>
+<li id="style_99" data-color="#222222"></li>
+<li id="style_0" data-color="#e64346" class="on"></li>
+<li id="style_1" data-color="#E64346"></li>
+<li id="style_2" data-color="#FF9501"></li>
+<li id="style_3" data-color="#AAC238"></li>
+<li id="style_4" data-color="#1A497D"></li>
+</ul>
+</div>
+</div>
+<div class="mm-mask"></div>
+<script type="text/javascript">
+    $(document).ready(function(){
+    	//右侧浮动链接初始化变量
+        var web_stop = 0, web_top = 0;        
+        var isScrolling = false;
+        
+        //图片懒加载
+        $("img.lazys").lazyload();
+
+        //处理侧栏导航
+        $('body').prepend($('#navright'));
+        $('.mm-menu, .mm-mask').height($(window).height() + 100);
+        $('.mm-openmenu').click(function() {
+            $('body').addClass('mm-opening');
+            $('.mm-mask').delay(300).fadeIn();
+        });
+        $('.mm-mask').click(function() {
+            $('body').removeClass('mm-opening');
+            $(this).hide();
+        });
+        
+        //用户自定义风格
+        $('.mm-menubottom li').click(function() {
+            var styleID = $(this).attr('id');
+            var colorID = $(this).data('color');
+            switchSkin(styleID, colorID, 1)
+        });
+        var styleID = $.cookie('styleID');
+        if (styleID) {
+            switchSkin(styleID, 0, 0)
+        };
+                        
+        //页眉浮动功能
+        $(window).scroll(function(){
+            var bnerheight = $('.hideheader').outerHeight();
+            var coverheight = $('.sortrollheight').outerHeight()+0;
+            if( bnerheight > 0){
+                coverheight = coverheight-($('.header').height());
+            };
+            if($(window).scrollTop() > coverheight){
+                $('.sortmenus').addClass('sortmenu_top');
+            }else{
+                $('.sortmenus').removeClass('sortmenu_top');
+            }
+        });
+                
+        //右侧浮动链接
+        $(window).scroll(function() {
+            if (!isScrolling) {            	
+                if ($(window).scrollTop() > 80) {
+                	web_stop = $(window).scrollTop();
+                    if (web_top <= web_stop) {
+                    	handleScrollClass(true);
+                    } else {
+                    	handleScrollClass(false);
+                    }
+                } else {
+                	handleScrollClass(false);
+                }
+                web_top = web_stop
+            }
+        });
+        
+    });
+    
+    //自定义风格函数
+    function switchSkin(s, c, i) {
+        $('#' + s).addClass('on').siblings().removeClass('on');
+        if (i == 1) {
+            var cssHref = 'template/v2_mbl20121009/touch_plus/css/diy/' + s + '.css';
+            var defaultcssHref = 'data/cache/' + s + '.css';
+            if (s == 'style_0') {
+                $('#cssfile').attr('href', defaultcssHref)
+            } else {
+                $('#cssfile').attr('href', cssHref)
+            }
+            $.cookie('styleID', s, {
+                path: '/',
+                expires: 30
+            });
+            $.cookie('colorID', c, {
+                path: '/',
+                expires: 30
+            })
+        }
+    }
+    
+    //右侧浮动链接处理函数
+    function handleScrollClass(shouldAdd){
+    	$('.scroll_plus,.scroll_openmenu').toggleClass('scroll_hide',shouldAdd);
+    }
+    </script>
+
+</body>
+</html>

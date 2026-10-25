@@ -87,6 +87,7 @@ fun ThreadListScreen(
     var filter by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
 
+
     suspend fun loadFirst() {
         runCatching { loader(1, filter) }
             .onSuccess {
@@ -116,6 +117,18 @@ fun ThreadListScreen(
                 }
             }
         loadingMore = false
+    }
+    // 刷新时保持当前滚动位置（不回顶）
+    fun refreshKeepPosition() {
+        if (refreshing) return
+        val index = listState.firstVisibleItemIndex
+        val offset = listState.firstVisibleItemScrollOffset
+        refreshing = true
+        scope.launch {
+            loadFirst()
+            runCatching { listState.scrollToItem(index, offset) }
+            refreshing = false
+        }
     }
 
     LaunchedEffect(title, reloadKey, filter) {
@@ -155,13 +168,7 @@ fun ThreadListScreen(
 
             is ListState.Content -> PullToRefreshBox(
                 isRefreshing = refreshing,
-                onRefresh = {
-                    refreshing = true
-                    scope.launch {
-                        loadFirst()
-                        refreshing = false
-                    }
-                },
+                onRefresh = { refreshKeepPosition() },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 LazyColumn(
@@ -251,15 +258,7 @@ fun ThreadListScreen(
         }
 
         DraggableRefreshFab(
-            onClick = {
-                if (!refreshing) {
-                    refreshing = true
-                    scope.launch {
-                        loadFirst()
-                        refreshing = false
-                    }
-                }
-            },
+            onClick = { refreshKeepPosition() },
             modifier = Modifier.align(Alignment.BottomEnd),
         )
     }
