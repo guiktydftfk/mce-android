@@ -43,8 +43,12 @@ class MceApplication : Application(), ImageLoaderFactory {
             chain.proceed(builder.build())
         }
 
+        // 网络拦截器会在每次重定向时重新加头（附件图常 301/302 跳转）
         val client = OkHttpClient.Builder()
             .addInterceptor(cookieInterceptor)
+            .addNetworkInterceptor(cookieInterceptor)
+            .followRedirects(true)
+            .followSslRedirects(true)
             .build()
 
         return ImageLoader.Builder(this)

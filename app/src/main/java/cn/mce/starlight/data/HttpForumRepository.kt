@@ -38,10 +38,11 @@ class HttpForumRepository(
             MobileForumParser.parse(fetch(url), url, page)
         }
 
-    override suspend fun loadGuide(page: Int): ForumPage = withContext(Dispatchers.IO) {
-        val url = "$baseHost/forum.php?mod=guide&view=newthread&page=$page"
-        MobileForumParser.parse(fetch(url), url, page)
-    }
+    override suspend fun loadGuide(view: String, page: Int): ForumPage =
+        withContext(Dispatchers.IO) {
+            val url = "$baseHost/forum.php?mod=guide&view=$view&page=$page"
+            MobileForumParser.parse(fetch(url), url, page)
+        }
 
     override suspend fun loadThreadDetail(tid: Int, page: Int): ThreadDetail =
         withContext(Dispatchers.IO) {

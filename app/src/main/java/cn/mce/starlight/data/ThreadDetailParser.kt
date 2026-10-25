@@ -3,17 +3,17 @@ package cn.mce.starlight.data
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import org.jsoup.nodes.Node
+import org.jsoup.nodes.TextNode
 
 /**
- * 帖子详情解析器（Discuz 触屏模板）。
+ * Thread detail parser (Discuz touch template).
  *
- * 实测要点：
- *  - 楼层：div.plc[id=pid<数字>]
- *  - 作者：span.view_author > a ；时间：span.datelinetimes
- *  - 图片：正文里的附件是**链接**（forum.php?mod=attachment&aid=...）
- *          以及懒加载 <img file=/zoomfile=/data-src=...>
- *  - 回复表单：forum.php?mod=post&action=reply&fid=53&tid=...
- *  - 打赏：div.view_reward（打赏人数）
+ * Image rules learned from a working HarmonyOS client:
+ *  - lazy images: real url is in data-src / file / zoomfile (src is a 1x1 placeholder)
+ *  - attachments may only exist as links: <a href="data/attachment/.../x.jpg">点击查看</a>
+ *    or <a href="forum.php?mod=attachment&aid=..">x.png</a> or mod=image
+ *  - smilies / none.gif / filetype icons are not content images
  */
 object ThreadDetailParser {
 
@@ -39,8 +39,7 @@ object ThreadDetailParser {
             ?: emptyList()
 
         val posts = blocks.mapNotNull { block ->
-            val index = blocks.indexOf(block)
-            parsePost(block, index, doc)
+            parsePost(block, blocks.indexOf(block))
         }
 
         val fid = Regex("""action=reply&(?:amp;)?fid=(\d+)""").find(html)
@@ -57,19 +56,15 @@ object ThreadDetailParser {
             replies = null,
             posts = posts,
             page = page,
-            hasNextPage = doc.select("a").any { it.text().contains("下一页") },
+            hasNextPage = doc.select("a").any { it.text().contains("\u4e0b\u4e00\u9875") },
             fid = fid,
-            formhash = Regex("""name="formhash"\s+value="([a-z0-9]+)"""")
-                .find(html)?.groupValues?.get(1),
+            formhash = Regex("""name="formhash"\s+value="([a-z0-9]+)"""").find(html)?.groupValues?.get(1),
             rewardCount = rewardCount,
-            rewardUrl = firstPid?.let {
-                "$baseUrl".substringBefore("forum.php") +
-                    "forum.php?mod=misc&action=viewratings&tid=$tid&pid=$it"
-            },
+            rewardUrl = firstPid?.let { "forum.php?mod=misc&action=viewratings&tid=$tid&pid=$it" },
         )
     }
 
-    private fun parsePost(el: Element, index: Int, doc: Document): Post? {
+    private fun parsePost(el: Element, index: Int): Post? {
         val pid = pidRegex.find(el.id())?.groupValues?.get(1)?.toIntOrNull() ?: (index + 1)
 
         val authi = el.selectFirst("div.view_authi")
@@ -78,7 +73,7 @@ object ThreadDetailParser {
 
         val author = authi?.selectFirst("span.view_author a")?.text()?.trim()
             ?: authi?.select("a[href*=space]")?.firstOrNull { it.text().isNotBlank() }?.text()?.trim()
-            ?: "匿名"
+            ?: "\u533f\u540d"
 
         val avatar = authi?.selectFirst("a.avatars img, img")?.attr("src")
             ?.takeIf { it.isNotBlank() }?.let(::absolutize)
@@ -86,7 +81,7 @@ object ThreadDetailParser {
         val message = el.selectFirst("div.message") ?: el.selectFirst(".message")
 
         val contentHtml = message?.html().orEmpty()
-        val contentText = message?.text()?.trim().orEmpty()
+        val contentText = message?.let { htmlToText(it) }.orEmpty()
 
         val date = el.selectFirst("span.datelinetimes")?.text()?.trim()
             ?: authi?.selectFirst("span.datelinetimes")?.text()?.trim()
@@ -98,47 +93,85 @@ object ThreadDetailParser {
             contentHtml = contentHtml,
             contentText = contentText,
             images = message?.let { collectImages(it) }.orEmpty(),
-            floorLabel = if (index == 0) "楼主" else "${index + 1}楼",
+            floorLabel = if (index == 0) "\u697c\u4e3b" else "${index + 1}\u697c",
             dateText = date,
             isOp = index == 0,
         )
     }
 
-    /** 收集正文图片：懒加载属性 + 附件链接 */
+    /** Collect content images (lazy attrs + attachment links + data/attachment links). */
     fun collectImages(root: Element): List<String> {
         val result = LinkedHashSet<String>()
 
         root.select("img").forEach { img ->
-            val candidate = sequenceOf("file", "zoomfile", "data-src", "data-original", "src")
-                .map { it to img.attr(it) }
-                .firstOrNull { (_, v) ->
+            val candidate = sequenceOf("zoomfile", "file", "data-src", "data-original", "src")
+                .map { img.attr(it) }
+                .firstOrNull { v ->
                     v.isNotBlank() &&
                         !v.contains("avatar.php") &&
                         !v.contains("filetype/") &&
                         !v.contains("smiley") &&
-                        !v.contains("common/none") &&
+                        !v.contains("none.gif") &&
                         !v.startsWith("static/image")
                 }
-            candidate?.let { (_, v) -> result.add(absolutize(decode(v))) }
+            candidate?.let { result.add(absolutize(it.replace("&amp;", "&"))) }
         }
 
-        root.select("a[href*=mod=attachment]").forEach { a ->
-            val href = a.attr("href")
-            val text = a.text()
-            val looksImage = imageExtRegex.containsMatchIn(text) || imageExtRegex.containsMatchIn(href)
-            // 附件常以「图标 + 链接」呈现；图标为 image.gif 即为图片附件
-            val hasImageIcon = a.parents().any { parent ->
-                parent.selectFirst("img[src*=filetype/image]") != null
-            } || a.selectFirst("img[src*=filetype/image]") != null
-            if (looksImage || hasImageIcon) {
-                result.add(absolutize(decode(href)))
+        // Attachment links: href may be data/attachment/... , mod=attachment, mod=image
+        root.select("a[href]").forEach { a ->
+            val href = a.attr("href").replace("&amp;", "&")
+            val label = a.text().trim()
+
+            val isInternalAttachment = href.contains("data/attachment") ||
+                href.contains("mod=attachment") ||
+                href.contains("mod=image")
+            if (!isInternalAttachment) return@forEach
+
+            val hrefIsImage = imageExtRegex.containsMatchIn(href)
+            val labelIsImage = imageExtRegex.containsMatchIn(label)
+            val hasImageIcon = a.selectFirst("img[src*=filetype/image]") != null ||
+                a.parents().any { it.selectFirst("img[src*=filetype/image]") != null }
+
+            if (hrefIsImage || labelIsImage || hasImageIcon) {
+                result.add(absolutize(href))
             }
         }
 
         return result.toList()
     }
 
-    private fun decode(s: String): String = s.replace("&amp;", "&")
+    /** Convert message HTML into readable text, keeping line breaks. */
+    private fun htmlToText(element: Element): String {
+        val sb = StringBuilder()
+
+        fun walk(node: Node) {
+            when (node) {
+                is TextNode -> sb.append(node.text())
+                is Element -> {
+                    val tag = node.tagName().lowercase()
+                    when (tag) {
+                        "br" -> { sb.append('\n'); return }
+                        "img" -> return
+                        "p", "div", "li", "tr", "h1", "h2", "h3", "h4", "blockquote" -> {
+                            sb.append('\n')
+                            node.childNodes().forEach(::walk)
+                            sb.append('\n')
+                            return
+                        }
+                        else -> node.childNodes().forEach(::walk)
+                    }
+                }
+                else -> {}
+            }
+        }
+
+        element.childNodes().forEach(::walk)
+        return sb.toString()
+            .replace("\u00a0", " ")
+            .replace(Regex("""[ \t]+\n"""), "\n")
+            .replace(Regex("""\n{3,}"""), "\n\n")
+            .trim()
+    }
 
     private fun absolutize(src: String): String = when {
         src.startsWith("//") -> "https:$src"

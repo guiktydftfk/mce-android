@@ -19,6 +19,8 @@ data class ThreadSummary(
     val replies: Int?,
     val metaText: String?,
     val typeLabel: String?,
+    val summary: String? = null,
+    val forumName: String? = null,
 )
 
 /** 列表页 */
@@ -60,6 +62,6 @@ data class ThreadDetail(
 interface ForumRepository {
     suspend fun loadBoards(): List<ForumBoard>
     suspend fun loadThreads(fid: Int, page: Int, filter: String? = null): ForumPage
-    suspend fun loadGuide(page: Int): ForumPage
+    suspend fun loadGuide(view: String = "newthread", page: Int = 1): ForumPage
     suspend fun loadThreadDetail(tid: Int, page: Int): ThreadDetail
 }

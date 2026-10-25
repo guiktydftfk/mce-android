@@ -56,6 +56,8 @@ object MobileForumParser {
             replies = meta?.let { replyRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() },
             metaText = meta,
             typeLabel = li.selectFirst("span.threadtypes")?.text()?.trim()?.takeIf { it.isNotBlank() },
+            summary = li.selectFirst("a.th_item p")?.text()?.trim()?.takeIf { it.isNotBlank() },
+            forumName = li.selectFirst("a[href*=forumdisplay]")?.text()?.trim()?.takeIf { it.isNotBlank() },
         )
     }
 

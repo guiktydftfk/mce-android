@@ -11,6 +11,8 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -80,7 +82,7 @@ fun MceApp() {
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
+            ModalDrawerSheet(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Column(Modifier.padding(start = 20.dp, top = 28.dp, bottom = 10.dp)) {
                     Text("MCE星光班", style = MaterialTheme.typography.titleLarge)
                     Text(
@@ -193,12 +195,10 @@ fun MceApp() {
             )
 
             null -> when (dest) {
-                // 沉浸式刷帖：全站最新（不区分板块，按发布时间/最新回复聚合）
-                Dest.Feed -> ThreadListScreen(
-                    title = "全部最新",
+                // 首页动态流（卡片式，借鉴鸿蒙版布局）
+                Dest.Feed -> HomeFeedScreen(
                     onMenu = ::openDrawer,
                     reloadKey = dataVersion,
-                    loader = { page, _ -> HttpForumRepository().loadGuide(page) },
                     onOpenThread = { push(Route.Thread(it.id, it.title)) },
                     onCompose = { push(Route.Compose(null)) },
                 )
