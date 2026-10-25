@@ -86,6 +86,11 @@ gradle :app:testDebugUnitTest
 - 修复：签到统计数值、BBCode 按光标插入、附件图按图标识别
 - 变更：版本号规则改为每 10 进 1；更新记录并入 README
 
+## 0.0.14 · 登录态修复（自建 Cookie 存储）
+
+- 根因：移除 WebView 后 CookieManager 未初始化 → 新增 CookieJar（SharedPreferences）
+- 修复：发帖表单/赞赏/附件图/签到「用户组不允许」等连锁问题
+
 ## 0.0.13 · 发帖页对齐网页版
 
 - 图片上传（`swfupload` + `attachnew[aid]`）、BBCode 工具条、附加选项、回帖奖励、保存草稿
@@ -108,11 +113,6 @@ gradle :app:testDebugUnitTest
 ## 0.0.9 · 沉浸式刷帖改版
 
 - 首页信息流、发帖独立页、楼层回复、评分入口、我的页
-
-## 0.0.14 · 登录态修复（自建 Cookie 存储）
-
-- 根因：移除 WebView 后 CookieManager 未初始化 → 新增 CookieJar（SharedPreferences）
-- 修复：发帖表单/赞赏/附件图/签到「用户组不允许」等连锁问题
 
 ## 0.0.8 · 刷新修复 + 图片修复 + 发帖/回帖
 
