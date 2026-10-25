@@ -49,6 +49,10 @@ data class ThreadDetail(
     val posts: List<Post>,
     val page: Int,
     val hasNextPage: Boolean,
+    val fid: Int? = null,
+    val formhash: String? = null,
+    val rewardCount: Int? = null,
+    val rewardUrl: String? = null,
 )
 
 // ---------------- 协议 ----------------

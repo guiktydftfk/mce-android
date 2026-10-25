@@ -59,6 +59,7 @@ fun MceApp() {
     var stack by remember { mutableStateOf(listOf<Route>()) }
     var dataVersion by remember { mutableIntStateOf(0) }
     var showLogin by remember { mutableStateOf(false) }
+    var composeFid by remember { mutableStateOf<Int?>(null) }
 
     fun openDrawer() { scope.launch { drawerState.open() } }
     fun closeDrawer() { scope.launch { drawerState.close() } }
@@ -140,6 +141,7 @@ fun MceApp() {
                     reloadKey = dataVersion,
                     loader = { HttpForumRepository().loadThreads(2, 1).threads },
                     onOpenThread = { push(Route.Thread(it.id, it.title)) },
+                    onCompose = { composeFid = 2 },
                 )
 
                 Dest.Board53 -> ThreadListScreen(
@@ -148,6 +150,7 @@ fun MceApp() {
                     reloadKey = dataVersion,
                     loader = { HttpForumRepository().loadThreads(53, 1).threads },
                     onOpenThread = { push(Route.Thread(it.id, it.title)) },
+                    onCompose = { composeFid = 53 },
                 )
 
                 Dest.Board121 -> ThreadListScreen(
@@ -156,6 +159,7 @@ fun MceApp() {
                     reloadKey = dataVersion,
                     loader = { HttpForumRepository().loadThreads(121, 1).threads },
                     onOpenThread = { push(Route.Thread(it.id, it.title)) },
+                    onCompose = { composeFid = 121 },
                 )
 
                 Dest.Guide -> ThreadListScreen(
@@ -215,8 +219,20 @@ fun MceApp() {
                 reloadKey = dataVersion,
                 loader = { HttpForumRepository().loadThreads(current.fid, 1).threads },
                 onOpenThread = { push(Route.Thread(it.id, it.title)) },
+                onCompose = { composeFid = current.fid },
             )
         }
+    }
+
+    composeFid?.let { fid ->
+        NewThreadDialog(
+            fid = fid,
+            onDismiss = { composeFid = null },
+            onPosted = {
+                composeFid = null
+                dataVersion += 1
+            },
+        )
     }
 
     if (showLogin) {

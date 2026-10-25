@@ -29,9 +29,23 @@ object SigninClient {
         val doc = Jsoup.parse(html, URL_SIGN)
         val text = doc.text()
 
-        fun pick(label: String): String? =
-            Regex("""$label\s*[:：]?\s*(\d+)""").find(text)?.groupValues?.get(1)
-                ?: Regex("""(\d+)\s*$label""").find(text)?.groupValues?.get(1)
+        // 数值解析：兼容 "今日排名 0" / "今日排名：0" / "0 今日排名" / "第 0 名" 等形态
+        fun pick(label: String): String? {
+            val patterns = listOf(
+                Regex("""$label\s*[:：]?\s*第?\s*(\d+)"""),
+                Regex("""$label[^\d]{0,8}(\d+)"""),
+                Regex("""(\d+)[^\d]{0,8}$label"""),
+            )
+            for (p in patterns) {
+                val m = p.find(text) ?: continue
+                val v = m.groupValues[1]
+                if (v.isNotBlank()) return v
+            }
+            // 兜底：标签所在元素附近找数字
+            val el = doc.select(":containsOwn($label)").firstOrNull() ?: return null
+            val near = (el.parent() ?: el).text().replace(label, "")
+            return Regex("""\d+""").find(near)?.value
+        }
 
         val todayRank = pick("今日排名")
         val continuous = pick("连续签到")

@@ -7,19 +7,18 @@ import org.jsoup.nodes.Element
 /**
  * 帖子详情解析器（Discuz 触屏模板）。
  *
- * 实测结构：
- *   div.plc[id=pid<digits>]
- *     div.view_authi
- *       a.avatars > img                     头像
- *       span.view_author > a                作者
- *       span.datelinetimes                  时间
- *     div.message                           正文（可能含 img）
- *
- * 兼容性：不同模板/权限下节点名可能不同，因此按多种选择器回退。
+ * 实测要点：
+ *  - 楼层：div.plc[id=pid<数字>]
+ *  - 作者：span.view_author > a ；时间：span.datelinetimes
+ *  - 图片：正文里的附件是**链接**（forum.php?mod=attachment&aid=...）
+ *          以及懒加载 <img file=/zoomfile=/data-src=...>
+ *  - 回复表单：forum.php?mod=post&action=reply&fid=53&tid=...
+ *  - 打赏：div.view_reward（打赏人数）
  */
 object ThreadDetailParser {
 
     private val pidRegex = Regex("""pid(\d+)""")
+    private val imageExtRegex = Regex("""\.(jpe?g|png|gif|webp|bmp)(\?|$)""", RegexOption.IGNORE_CASE)
 
     private val blockSelectors = listOf(
         "div.plc[id^=pid]",
@@ -39,23 +38,38 @@ object ThreadDetailParser {
             .firstOrNull { it.isNotEmpty() }
             ?: emptyList()
 
-        val posts = blocks.mapIndexedNotNull { index, el -> parsePost(el, index) }
+        val posts = blocks.mapNotNull { block ->
+            val index = blocks.indexOf(block)
+            parsePost(block, index, doc)
+        }
 
-        val replies = Regex("""(\d+)\s*回复""")
-            .find(doc.selectFirst("span.z")?.text().orEmpty())
+        val fid = Regex("""action=reply&(?:amp;)?fid=(\d+)""").find(html)
             ?.groupValues?.get(1)?.toIntOrNull()
+
+        val rewardCount = doc.selectFirst("div.view_reward .reward_num span")
+            ?.text()?.trim()?.toIntOrNull()
+
+        val firstPid = Regex("""id="pid(\d+)"""").find(html)?.groupValues?.get(1)
 
         return ThreadDetail(
             tid = tid,
             title = title,
-            replies = replies,
+            replies = null,
             posts = posts,
             page = page,
             hasNextPage = doc.select("a").any { it.text().contains("下一页") },
+            fid = fid,
+            formhash = Regex("""name="formhash"\s+value="([a-z0-9]+)"""")
+                .find(html)?.groupValues?.get(1),
+            rewardCount = rewardCount,
+            rewardUrl = firstPid?.let {
+                "$baseUrl".substringBefore("forum.php") +
+                    "forum.php?mod=misc&action=viewratings&tid=$tid&pid=$it"
+            },
         )
     }
 
-    private fun parsePost(el: Element, index: Int): Post? {
+    private fun parsePost(el: Element, index: Int, doc: Document): Post? {
         val pid = pidRegex.find(el.id())?.groupValues?.get(1)?.toIntOrNull() ?: (index + 1)
 
         val authi = el.selectFirst("div.view_authi")
@@ -67,16 +81,12 @@ object ThreadDetailParser {
             ?: "匿名"
 
         val avatar = authi?.selectFirst("a.avatars img, img")?.attr("src")
-            ?.takeIf { it.isNotBlank() }?.let { absolutize(it) }
+            ?.takeIf { it.isNotBlank() }?.let(::absolutize)
 
-        val message = el.selectFirst("div.message")
-            ?: el.selectFirst(".message")
+        val message = el.selectFirst("div.message") ?: el.selectFirst(".message")
 
         val contentHtml = message?.html().orEmpty()
         val contentText = message?.text()?.trim().orEmpty()
-        val images = message?.select("img")?.mapNotNull { img ->
-            img.attr("src").takeIf { it.isNotBlank() }?.let { absolutize(it) }
-        }.orEmpty()
 
         val date = el.selectFirst("span.datelinetimes")?.text()?.trim()
             ?: authi?.selectFirst("span.datelinetimes")?.text()?.trim()
@@ -87,12 +97,43 @@ object ThreadDetailParser {
             avatarUrl = avatar,
             contentHtml = contentHtml,
             contentText = contentText,
-            images = images,
+            images = message?.let { collectImages(it) }.orEmpty(),
             floorLabel = if (index == 0) "楼主" else "${index + 1}楼",
             dateText = date,
             isOp = index == 0,
         )
     }
+
+    /** 收集正文图片：懒加载属性 + 附件链接 */
+    fun collectImages(root: Element): List<String> {
+        val result = LinkedHashSet<String>()
+
+        root.select("img").forEach { img ->
+            val candidate = sequenceOf("file", "zoomfile", "data-src", "data-original", "src")
+                .map { it to img.attr(it) }
+                .firstOrNull { (_, v) ->
+                    v.isNotBlank() &&
+                        !v.contains("avatar.php") &&
+                        !v.contains("filetype/") &&
+                        !v.contains("smiley") &&
+                        !v.contains("common/none") &&
+                        !v.startsWith("static/image")
+                }
+            candidate?.let { (_, v) -> result.add(absolutize(decode(v))) }
+        }
+
+        root.select("a[href*=mod=attachment]").forEach { a ->
+            val href = a.attr("href")
+            val text = a.text()
+            if (imageExtRegex.containsMatchIn(text) || imageExtRegex.containsMatchIn(href)) {
+                result.add(absolutize(decode(href)))
+            }
+        }
+
+        return result.toList()
+    }
+
+    private fun decode(s: String): String = s.replace("&amp;", "&")
 
     private fun absolutize(src: String): String = when {
         src.startsWith("//") -> "https:$src"

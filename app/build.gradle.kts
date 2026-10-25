@@ -58,8 +58,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     // Discuz 移动版 HTML 解析
     implementation("org.jsoup:jsoup:1.18.1")
-    // 头像加载
+    // 头像 / 附件图片加载
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     testImplementation("junit:junit:4.13.2")
 }

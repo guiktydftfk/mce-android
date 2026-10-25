@@ -21,10 +21,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,11 +53,13 @@ private sealed interface ListState {
 }
 
 /**
- * 沉浸式帖子列表（原生）：
- * - 内容铺满全屏，滚动时从悬浮顶栏下方滑过
- * - 打开即自动加载一次；切回前台也会自动刷新
+ * 沉浸式帖子列表：
+ * - 内容铺满全屏，从悬浮顶栏下滑过
+ * - 下拉刷新（PullToRefreshBox）
  * - 右下角可拖动刷新按钮
+ * - 显示作者头像 + 帖子配图（按需抓取首图）
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThreadListScreen(
     title: String,
@@ -64,6 +68,7 @@ fun ThreadListScreen(
     reloadKey: Int = 0,
     loader: suspend () -> List<ThreadSummary>,
     onOpenThread: (ThreadSummary) -> Unit,
+    onCompose: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<ListState>(ListState.Loading) }
@@ -77,7 +82,6 @@ fun ThreadListScreen(
             .onFailure { state = ListState.Error(it.message ?: "加载失败") }
     }
 
-    // 打开页面时自动刷新一次；登录态变化（reloadKey）时重新加载
     LaunchedEffect(title, reloadKey) { load() }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -101,16 +105,28 @@ fun ThreadListScreen(
                 }
             }
 
-            is ListState.Content -> LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    top = topInset + 56.dp,
-                    bottom = 120.dp,
-                ),
+            is ListState.Content -> PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = {
+                    refreshing = true
+                    scope.launch {
+                        load()
+                        refreshing = false
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
             ) {
-                items(s.threads, key = { it.id }) { thread ->
-                    ThreadRow(thread) { onOpenThread(thread) }
-                    HorizontalDivider(Modifier.padding(start = 14.dp))
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        top = topInset + 56.dp,
+                        bottom = 140.dp,
+                    ),
+                ) {
+                    items(s.threads, key = { it.id }) { thread ->
+                        ThreadRow(thread) { onOpenThread(thread) }
+                        HorizontalDivider(Modifier.padding(start = 14.dp))
+                    }
                 }
             }
         }
@@ -119,27 +135,29 @@ fun ThreadListScreen(
             title = title,
             modifier = Modifier.align(Alignment.TopStart),
             onMenu = onMenu,
+            actionLabel = if (onCompose != null) "发帖" else null,
+            onAction = onCompose,
         )
 
         DraggableRefreshFab(
             onClick = {
-                scope.launch {
+                if (!refreshing) {
                     refreshing = true
-                    load()
-                    refreshing = false
+                    scope.launch {
+                        load()
+                        refreshing = false
+                    }
                 }
             },
+            modifier = Modifier.align(Alignment.BottomEnd),
         )
     }
 }
 
 @Composable
 private fun ThreadRow(thread: ThreadSummary, onClick: () -> Unit) {
-    // 帖子配图：列表 HTML 里没有缩略图，按需抓取首图并缓存
     var thumb by remember(thread.id) { mutableStateOf<String?>(null) }
-    LaunchedEffect(thread.id) {
-        thumb = ThreadImageCache.firstImage(thread.id)
-    }
+    LaunchedEffect(thread.id) { thumb = ThreadImageCache.firstImage(thread.id) }
 
     Row(
         Modifier
