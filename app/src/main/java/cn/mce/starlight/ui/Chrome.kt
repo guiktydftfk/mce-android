@@ -47,12 +47,13 @@ fun ImmersiveTopBar(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
+    val surface = MaterialTheme.colorScheme.surface
     Column(
         modifier
             .fillMaxWidth()
             .background(
                 Brush.verticalGradient(
-                    listOf(Color.White, Color.White.copy(alpha = 0.94f), Color.Transparent),
+                    listOf(surface, surface.copy(alpha = 0.94f), Color.Transparent),
                 ),
             )
             .statusBarsPadding(),

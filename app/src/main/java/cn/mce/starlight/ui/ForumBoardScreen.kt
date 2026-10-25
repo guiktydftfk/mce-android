@@ -29,7 +29,6 @@ fun ForumBoardScreen(
     modifier: Modifier = Modifier,
     onMenu: () -> Unit,
     onOpenBoard: (ForumBoard) -> Unit,
-    onOpenWeb: () -> Unit,
 ) {
     val grouped = remember { Boards.all.groupBy { it.group } }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -76,8 +75,6 @@ fun ForumBoardScreen(
             title = "社区论坛",
             modifier = Modifier.align(Alignment.TopStart),
             onMenu = onMenu,
-            actionLabel = "网页版",
-            onAction = onOpenWeb,
         )
     }
 }

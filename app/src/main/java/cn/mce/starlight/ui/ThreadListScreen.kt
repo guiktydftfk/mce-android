@@ -61,7 +61,6 @@ fun ThreadListScreen(
     reloadKey: Int = 0,
     loader: suspend () -> List<ThreadSummary>,
     onOpenThread: (ThreadSummary) -> Unit,
-    onOpenWeb: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<ListState>(ListState.Loading) }
@@ -96,7 +95,6 @@ fun ThreadListScreen(
                             load()
                         }
                     }) { Text("重试") }
-                    TextButton(onClick = onOpenWeb) { Text("改用网页版") }
                 }
             }
 
@@ -118,8 +116,6 @@ fun ThreadListScreen(
             title = title,
             modifier = Modifier.align(Alignment.TopStart),
             onMenu = onMenu,
-            actionLabel = "网页版",
-            onAction = onOpenWeb,
         )
 
         DraggableRefreshFab(

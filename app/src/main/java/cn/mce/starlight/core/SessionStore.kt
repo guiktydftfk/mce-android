@@ -12,13 +12,11 @@ import java.net.URL
 /**
  * 会话层：登录态判定 + 当前用户信息解析。
  *
- * 判定策略（按可靠性排序）：
- *  1. Cookie 里是否出现 auth（Discuz 登录后的鉴权 cookie）——最可靠，与页面跳转无关
- *  2. 页面里是否存在"退出"链接
- *
- * 用户信息：
- *  用户名 ← "退出"链接周围的 `home.php?mod=space&uid=` 链接文字
- *  头像   ← 用解析出的 uid 直接拼 UC 头像地址（避免抓到楼主头像）
+ * 关键修正：
+ *  - 登录态：只认"论坛页里存在退出链接"（Cookie 里 auth 存在但页面没退出链接 → 视为未登录）
+ *  - 用户名：从 **个人资料页 home.php?mod=space&do=profile** 解析
+ *    （登录后该页就是当前用户，不会误取列表里第一个帖子的作者）
+ *  - 头像：从资料页的头像 img 取，或用资料页解析出的 uid 拼 UC 地址
  */
 object SessionStore {
     var isLoggedIn by mutableStateOf(false)
@@ -35,54 +33,59 @@ object SessionStore {
             "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 " +
             "Mobile/15E148 Safari/604.1"
 
+    private const val BASE = "https://mce.msi.cn"
+
     suspend fun probeLoginState() = withContext(Dispatchers.IO) {
         val cookie = WebCookies.cookieHeader()
+        if (cookie.isNullOrBlank()) {
+            clearLocal()
+            return@withContext
+        }
 
-        if (cookie.isNullOrBlank() || !WebCookies.hasAuthCookie()) {
-            isLoggedIn = false
+        // 1) 用论坛首页判断是否登录（"退出"链接是最可靠的证据）
+        val forumHtml = runCatching { fetch("$BASE/forum.php", cookie) }.getOrNull()
+        val loggedIn = forumHtml != null && hasLogoutLink(forumHtml)
+
+        if (!loggedIn) {
+            // Cookie 可能残留；页面没有退出链接就按未登录处理
+            clearLocal()
+            return@withContext
+        }
+        isLoggedIn = true
+
+        // 2) 从个人资料页取当前用户信息
+        val profileHtml = runCatching {
+            fetch("$BASE/home.php?mod=space&do=profile", cookie)
+        }.getOrNull()
+
+        if (profileHtml == null) {
             username = null
             avatarUrl = null
             uid = null
             return@withContext
         }
 
-        val html = runCatching { fetch("https://mce.msi.cn/forum.php", cookie) }.getOrNull()
-        if (html == null) {
-            // 网络异常时退化：只信 Cookie
-            isLoggedIn = true
-            return@withContext
+        val doc = Jsoup.parse(profileHtml, BASE)
+
+        val titleName = Regex("""^(.{1,24}?)的个人资料""")
+            .find(doc.title())?.groupValues?.get(1)?.trim()
+
+        val headingName = doc.select("h1, h2")
+            .map { it.text().trim() }
+            .firstOrNull { it.isNotBlank() && it.length <= 24 && !it.contains("资料") }
+
+        username = titleName ?: headingName
+
+        val avatarImg = doc.selectFirst("img[src*=avatar.php]")?.attr("src")
+            ?.takeIf { it.isNotBlank() }
+            ?.replace("&amp;", "&")
+            ?.let(::absolutize)
+
+        uid = avatarImg?.let {
+            Regex("""uid=(\d+)""").find(it)?.groupValues?.get(1)?.toIntOrNull()
         }
 
-        val doc = Jsoup.parse(html, "https://mce.msi.cn/")
-
-        // 退出链接 = 已登录的硬证据
-        val hasLogout = doc.selectFirst("a[href*=action=logout]") != null
-        isLoggedIn = hasLogout || WebCookies.hasAuthCookie()
-
-        if (!isLoggedIn) {
-            username = null
-            avatarUrl = null
-            uid = null
-            return@withContext
-        }
-
-        // 找当前用户的空间链接（排除公共入口与"空间"字样）
-        val userLink = doc.select("a[href*=home.php?mod=space]")
-            .firstOrNull { a ->
-                val text = a.text().trim()
-                text.isNotBlank() &&
-                    !text.contains("空间") &&
-                    !text.contains("消息") &&
-                    a.attr("href").contains("uid=")
-            }
-        val userUid = userLink?.attr("href")
-            ?.let { Regex("""uid=(\d+)""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
-
-        username = userLink?.text()?.trim()
-        uid = userUid
-        avatarUrl = userUid?.let {
-            "https://mce.msi.cn/uc_server/avatar.php?uid=$it&size=middle"
-        }
+        avatarUrl = avatarImg ?: uid?.let { "$BASE/uc_server/avatar.php?uid=$it&size=middle" }
     }
 
     fun clearLocal() {
@@ -92,10 +95,21 @@ object SessionStore {
         uid = null
     }
 
+    private fun hasLogoutLink(html: String): Boolean =
+        html.contains("action=logout") || html.contains("action=logout")
+
+    private fun absolutize(src: String): String = when {
+        src.startsWith("//") -> "https:$src"
+        src.startsWith("http") -> src
+        src.startsWith("/") -> "$BASE$src"
+        else -> "$BASE/$src"
+    }
+
     private fun fetch(url: String, cookie: String): String {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 12_000
             readTimeout = 15_000
+            instanceFollowRedirects = true
             setRequestProperty("User-Agent", MOBILE_UA)
             setRequestProperty("Cookie", cookie)
         }

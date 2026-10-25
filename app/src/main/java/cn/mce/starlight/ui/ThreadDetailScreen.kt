@@ -56,7 +56,6 @@ fun ThreadDetailScreen(
     modifier: Modifier = Modifier,
     onMenu: () -> Unit,
     reloadKey: Int = 0,
-    onOpenWeb: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val repo = remember { HttpForumRepository() }
@@ -93,7 +92,6 @@ fun ThreadDetailScreen(
                             load()
                         }
                     }) { Text("重试") }
-                    TextButton(onClick = onOpenWeb) { Text("改用网页版") }
                 }
             }
 
@@ -124,8 +122,6 @@ fun ThreadDetailScreen(
             title = title,
             modifier = Modifier.align(Alignment.TopStart),
             onMenu = onMenu,
-            actionLabel = "网页版",
-            onAction = onOpenWeb,
         )
 
         DraggableRefreshFab(
@@ -192,7 +188,7 @@ private fun PostItem(post: Post) {
         }
         if (post.images.size > 4) {
             Text(
-                "还有 ${post.images.size - 4} 张图片，用网页版查看",
+                "还有 ${post.images.size - 4} 张图片未显示",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
