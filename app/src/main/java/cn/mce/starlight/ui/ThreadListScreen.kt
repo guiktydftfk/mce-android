@@ -91,7 +91,8 @@ fun ThreadListScreen(
         runCatching { loader(1, filter) }
             .onSuccess {
                 page = 1
-                hasNext = it.hasNextPage
+                // 无法可靠判断"是否有下一页"时，默认认为还有，直到某一页为空
+                hasNext = it.threads.isNotEmpty()
                 state = if (it.threads.isEmpty()) ListState.Error("没有解析到帖子")
                 else ListState.Content(it.threads)
             }
@@ -104,10 +105,15 @@ fun ThreadListScreen(
         loadingMore = true
         runCatching { loader(page + 1, filter) }
             .onSuccess { next ->
-                page += 1
-                hasNext = next.hasNextPage
-                val merged = (current + next.threads).distinctBy { it.id }
-                state = ListState.Content(merged)
+                if (next.threads.isEmpty()) {
+                    hasNext = false
+                } else {
+                    page += 1
+                    val merged = (current + next.threads).distinctBy { it.id }
+                    // 如果合并后没有新增，说明到底了
+                    if (merged.size == current.size) hasNext = false
+                    state = ListState.Content(merged)
+                }
             }
         loadingMore = false
     }

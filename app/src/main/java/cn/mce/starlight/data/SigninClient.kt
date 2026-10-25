@@ -31,10 +31,14 @@ object SigninClient {
         val doc = Jsoup.parse(html, SIGN_PAGE)
 
         // stats blocks: <div class="item"><div>label</div><div>value</div></div>
-        val stats = doc.select("div.info div.item").mapNotNull { item ->
-            val parts = item.select("div")
-            if (parts.size >= 2) parts[0].text().trim() to parts[1].text().trim() else null
-        }.toMap()
+        val stats = mutableMapOf<String, String>()
+        doc.select("div.info div.item").forEach { item ->
+            val label = item.select("div").firstOrNull()?.text()?.trim().orEmpty()
+            if (label.isNotEmpty()) {
+                val digits = Regex("""\d+""").find(item.text().replace(label, ""))?.value
+                if (digits != null) stats[label] = digits
+            }
+        }
 
         fun stat(vararg keys: String): String? =
             stats.entries.firstOrNull { entry -> keys.any { entry.key.contains(it) } }?.value

@@ -191,14 +191,13 @@ object GenericPageClient {
         }
     }
 
-    /** 把响应里的 Set-Cookie 写回 CookieManager，保证后续原生请求带得上 */
+    /** 保存响应 Cookie：写入自建 CookieJar（不依赖 WebView），并尽力兼容 CookieManager */
     private fun storeCookies(url: String, conn: HttpURLConnection) {
         runCatching {
-            conn.headerFields
+            val headers = conn.headerFields
                 .filterKeys { it?.equals("Set-Cookie", ignoreCase = true) == true }
                 .values.flatten()
-                .forEach { cookie -> CookieManager.getInstance().setCookie(url, cookie) }
-            CookieManager.getInstance().flush()
+            if (headers.isNotEmpty()) WebCookies.saveFromHeaders(headers)
         }
     }
 
