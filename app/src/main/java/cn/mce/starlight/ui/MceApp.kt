@@ -38,6 +38,10 @@ sealed interface Route {
     data class Page(val url: String, val title: String) : Route
     data class Compose(val fid: Int?) : Route
     data class Board(val fid: Int, val name: String) : Route
+    data object MyThreads : Route
+    data object MyReplies : Route
+    data object Favorites : Route
+    data object Notices : Route
 }
 
 /** 抽屉一级目的地 */
@@ -192,6 +196,26 @@ fun MceApp() {
                 },
             )
 
+            is Route.MyThreads -> MyThreadsScreen(
+                onMenu = ::openDrawer,
+                onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+            )
+
+            is Route.MyReplies -> MyRepliesScreen(
+                onMenu = ::openDrawer,
+                onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+            )
+
+            is Route.Favorites -> FavoritesScreen(
+                onMenu = ::openDrawer,
+                onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+            )
+
+            is Route.Notices -> NoticesScreen(
+                onMenu = ::openDrawer,
+                onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+            )
+
             is Route.Board -> ThreadListScreen(
                 title = current.name,
                 onMenu = ::openDrawer,
@@ -222,7 +246,15 @@ fun MceApp() {
                             dataVersion += 1
                         }
                     },
-                    onOpenPage = { url, title -> push(Route.Page(url, title)) },
+                    onOpenPage = { url, _ ->
+                        when {
+                            url.contains("do=thread") && url.contains("type=reply") -> push(Route.MyReplies)
+                            url.contains("do=thread") -> push(Route.MyThreads)
+                            url.contains("do=favorite") -> push(Route.Favorites)
+                            url.contains("do=notice") -> push(Route.Notices)
+                            else -> push(Route.Page(url, url))
+                        }
+                    },
                 )
 
                 Dest.SignIn -> SigninScreen(
@@ -245,9 +277,7 @@ fun MceApp() {
                     onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
                 )
 
-                Dest.Notice -> NativePageScreen(
-                    initialUrl = "$BASE/home.php?mod=space&do=notice",
-                    fallbackTitle = "消息提醒",
+                Dest.Notice -> NoticesScreen(
                     onMenu = ::openDrawer,
                     onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
                 )
