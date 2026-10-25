@@ -137,6 +137,16 @@ fun ThreadDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         TextButton(onClick = {
+                            val opPid = s.detail.posts.firstOrNull()?.pid
+                            if (opPid != null) {
+                                scope.launch {
+                                    val f = RateClient.loadForm(tid, opPid)
+                                    if (f == null) toast = "赞赏表单加载失败（可能未登录）" else rateForm = f
+                                }
+                            }
+                        }) { Text("赞赏") }
+
+                        TextButton(onClick = {
                             scope.launch {
                                 val r = PostActions.favorite(tid)
                                 toast = r.message
@@ -166,8 +176,10 @@ fun ThreadDetailScreen(
                             toast = "正在回复 ${post.author}（${post.floorLabel}）"
                         },
                         onRate = {
-                            ratePid = post.pid
-                            scope.launch { rateForm = RateClient.loadForm(tid, post.pid) }
+                            scope.launch {
+                                val f = RateClient.loadForm(tid, post.pid)
+                                if (f == null) toast = "评分表单加载失败（可能未登录）" else rateForm = f
+                            }
                         },
                     )
                     HorizontalDivider(Modifier.padding(vertical = 4.dp))

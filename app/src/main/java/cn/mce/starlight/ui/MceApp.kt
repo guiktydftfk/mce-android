@@ -94,7 +94,7 @@ fun MceApp() {
                 }
                 HorizontalDivider(Modifier.padding(vertical = 6.dp))
 
-                DrawerItem("全部最新", dest == Dest.Feed) {
+                DrawerItem("全部最新", dest == Dest.Feed && stack.isEmpty()) {
                     dest = Dest.Feed; stack = emptyList(); closeDrawer()
                 }
                 DrawerItem("我的", dest == Dest.Profile) {
@@ -109,7 +109,9 @@ fun MceApp() {
                     modifier = Modifier.padding(start = 20.dp, top = 6.dp, bottom = 2.dp),
                 )
                 Boards.all.forEach { board ->
-                    DrawerItem(board.name, dest == Dest.Feed && stack.isEmpty()) {
+                    val selected = dest == Dest.Feed && stack.firstOrNull()
+                        ?.let { it is Route.Board && it.fid == board.fid } == true
+                    DrawerItem(board.name, selected) {
                         dest = Dest.Feed
                         stack = listOf(Route.Board(board.fid, board.name))
                         closeDrawer()

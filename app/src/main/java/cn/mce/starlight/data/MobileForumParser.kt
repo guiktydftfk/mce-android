@@ -5,21 +5,19 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
 /**
- * 帖子列表解析器（Discuz 触屏模板）。
- * 同时适配 forumdisplay（版块列表）与 guide（看帖中心）。
+ * Thread list parser (Discuz touch template): forumdisplay + guide.
  *
- * 实测结构：
- *   li.subjects_<N>.mtb
- *     a.avatar > img            作者头像
- *     span.th_author > a        作者
- *     span.y                    "2022-6-3 / 1338回复"
- *     a.th_item[h1]             标题（href 含 tid）
- *     span.threadtypes          分类标签
+ * li.subjects_<N>.mtb
+ *   a.avatar > img          author avatar
+ *   span.th_author > a      author
+ *   span.y                  "date / N replies"
+ *   a.th_item[h1]           title (href contains tid)
+ *   span.threadtypes        type label
  */
 object MobileForumParser {
 
     private val tidRegex = Regex("""tid=(\d+)""")
-    private val replyRegex = Regex("""(\d+)\s*(?:回复|阅读)""")
+    private val replyRegex = Regex("""(\d+)\s*(?:\u56de\u590d|\u9605\u8bfb)""")
 
     fun parse(html: String, baseUrl: String, page: Int): ForumPage {
         val doc = Jsoup.parse(html, baseUrl)
@@ -30,7 +28,7 @@ object MobileForumParser {
         return ForumPage(
             threads = threads,
             page = page,
-            hasNextPage = doc.select("a").any { it.text().contains("下一页") },
+            hasNextPage = hasNext(doc, page),
         )
     }
 
@@ -52,13 +50,28 @@ object MobileForumParser {
 
         return ThreadSummary(
             id = tid,
-            title = title.removePrefix("[置顶]").trim(),
+            title = title.trim(),
             author = li.selectFirst("span.th_author")?.text()?.trim()?.takeIf { it.isNotBlank() },
             avatarUrl = avatar,
             replies = meta?.let { replyRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() },
             metaText = meta,
             typeLabel = li.selectFirst("span.threadtypes")?.text()?.trim()?.takeIf { it.isNotBlank() },
         )
+    }
+
+    /**
+     * Next page detection: explicit "next" anchor, any page=N link greater than current,
+     * or a pagination container (touch template often loads more on scroll).
+     */
+    private fun hasNext(doc: Document, page: Int): Boolean {
+        if (doc.select("a").any { it.text().contains("\u4e0b\u4e00\u9875") }) return true
+
+        val numbers = doc.select("a[href*=page=]").mapNotNull {
+            Regex("""page=(\d+)""").find(it.attr("href"))?.groupValues?.get(1)?.toIntOrNull()
+        }
+        if (numbers.any { it > page }) return true
+
+        return doc.select(".pg, .pagination, #autopage").isNotEmpty()
     }
 
     private fun absolutize(src: String): String = when {
