@@ -1,9 +1,11 @@
 package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -13,6 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,7 +44,7 @@ private sealed interface SignState {
     data class Content(val state: SigninClient.State) : SignState
 }
 
-/** 签到页（专用解析，不是通用页面渲染） */
+/** 签到页：统计 + 签到按钮 + 排行榜（今日/本月/总） */
 @Composable
 fun SigninScreen(
     onMenu: () -> Unit,
@@ -50,15 +55,16 @@ fun SigninScreen(
     var state by remember { mutableStateOf<SignState>(SignState.Loading) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    var rankType by remember { mutableStateOf("today") }
 
     suspend fun load() {
         state = SignState.Loading
-        runCatching { SigninClient.load() }
+        runCatching { SigninClient.load(rankType) }
             .onSuccess { state = SignState.Content(it) }
             .onFailure { state = SignState.Error(it.message ?: "加载失败") }
     }
 
-    LaunchedEffect(reloadKey) { load() }
+    LaunchedEffect(reloadKey, rankType) { load() }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
@@ -81,73 +87,134 @@ fun SigninScreen(
 
             is SignState.Content -> {
                 val data = s.state
-                Column(Modifier.padding(top = topInset + 64.dp, start = 20.dp, end = 20.dp)) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                RoundedCornerShape(14.dp),
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = topInset + 64.dp, bottom = 48.dp),
+                ) {
+                    item {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    RoundedCornerShape(14.dp),
+                                )
+                                .padding(vertical = 18.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                        ) {
+                            StatItem("今日排名", data.todayRank ?: "-")
+                            StatItem("连续签到", data.continuous ?: "-")
+                            StatItem("累计签到", data.total ?: "-")
+                        }
+                    }
+
+                    item {
+                        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            Text(
+                                when {
+                                    data.alreadySigned -> "今天已签到 ✔"
+                                    else -> "今天还没有签到"
+                                },
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (data.alreadySigned) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
                             )
-                            .padding(vertical = 18.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                    ) {
-                        StatItem("今日排名", data.todayRank ?: "-")
-                        StatItem("连续签到", data.continuous ?: "-")
-                        StatItem("累计签到", data.total ?: "-")
-                    }
-
-                    Spacer(Modifier.height(18.dp))
-                    Text(
-                        if (data.alreadySigned) "今天已签到 ✔" else "今天还没有签到",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (data.alreadySigned) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
-
-                    message?.let {
-                        Spacer(Modifier.height(8.dp))
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                    }
-
-                    Spacer(Modifier.height(18.dp))
-                    Button(
-                        enabled = !busy && !data.alreadySigned &&
-                            (data.signForm != null || data.signActionUrl != null),
-                        onClick = {
-                            busy = true
-                            message = null
-                            scope.launch {
-                                val ok = SigninClient.signIn(data)
-                                busy = false
-                                message = if (ok) "签到成功" else "签到失败，请稍后重试"
-                                load()
+                            data.level?.let {
+                                Text(
+                                    "签到等级 Lv $it",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(if (busy) "签到中…" else "立即签到") }
+                            message?.let {
+                                Spacer(Modifier.height(6.dp))
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Button(
+                                enabled = !busy && !data.alreadySigned && data.formhash != null,
+                                onClick = {
+                                    busy = true
+                                    message = null
+                                    scope.launch {
+                                        val (ok, msg) = SigninClient.signIn(data)
+                                        busy = false
+                                        message = msg
+                                        if (ok) load()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(if (busy) "签到中…" else "立即签到") }
+                        }
+                    }
 
-                    if (data.signForm == null && data.signActionUrl == null) {
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            "没有找到签到按钮（页面结构可能变化）",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    item {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            RankTab("今日", rankType == "today") { rankType = "today" }
+                            RankTab("本月", rankType == "month") { rankType = "month" }
+                            RankTab("总排行", rankType == "total") { rankType = "total" }
+                        }
+                    }
+
+                    if (data.ranks.isEmpty()) {
+                        item {
+                            Text(
+                                "暂无排行榜数据",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp),
+                            )
+                        }
+                    } else {
+                        items(data.ranks) { entry ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    entry.username,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(
+                                    entry.value,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
 
-        ImmersiveTopBar(
-            title = "签到",
-            modifier = Modifier.align(Alignment.TopStart),
-            onMenu = onMenu,
-        )
+        ImmersiveTopBar(title = "签到", modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
     }
+}
+
+@Composable
+private fun RankTab(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+    )
 }
 
 @Composable

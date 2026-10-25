@@ -26,10 +26,17 @@ class HttpForumRepository(
 
     override suspend fun loadBoards(): List<ForumBoard> = Boards.all
 
-    override suspend fun loadThreads(fid: Int, page: Int): ForumPage = withContext(Dispatchers.IO) {
-        val url = "$baseHost/forum.php?mod=forumdisplay&fid=$fid&page=$page"
-        MobileForumParser.parse(fetch(url), url, page)
-    }
+    override suspend fun loadThreads(fid: Int, page: Int, filter: String?): ForumPage =
+        withContext(Dispatchers.IO) {
+            val extra = when (filter) {
+                "lastpost" -> "&filter=lastpost&orderby=lastpost"
+                "heat" -> "&filter=heat&orderby=heats"
+                "digest" -> "&filter=digest&digest=1"
+                else -> ""
+            }
+            val url = "$baseHost/forum.php?mod=forumdisplay&fid=$fid&page=$page$extra"
+            MobileForumParser.parse(fetch(url), url, page)
+        }
 
     override suspend fun loadGuide(page: Int): ForumPage = withContext(Dispatchers.IO) {
         val url = "$baseHost/forum.php?mod=guide&view=newthread&page=$page"

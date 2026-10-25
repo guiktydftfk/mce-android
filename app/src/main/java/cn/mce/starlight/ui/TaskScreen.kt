@@ -1,9 +1,11 @@
 package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -40,7 +42,7 @@ private sealed interface TaskState {
     data class Content(val tasks: List<TaskClient.TaskItem>) : TaskState
 }
 
-/** 任务中心（专用解析：标题 + 描述 + 申请按钮成组） */
+/** 任务中心：标题 + 描述 + 奖励 + 申请 */
 @Composable
 fun TaskScreen(
     onMenu: () -> Unit,
@@ -98,10 +100,7 @@ fun TaskScreen(
                         Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 14.dp, vertical = 6.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                RoundedCornerShape(14.dp),
-                            )
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))
                             .padding(16.dp),
                     ) {
                         Text(
@@ -109,12 +108,21 @@ fun TaskScreen(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                         )
-                        task.status?.let {
-                            Text(
-                                it,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            task.reward?.let {
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            task.hot?.let {
+                                Text(
+                                    "人气 $it",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                         task.description?.let {
                             Spacer(Modifier.height(6.dp))
@@ -144,10 +152,6 @@ fun TaskScreen(
             }
         }
 
-        ImmersiveTopBar(
-            title = "任务中心",
-            modifier = Modifier.align(Alignment.TopStart),
-            onMenu = onMenu,
-        )
+        ImmersiveTopBar(title = "任务中心", modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
     }
 }

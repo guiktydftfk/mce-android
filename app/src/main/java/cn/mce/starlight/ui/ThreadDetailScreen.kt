@@ -1,6 +1,8 @@
 package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -37,12 +40,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.data.HttpForumRepository
 import cn.mce.starlight.data.Post
 import cn.mce.starlight.data.PostActions
+import cn.mce.starlight.data.RateClient
 import cn.mce.starlight.data.ThreadDetail
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
@@ -53,7 +56,7 @@ private sealed interface DetailState {
     data class Content(val detail: ThreadDetail) : DetailState
 }
 
-/** 沉浸式帖子详情：楼层 + 头像 + 正文 + 附件图片 + 回帖栏 */
+/** 帖子详情：楼层 + 图片 + 楼层回复 + 评分 */
 @Composable
 fun ThreadDetailScreen(
     tid: Int,
@@ -63,15 +66,18 @@ fun ThreadDetailScreen(
     reloadKey: Int = 0,
 ) {
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val repo = remember { HttpForumRepository() }
     var state by remember { mutableStateOf<DetailState>(DetailState.Loading) }
     var replyText by remember { mutableStateOf("") }
+    var replyTo by remember { mutableStateOf<Post?>(null) }
     var sending by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
+    var rateForm by remember { mutableStateOf<RateClient.Form?>(null) }
+    var ratePid by remember { mutableStateOf<Int?>(null) }
+    var page by remember { mutableStateOf(1) }
 
-    suspend fun load() {
-        runCatching { repo.loadThreadDetail(tid, 1) }
+    suspend fun load(targetPage: Int = page) {
+        runCatching { repo.loadThreadDetail(tid, targetPage) }
             .onSuccess {
                 state = if (it.posts.isEmpty()) DetailState.Error("没有解析到楼层内容")
                 else DetailState.Content(it)
@@ -79,7 +85,10 @@ fun ThreadDetailScreen(
             .onFailure { state = DetailState.Error(it.message ?: "加载失败") }
     }
 
-    LaunchedEffect(tid, reloadKey) { load() }
+    LaunchedEffect(tid, reloadKey) {
+        page = 1
+        load(1)
+    }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val detail = (state as? DetailState.Content)?.detail
@@ -103,10 +112,7 @@ fun ThreadDetailScreen(
 
             is DetailState.Content -> LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    top = topInset + 56.dp,
-                    bottom = 96.dp,
-                ),
+                contentPadding = PaddingValues(top = topInset + 56.dp, bottom = 100.dp),
             ) {
                 item {
                     Text(
@@ -123,22 +129,54 @@ fun ThreadDetailScreen(
                             modifier = Modifier.padding(horizontal = 16.dp),
                         )
                     }
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(onClick = {
+                            scope.launch {
+                                val r = PostActions.favorite(tid)
+                                toast = r.message
+                            }
+                        }) { Text("收藏") }
+
+                        if (s.detail.hasNextPage) {
+                            TextButton(onClick = {
+                                page += 1
+                                scope.launch { load(page) }
+                            }) { Text("下一页") }
+                        } else {
+                            Text(
+                                "已是最后一页",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     HorizontalDivider(Modifier.padding(top = 8.dp))
                 }
                 items(s.detail.posts, key = { it.pid }) { post ->
-                    PostItem(post)
+                    PostItem(
+                        post = post,
+                        onReply = {
+                            replyTo = post
+                            toast = "正在回复 ${post.author}（${post.floorLabel}）"
+                        },
+                        onRate = {
+                            ratePid = post.pid
+                            scope.launch { rateForm = RateClient.loadForm(tid, post.pid) }
+                        },
+                    )
                     HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 }
             }
         }
 
-        ImmersiveTopBar(
-            title = title,
-            modifier = Modifier.align(Alignment.TopStart),
-            onMenu = onMenu,
-        )
+        ImmersiveTopBar(title = title, modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
 
-        // 回帖栏
         detail?.let { d ->
             Row(
                 Modifier
@@ -152,7 +190,9 @@ fun ThreadDetailScreen(
                 OutlinedTextField(
                     value = replyText,
                     onValueChange = { replyText = it },
-                    placeholder = { Text("说点什么…") },
+                    placeholder = {
+                        Text(replyTo?.let { "回复 ${it.author}" } ?: "说点什么…")
+                    },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
@@ -163,11 +203,12 @@ fun ThreadDetailScreen(
                         val fid = d.fid ?: return@TextButton
                         sending = true
                         scope.launch {
-                            val r = PostActions.reply(tid, fid, replyText.trim())
+                            val r = PostActions.reply(tid, fid, replyText.trim(), replyTo?.pid)
                             sending = false
                             toast = r.message
                             if (r.ok) {
                                 replyText = ""
+                                replyTo = null
                                 load()
                             }
                         }
@@ -183,16 +224,86 @@ fun ThreadDetailScreen(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 90.dp)
+                    .padding(bottom = 92.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
     }
+
+    // 评分弹窗
+    val form = rateForm
+    if (form != null) {
+        RateDialog(
+            form = form,
+            onDismiss = { rateForm = null; ratePid = null },
+            onSubmit = { score, reason ->
+                rateForm = null
+                scope.launch {
+                    val (ok, msg) = RateClient.submit(form, score, reason)
+                    toast = msg
+                    if (ok) load()
+                }
+            },
+        )
+    }
 }
 
 @Composable
-private fun PostItem(post: Post) {
+private fun RateDialog(
+    form: RateClient.Form,
+    onDismiss: () -> Unit,
+    onSubmit: (String, String) -> Unit,
+) {
+    var score by remember { mutableStateOf(form.scoreMin.toString()) }
+    var reason by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("评分 / 赞赏") },
+        text = {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "可给 ${form.scoreMin}~${form.scoreMax} 分",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    (form.scoreMin..form.scoreMax).forEach { v ->
+                        TextButton(onClick = { score = v.toString() }) {
+                            Text(if (score == v.toString()) "✓ $v 分" else "$v 分")
+                        }
+                    }
+                }
+                if (form.reasons.isNotEmpty()) {
+                    Text("可选理由", style = MaterialTheme.typography.bodySmall)
+                    form.reasons.take(4).forEach { preset ->
+                        Text(
+                            preset,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { reason = preset }
+                                .padding(vertical = 4.dp),
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    label = { Text("评分理由") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSubmit(score, reason) }) { Text("提交") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
+}
+
+@Composable
+private fun PostItem(post: Post, onReply: () -> Unit, onRate: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -220,6 +331,10 @@ private fun PostItem(post: Post) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (!post.isOp) {
+                TextButton(onClick = onRate) { Text("评分", style = MaterialTheme.typography.labelSmall) }
+            }
+            TextButton(onClick = onReply) { Text("回复", style = MaterialTheme.typography.labelSmall) }
         }
         Spacer(Modifier.height(8.dp))
         if (post.contentText.isNotBlank()) {

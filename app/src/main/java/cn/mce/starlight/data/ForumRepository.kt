@@ -59,7 +59,7 @@ data class ThreadDetail(
 
 interface ForumRepository {
     suspend fun loadBoards(): List<ForumBoard>
-    suspend fun loadThreads(fid: Int, page: Int): ForumPage
+    suspend fun loadThreads(fid: Int, page: Int, filter: String? = null): ForumPage
     suspend fun loadGuide(page: Int): ForumPage
     suspend fun loadThreadDetail(tid: Int, page: Int): ThreadDetail
 }

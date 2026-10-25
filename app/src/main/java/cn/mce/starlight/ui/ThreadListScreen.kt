@@ -2,6 +2,7 @@ package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +36,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +44,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import cn.mce.starlight.data.ForumPage
 import cn.mce.starlight.data.ThreadImageCache
 import cn.mce.starlight.data.ThreadSummary
 import coil.compose.AsyncImage
@@ -52,12 +56,15 @@ private sealed interface ListState {
     data class Content(val threads: List<ThreadSummary>) : ListState
 }
 
+private val FILTERS = listOf(
+    null to "全部",
+    "lastpost" to "最新",
+    "heat" to "热门",
+    "digest" to "精华",
+)
+
 /**
- * 沉浸式帖子列表：
- * - 内容铺满全屏，从悬浮顶栏下滑过
- * - 下拉刷新（PullToRefreshBox）
- * - 右下角可拖动刷新按钮
- * - 显示作者头像 + 帖子配图（按需抓取首图）
+ * 沉浸式帖子列表：下拉刷新 + 上拉自动加载更多 + 版块筛选。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,23 +73,58 @@ fun ThreadListScreen(
     modifier: Modifier = Modifier,
     onMenu: () -> Unit,
     reloadKey: Int = 0,
-    loader: suspend () -> List<ThreadSummary>,
+    enableFilters: Boolean = false,
+    loader: suspend (page: Int, filter: String?) -> ForumPage,
     onOpenThread: (ThreadSummary) -> Unit,
     onCompose: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<ListState>(ListState.Loading) }
     var refreshing by remember { mutableStateOf(false) }
+    var loadingMore by remember { mutableStateOf(false) }
+    var hasNext by remember { mutableStateOf(false) }
+    var page by remember { mutableStateOf(1) }
+    var filter by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
 
-    suspend fun load() {
-        runCatching { loader() }
+    suspend fun loadFirst() {
+        runCatching { loader(1, filter) }
             .onSuccess {
-                state = if (it.isEmpty()) ListState.Error("没有解析到帖子") else ListState.Content(it)
+                page = 1
+                hasNext = it.hasNextPage
+                state = if (it.threads.isEmpty()) ListState.Error("没有解析到帖子")
+                else ListState.Content(it.threads)
             }
             .onFailure { state = ListState.Error(it.message ?: "加载失败") }
     }
 
-    LaunchedEffect(title, reloadKey) { load() }
+    suspend fun loadMore() {
+        if (!hasNext || loadingMore) return
+        val current = (state as? ListState.Content)?.threads ?: return
+        loadingMore = true
+        runCatching { loader(page + 1, filter) }
+            .onSuccess { next ->
+                page += 1
+                hasNext = next.hasNextPage
+                val merged = (current + next.threads).distinctBy { it.id }
+                state = ListState.Content(merged)
+            }
+        loadingMore = false
+    }
+
+    LaunchedEffect(title, reloadKey, filter) {
+        state = ListState.Loading
+        loadFirst()
+    }
+
+    // 触底自动加载
+    LaunchedEffect(listState, hasNext) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .collect { last ->
+                val total = (state as? ListState.Content)?.threads?.size ?: 0
+                if (hasNext && total > 0 && last >= total - 3) loadMore()
+            }
+    }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
@@ -99,7 +141,7 @@ fun ThreadListScreen(
                     TextButton(onClick = {
                         scope.launch {
                             state = ListState.Loading
-                            load()
+                            loadFirst()
                         }
                     }) { Text("重试") }
                 }
@@ -110,22 +152,44 @@ fun ThreadListScreen(
                 onRefresh = {
                     refreshing = true
                     scope.launch {
-                        load()
+                        loadFirst()
                         refreshing = false
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 LazyColumn(
-                    Modifier.fillMaxSize(),
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        top = topInset + 56.dp,
+                        top = topInset + if (enableFilters) 100.dp else 56.dp,
                         bottom = 140.dp,
                     ),
                 ) {
                     items(s.threads, key = { it.id }) { thread ->
                         ThreadRow(thread) { onOpenThread(thread) }
                         HorizontalDivider(Modifier.padding(start = 14.dp))
+                    }
+                    if (loadingMore) {
+                        item {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                Alignment.Center,
+                            ) { CircularProgressIndicator(Modifier.size(22.dp)) }
+                        }
+                    } else if (!hasNext) {
+                        item {
+                            Text(
+                                "没有更多了",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -139,12 +203,53 @@ fun ThreadListScreen(
             onAction = onCompose,
         )
 
+        if (enableFilters) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = topInset + 52.dp, start = 12.dp, end = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                FILTERS.forEach { (value, label) ->
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (filter == value) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (filter == value) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                },
+                            )
+                            .clickable { filter = value }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
+            }
+        }
+
+        if (refreshing) {
+            androidx.compose.material3.LinearProgressIndicator(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .fillMaxWidth()
+                    .padding(top = topInset + 46.dp),
+            )
+        }
+
         DraggableRefreshFab(
             onClick = {
                 if (!refreshing) {
                     refreshing = true
                     scope.launch {
-                        load()
+                        loadFirst()
                         refreshing = false
                     }
                 }

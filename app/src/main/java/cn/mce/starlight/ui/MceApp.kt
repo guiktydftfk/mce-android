@@ -1,7 +1,6 @@
 package cn.mce.starlight.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerValue
@@ -31,22 +30,22 @@ import kotlinx.coroutines.launch
 
 private const val BASE = "https://mce.msi.cn"
 
-/** 导航栈中的一页 */
+/** 导航栈 */
 sealed interface Route {
-    data class Board(val fid: Int, val name: String) : Route
     data class Thread(val tid: Int, val title: String) : Route
     data class Page(val url: String, val title: String) : Route
+    data class Compose(val fid: Int?) : Route
+    data class Board(val fid: Int, val name: String) : Route
 }
 
 /** 抽屉一级目的地 */
 private enum class Dest(val label: String) {
-    Board2("综合交流"),
-    Board53("通知公告"),
-    Board121("小红龙频道"),
-    Guide("看帖中心"),
+    Feed("全部最新"),
+    Profile("我的"),
     SignIn("签到"),
     Tasks("任务中心"),
     Search("搜索"),
+    Compose("发帖"),
     Settings("设置"),
 }
 
@@ -55,11 +54,10 @@ fun MceApp() {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    var dest by remember { mutableStateOf(Dest.Board2) }
+    var dest by remember { mutableStateOf(Dest.Feed) }
     var stack by remember { mutableStateOf(listOf<Route>()) }
     var dataVersion by remember { mutableIntStateOf(0) }
     var showLogin by remember { mutableStateOf(false) }
-    var composeFid by remember { mutableStateOf<Int?>(null) }
 
     fun openDrawer() { scope.launch { drawerState.open() } }
     fun closeDrawer() { scope.launch { drawerState.close() } }
@@ -73,7 +71,6 @@ fun MceApp() {
         }
     }
 
-    // 启动：探测登录态；未登录则弹登录框
     LaunchedEffect(Unit) {
         SessionStore.probeLoginState()
         if (!SessionStore.isLoggedIn) showLogin = true
@@ -97,21 +94,35 @@ fun MceApp() {
                 }
                 HorizontalDivider(Modifier.padding(vertical = 6.dp))
 
-                DrawerItem("综合交流", dest == Dest.Board2) {
-                    dest = Dest.Board2; stack = emptyList(); closeDrawer()
+                DrawerItem("全部最新", dest == Dest.Feed) {
+                    dest = Dest.Feed; stack = emptyList(); closeDrawer()
                 }
-                DrawerItem("通知公告", dest == Dest.Board53) {
-                    dest = Dest.Board53; stack = emptyList(); closeDrawer()
+                DrawerItem("我的", dest == Dest.Profile) {
+                    dest = Dest.Profile; stack = emptyList(); closeDrawer()
                 }
-                DrawerItem("小红龙频道", dest == Dest.Board121) {
-                    dest = Dest.Board121; stack = emptyList(); closeDrawer()
-                }
-                DrawerItem("看帖中心", dest == Dest.Guide) {
-                    dest = Dest.Guide; stack = emptyList(); closeDrawer()
+
+                HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                Text(
+                    "板块",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 20.dp, top = 6.dp, bottom = 2.dp),
+                )
+                Boards.all.forEach { board ->
+                    DrawerItem(board.name, dest == Dest.Feed && stack.isEmpty()) {
+                        dest = Dest.Feed
+                        stack = listOf(Route.Board(board.fid, board.name))
+                        closeDrawer()
+                    }
                 }
 
                 HorizontalDivider(Modifier.padding(vertical = 6.dp))
 
+                DrawerItem("发帖", dest == Dest.Compose) {
+                    dest = Dest.Feed
+                    stack = listOf(Route.Compose(null))
+                    closeDrawer()
+                }
                 DrawerItem("签到", dest == Dest.SignIn) {
                     dest = Dest.SignIn; stack = emptyList(); closeDrawer()
                 }
@@ -121,84 +132,18 @@ fun MceApp() {
                 DrawerItem("搜索", dest == Dest.Search) {
                     dest = Dest.Search; stack = emptyList(); closeDrawer()
                 }
-
-                HorizontalDivider(Modifier.padding(vertical = 6.dp))
-
                 DrawerItem("设置", dest == Dest.Settings) {
                     dest = Dest.Settings; stack = emptyList(); closeDrawer()
                 }
             }
         },
     ) {
-        BackHandler(enabled = stack.isNotEmpty()) { pop() }
+        BackHandler(enabled = stack.isNotEmpty() || dest != Dest.Feed) {
+            if (stack.isNotEmpty()) pop() else dest = Dest.Feed
+        }
 
         val current = stack.lastOrNull()
         when (current) {
-            null -> when (dest) {
-                Dest.Board2 -> ThreadListScreen(
-                    title = "综合交流",
-                    onMenu = ::openDrawer,
-                    reloadKey = dataVersion,
-                    loader = { HttpForumRepository().loadThreads(2, 1).threads },
-                    onOpenThread = { push(Route.Thread(it.id, it.title)) },
-                    onCompose = { composeFid = 2 },
-                )
-
-                Dest.Board53 -> ThreadListScreen(
-                    title = "通知公告",
-                    onMenu = ::openDrawer,
-                    reloadKey = dataVersion,
-                    loader = { HttpForumRepository().loadThreads(53, 1).threads },
-                    onOpenThread = { push(Route.Thread(it.id, it.title)) },
-                    onCompose = { composeFid = 53 },
-                )
-
-                Dest.Board121 -> ThreadListScreen(
-                    title = "小红龙频道",
-                    onMenu = ::openDrawer,
-                    reloadKey = dataVersion,
-                    loader = { HttpForumRepository().loadThreads(121, 1).threads },
-                    onOpenThread = { push(Route.Thread(it.id, it.title)) },
-                    onCompose = { composeFid = 121 },
-                )
-
-                Dest.Guide -> ThreadListScreen(
-                    title = "看帖中心",
-                    onMenu = ::openDrawer,
-                    reloadKey = dataVersion,
-                    loader = { HttpForumRepository().loadGuide(1).threads },
-                    onOpenThread = { push(Route.Thread(it.id, it.title)) },
-                )
-
-                Dest.SignIn -> SigninScreen(
-                    onMenu = ::openDrawer,
-                    reloadKey = dataVersion,
-                    onNeedLogin = { showLogin = true },
-                )
-
-                Dest.Tasks -> TaskScreen(
-                    onMenu = ::openDrawer,
-                    reloadKey = dataVersion,
-                )
-
-                Dest.Search -> SearchScreen(
-                    onMenu = ::openDrawer,
-                    onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
-                )
-
-                Dest.Settings -> SettingsScreen(
-                    onMenu = ::openDrawer,
-                    onLogin = { showLogin = true },
-                    onLogout = {
-                        scope.launch {
-                            AuthClient.logout()
-                            SessionStore.clearLocal()
-                            dataVersion += 1
-                        }
-                    },
-                )
-            }
-
             is Route.Thread -> ThreadDetailScreen(
                 tid = current.tid,
                 fallbackTitle = current.title,
@@ -213,26 +158,80 @@ fun MceApp() {
                 onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
             )
 
+            is Route.Compose -> NewThreadScreen(
+                onMenu = ::openDrawer,
+                initialFid = current.fid,
+                onPosted = {
+                    pop()
+                    dataVersion += 1
+                },
+            )
+
             is Route.Board -> ThreadListScreen(
                 title = current.name,
                 onMenu = ::openDrawer,
                 reloadKey = dataVersion,
-                loader = { HttpForumRepository().loadThreads(current.fid, 1).threads },
+                enableFilters = true,
+                loader = { page, filter -> HttpForumRepository().loadThreads(current.fid, page, filter) },
                 onOpenThread = { push(Route.Thread(it.id, it.title)) },
-                onCompose = { composeFid = current.fid },
+                onCompose = { push(Route.Compose(current.fid)) },
             )
-        }
-    }
 
-    composeFid?.let { fid ->
-        NewThreadDialog(
-            fid = fid,
-            onDismiss = { composeFid = null },
-            onPosted = {
-                composeFid = null
-                dataVersion += 1
-            },
-        )
+            null -> when (dest) {
+                // 沉浸式刷帖：全站最新（不区分板块，按发布时间/最新回复聚合）
+                Dest.Feed -> ThreadListScreen(
+                    title = "全部最新",
+                    onMenu = ::openDrawer,
+                    reloadKey = dataVersion,
+                    loader = { page, _ -> HttpForumRepository().loadGuide(page) },
+                    onOpenThread = { push(Route.Thread(it.id, it.title)) },
+                    onCompose = { push(Route.Compose(null)) },
+                )
+
+                Dest.Profile -> ProfileScreen(
+                    onMenu = ::openDrawer,
+                    onLogin = { showLogin = true },
+                    onLogout = {
+                        scope.launch {
+                            AuthClient.logout()
+                            SessionStore.clearLocal()
+                            dataVersion += 1
+                        }
+                    },
+                    onOpenPage = { url, title -> push(Route.Page(url, title)) },
+                )
+
+                Dest.SignIn -> SigninScreen(
+                    onMenu = ::openDrawer,
+                    reloadKey = dataVersion,
+                    onNeedLogin = { showLogin = true },
+                )
+
+                Dest.Tasks -> TaskScreen(onMenu = ::openDrawer, reloadKey = dataVersion)
+
+                Dest.Search -> SearchScreen(
+                    onMenu = ::openDrawer,
+                    onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+                )
+
+                Dest.Compose -> NewThreadScreen(
+                    onMenu = ::openDrawer,
+                    onPosted = { dest = Dest.Feed; dataVersion += 1 },
+                )
+
+                Dest.Settings -> SettingsScreen(
+                    onMenu = ::openDrawer,
+                    onLogin = { showLogin = true },
+                    onLogout = {
+                        scope.launch {
+                            AuthClient.logout()
+                            SessionStore.clearLocal()
+                            dataVersion += 1
+                        }
+                    },
+                )
+            }
+        }
     }
 
     if (showLogin) {
