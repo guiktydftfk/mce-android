@@ -1,4 +1,4 @@
-package cn.mce.starlight.core
+﻿package cn.mce.starlight.core
 
 import android.content.Context
 import androidx.compose.runtime.getValue

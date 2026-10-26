@@ -112,6 +112,20 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(8.dp))
 
+            // v0.3.5：界面尺寸 / 字体大小
+            Text("界面大小 ${(SettingsStore.uiScale * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+            Slider(
+                value = SettingsStore.uiScale,
+                onValueChange = { SettingsStore.updateUiScale(it) },
+                valueRange = 0.8f..1.3f,
+            )
+            Text("字体大小 ${(SettingsStore.fontScale * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+            Slider(
+                value = SettingsStore.fontScale,
+                onValueChange = { SettingsStore.updateFontScale(it) },
+                valueRange = 0.8f..1.4f,
+            )
+
             // 主题色（保留原有「莫奈蓝」为默认，新增 Edge 风格配色）
             Text("主题色", style = MaterialTheme.typography.bodyLarge)
             Text(

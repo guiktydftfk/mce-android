@@ -40,6 +40,7 @@ object PersonalClient {
         val time: String?,
         val note: String?,
         val tid: Int?,
+        val uid: Int? = null,
     )
 
     /** 我的主题（沿用帖子列表模板） */

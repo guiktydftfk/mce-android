@@ -24,6 +24,8 @@ object SettingsStore {
     private const val KEY_SNOOZE_UNTIL = "update_snooze_until"
     private const val KEY_LAST_CHECK = "update_last_check"
     private const val KEY_DOWNLOADED_APK = "update_downloaded_apk"
+    private const val KEY_UI_SCALE = "ui_scale"
+    private const val KEY_FONT_SCALE = "font_scale"
     private const val KEY_SIGNIN_REMIND = "signin_reminder_enabled"
     private const val KEY_SIGNIN_REMIND_HOUR = "signin_reminder_hour"
 
@@ -54,6 +56,10 @@ object SettingsStore {
     var downloadedApkPath by mutableStateOf<String?>(null)
         private set
 
+    var uiScale by mutableFloatStateOf(1f)
+        private set
+    var fontScale by mutableFloatStateOf(1f)
+        private set
     var signinReminderEnabled by mutableStateOf(false)
         private set
 
@@ -71,6 +77,8 @@ object SettingsStore {
         updateSnoozeUntil = prefs.getLong(KEY_SNOOZE_UNTIL, 0L)
         lastUpdateCheckAt = prefs.getLong(KEY_LAST_CHECK, 0L)
         downloadedApkPath = prefs.getString(KEY_DOWNLOADED_APK, null)
+        uiScale = prefs.getFloat(KEY_UI_SCALE, 1f)
+        fontScale = prefs.getFloat(KEY_FONT_SCALE, 1f)
         signinReminderEnabled = prefs.getBoolean(KEY_SIGNIN_REMIND, false)
         signinReminderHour = prefs.getInt(KEY_SIGNIN_REMIND_HOUR, 20)
     }
@@ -128,6 +136,16 @@ object SettingsStore {
     fun markUpdateChecked() {
         lastUpdateCheckAt = System.currentTimeMillis()
         prefs()?.edit()?.putLong(KEY_LAST_CHECK, lastUpdateCheckAt)?.apply()
+    }
+
+    fun updateUiScale(value: Float) {
+        uiScale = value.coerceIn(0.8f, 1.3f)
+        prefs()?.edit()?.putFloat(KEY_UI_SCALE, uiScale)?.apply()
+    }
+
+    fun updateFontScale(value: Float) {
+        fontScale = value.coerceIn(0.8f, 1.4f)
+        prefs()?.edit()?.putFloat(KEY_FONT_SCALE, fontScale)?.apply()
     }
 
     fun updateSigninReminder(enabled: Boolean) {

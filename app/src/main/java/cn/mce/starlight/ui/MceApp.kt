@@ -441,6 +441,7 @@ fun MceApp() {
 
                 Dest.Notice -> NoticesScreen(
                     onMenu = ::openDrawer,
+                    onOpenUser = { uid, name -> push(Route.User(uid, name)) },
                     onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
                     onOpenPm = { uid, title -> push(Route.Pm(uid, title)) },
                     onOpenPage = { url, title -> push(Route.Page(url, title)) },

@@ -208,6 +208,7 @@ fun NoticesScreen(
     onOpenThread: (Int, String) -> Unit,
     onOpenPage: (String, String) -> Unit = { _, _ -> },
     onOpenPm: (Int, String) -> Unit = { _, _ -> },
+    onOpenUser: (Int, String) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
     var tab by remember { mutableStateOf(0) } // 0 = 提醒，1 = 私信
@@ -280,7 +281,13 @@ fun NoticesScreen(
                                 text = item.note,
                                 unread = false,
                             ) {
-                                item.tid?.let { onOpenThread(it, item.note?.take(20) ?: "消息") }
+                                val t = item.tid
+                                val u = item.uid
+                                if (t != null) {
+                                    onOpenThread(t, item.note?.take(20) ?: "消息")
+                                } else if (u != null) {
+                                    onOpenUser(u, item.author ?: "用户")
+                                }
                             }
                             HorizontalDivider(Modifier.padding(start = 68.dp))
                         }
