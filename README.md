@@ -1,7 +1,7 @@
 # MCE 星光班 · Android 原生客户端
 
 > 面向 Discuz! X3.5 论坛 [mce.msi.cn](https://mce.msi.cn) 的原生 Android 客户端。
-> Kotlin + Jetpack Compose，无 WebView（纯原生抓取与解析），支持自动更新。
+> Kotlin + Jetpack Compose；除「扫一扫」借用系统 WebView 自带的离线条码识别外，其余均为纯原生抓取与解析；支持自动更新。
 
 **当前版本：`0.3.7`（versionCode 41）**
 
@@ -18,46 +18,66 @@
 
 | 模块 | 说明 |
 | --- | --- |
-| 首页动态流 | 卡片式信息流（头像/作者/分类/摘要/配图/回复数），导读分类：最新 / 热帖 / 精华 / 沙发 |
-| 板块浏览 | 4 个分组 34 个板块（全国交流 / 项目和活动 / 城市板块 / 星光大厅），侧边栏分组折叠 |
-| 帖子详情 | 完整楼层、图文按原顺序内联、翻页、收藏、赞赏（评分）、楼层回复 |
-| 发帖 | 板块折叠选择（默认综合交流）、主题分类必选、标题/内容必填、BBCode 工具条、图片上传、表情面板（网页表情集）、**发起投票**（选项/最多可选/记票天数/结果可见/公开参与人）、附加选项、存草稿 |
+| 首页动态流 | 卡片式信息流（头像/作者/分类/摘要/配图/回复数），导读分类：最新 / 热帖 / 精华 / 沙发；滑动时缩略图在滚动停止后批量加载，回滚不抖动 |
+| 板块浏览 | 4 个分组 34 个板块（全国交流 / 项目和活动 / 城市板块 / 星光大厅），侧边栏分组默认折叠 |
+| 帖子详情 | 完整楼层、图文按原顺序内联、翻页、收藏、赞赏（评分）、楼层回复；**回帖支持表情包与 @ 提及** |
+| 投票 | 帖子内直接参与：单选/多选、最多可选、记票天数、结果条与百分比、参与人数/累计票数，已投票与已结束区分展示 |
+| 发帖 | 板块折叠选择（默认综合交流）、主题分类必选、标题/内容必填、BBCode 工具条、图片上传、表情面板、**发起投票**、附加选项、存草稿 |
+| 私信 | 「消息提醒」分「提醒 / 私信」双页签；原生聊天界面（气泡 + 发送）；未读角标/红点与列表同源，读完即清（含论坛模板不返回已读的客户端兜底） |
+| 📷 扫码加好友 | 「我的」页入口：**我的好友码**（本地生成标准二维码，微信/相机可扫）+ **扫一扫（加好友）**（选图/拍照识别 → 打开对方主页加好友，不支持时手动输入） |
 | 签到 | 今日排名/连续/累计、完整排行榜（今日/本月/总榜，触底自动翻页）、一键签到 |
 | 任务中心 | 任务列表、申请与领奖 |
 | 搜索 | 搜帖子 / 搜用户、高级搜索（作者/版块/时间/排序） |
 | 排行榜 | 帖子 / 投票 / 版块多榜 |
-| 我的 | 个人资料、我的主题 / 回复 / 收藏 / 消息提醒 / 勋章 / 好友 / 道具 / 编辑资料 |
+| 我的 | 个人资料、我的主题（**草稿与已发布分区**）/ 回复 / 收藏 / 消息提醒 / 勋章 / 好友 / 道具 / 编辑资料 |
 | 个人空间 | 头像/昵称/用户组/统计/资料、打招呼/发消息/加好友、最近主题；可从帖子作者头像进入 |
-| 设置 | 深色模式、自定义背景（透明度/模糊度）、签到提醒、检查更新与暂停更新、自检报告、图片自检 |
+| 外观 | **液态玻璃侧边菜单**（呼出时右侧内容高斯模糊）、6 种主题色、**明暗模式三态（浅色 / 深色 / 跟随系统）**、字体大小 80–140%、自定义背景（透明度/模糊度） |
+| 设置 | 上述外观项、签到提醒、检查更新与暂停更新、自检报告（可选填帖子 ID 做图片自检） |
 | 自动更新 | 启动检查 → 弹窗展示更新内容 → 后台静默下载 → 拉起安装（下次启动即为新版） |
+
+## 📷 好友码与扫码加好友
+
+- **我的好友码**：「我的」→「我的好友码」。本地生成包含你个人主页链接（`home.php?mod=space&uid=<你的 UID>`）的**标准二维码**，
+  微信、系统相机、任意扫码器都能识别；编码器自研（`ui/QrCode.kt`），无第三方依赖、不联网。
+- **扫一扫（加好友）**：「我的」→「扫一扫（加好友）」。可从**相册选图**或**拍照**，用系统 WebView 自带的
+  `BarcodeDetector` **离线**识别二维码；识别到本站用户主页链接后直接打开对方主页，即可按站点规则加好友。
+- 兜底：部分机型 WebView 不支持离线条码识别，此时可**手动粘贴好友链接 / UID** 打开对方主页。
+- 隐私：识别全程在本机完成，不上传图片、不请求任何第三方识别服务。
 
 ## 🏗 项目结构
 
 ```
 app/src/main/java/cn/mce/starlight/
-├── MceApplication.kt          # 初始化 Cookie/设置/Coil（Cookie 注入 + Referer）
+├── MceApplication.kt          # 初始化 Cookie/设置/草稿/消息中心/PmReadStore/Coil（Cookie 注入 + Referer）
 ├── core/
 │   ├── CookieJar.kt           # 自建 Cookie 存储（不依赖 WebView）
 │   ├── WebCookies.kt          # Cookie 访问入口（jar 优先）
 │   ├── SessionStore.kt        # 登录态探测与用户信息
-│   ├── SettingsStore.kt       # 设置持久化（主题/背景/更新/签到提醒）
+│   ├── SettingsStore.kt       # 设置持久化（明暗三态/字体大小/主题色/背景/更新/签到提醒）
+│   ├── DraftStore.kt          # 本地草稿箱
+│   ├── MessageCenter.kt       # 新消息中心（未读角标、顶部提示、签名基线防重复）
+│   ├── PmReadStore.kt         # 私信本地已读账本（论坛模板不返回已读的兜底）
 │   ├── Diagnostics.kt         # 自检报告（一键复制）
 │   └── DebugDump.kt           # 抓取页面落盘（adb run-as 可拉取排查）
 ├── data/                      # 网络与解析层（无 UI 依赖）
 │   ├── GenericPageClient.kt   # 通用抓取：手动跟随 3xx、逐跳保存 Set-Cookie
 │   ├── HttpForumRepository.kt # 论坛仓储（列表/详情）
 │   ├── MobileForumParser.kt   # 列表解析
-│   ├── ThreadDetailParser.kt  # 详情解析（文本/图片分块、附件容器、表情）
-│   ├── PostActions.kt         # 发帖/回帖/收藏/图片上传
+│   ├── ThreadDetailParser.kt  # 详情解析（文本/图片分块、附件、表情、投票）
+│   ├── PostActions.kt         # 发帖/回帖/收藏/投票/图片上传/私信发送
 │   ├── SigninClient/TaskClient/RateClient/SearchClient/RanklistClient
 │   ├── PersonalClient/SocialClient/UserProfileClient/ProfileClient/ProfileEditClient
+│   ├── ThreadImageCache.kt    # 列表缩略图（进程 LRU + 失败负缓存 + 单飞）
+│   ├── ThumbCache.kt          # 缩略图磁盘缓存
 │   └── UpdateClient.kt        # 版本清单、镜像回退、APK 下载
 └── ui/                        # Compose 界面
-    ├── MceApp.kt              # 导航、抽屉、登录、更新与签到提醒弹窗
-    ├── HomeFeedScreen/ThreadListScreen/ThreadDetailScreen/FeedCard
-    ├── NewThreadScreen/SettingsScreen/SigninScreen/TaskScreen/SearchScreen
-    ├── PersonalScreens/ProfileScreen/UserProfileScreen/SocialScreens
-    └── Theme/Chrome/DraggableRefreshFab/UpdateDialog/SigninReminder
+    ├── MceApp.kt              # 导航栈、液态玻璃抽屉、登录/更新/签到提醒弹窗
+    ├── HomeFeedScreen/ThreadListScreen/PagedThreadList/ThreadDetailScreen/FeedCard
+    ├── NewThreadScreen/DraftBoxScreen/DraftListItem/SmileyPanel/TextEditing
+    ├── SettingsScreen/ProfileScreen/PersonalScreens/PmChatScreen/MessageBanner
+    ├── ScanScreen/FriendQrScreen/QrCode       # 扫一扫 + 我的好友码（自研 QR 编码）
+    ├── Skeleton/StateBlocks/Chrome/DraggableRefreshFab
+    └── theme（AppTheme/AccentTheme）/UpdateDialog/SigninReminder
 ```
 
 ## 🔧 构建
@@ -82,8 +102,8 @@ powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -Bump -ToDesktop
 
 ## 🐞 问题自查（无需连电脑）
 
-- **自检报告**：设置 → 诊断 → 自检报告（版本/设备/登录态/设置/最近抓取页面，一键复制）
-- **图片自检**：设置 → 诊断 → 图片自检，输入帖子 ID，逐张探测图片请求（状态码/Content-Type/是否返回 HTML）
+- **自检报告**：设置 → 诊断 → 自检报告（版本/设备/登录态/设置/最近抓取页面，一键复制）；
+  帖子 ID 选填，填了会顺带逐张探测该帖图片请求（状态码/Content-Type/是否返回 HTML）并写入报告
 - **开发者**：抓取过的页面会落盘到应用私有目录，可 `adb shell run-as cn.mce.starlight cat files/debug_xxx.html` 查看原始 HTML
 
 ## ⚠️ 已知限制
@@ -91,6 +111,9 @@ powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -Bump -ToDesktop
 - 普通应用无法完全静默安装：系统安装器需用户点一次「安装」（Android 安全限制）
 - 门户资讯（`portal.php`）、活动发帖、附件（非图片）上传尚未实现（投票发帖与**帖子内投票参与**已支持）
 - **用户搜索**（搜用户）在论坛手机模板缺失 `mytpl/menubottom.htm` 时服务端会 503：客户端已内置电脑版模板回退，可正常使用；根治需论坛后台补模板文件
+- **扫一扫（加好友）**依赖系统 WebView 的离线 `BarcodeDetector`：极少数机型/WebView 版本不支持该能力时，请用「手动输入好友链接/UID」兜底；识别本身不联网
+- **私信已读**：论坛手机模板存在「读完仍返回未读标记」的问题（网页端同样如此），客户端用本地已读账本兜底；换设备/清数据后会以服务端状态为准
+- 私信发送、扫一扫识别建议在真机上验收（模拟器无法完整覆盖相机与条码识别）
 
 ## 📄 许可证与免责声明
 
