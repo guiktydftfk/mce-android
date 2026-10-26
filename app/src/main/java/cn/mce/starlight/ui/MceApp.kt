@@ -438,7 +438,12 @@ fun MceApp() {
                     updateError = null
                     updateProgress = 0
                     scope.launch {
-                        val file = UpdateClient.download(context, url) { p -> updateProgress = p }
+                        var file = UpdateClient.download(context, url) { p -> updateProgress = p }
+                        if (file == null) {
+                            // 备用源：直连 raw.githubusercontent（部分网络可用）
+                            val backup = url.replace("https://gh-proxy.com/", "")
+                            file = UpdateClient.download(context, backup) { p -> updateProgress = p }
+                        }
                         updateDownloading = false
                         if (file != null) {
                             updateRelease = null

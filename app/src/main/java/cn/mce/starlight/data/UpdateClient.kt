@@ -86,7 +86,7 @@ object UpdateClient {
     suspend fun check(context: Context): Release? = withContext(Dispatchers.IO) {
         // 1) 优先 version.json（多镜像，国内常用 jsDelivr）
         for (manifestUrl in MANIFEST_URLS) {
-        httpGet(manifestUrl)?.let { body ->
+        httpGet(manifestUrl + (if (manifestUrl.contains("?")) "&" else "?") + "t=" + System.currentTimeMillis())?.let { body ->
             runCatching {
                 val json = JSONObject(body)
                 val code = json.optInt("versionCode", 0)
