@@ -1,6 +1,1 @@
-{
-  "versionName": "0.2.4",
-  "versionCode": 27,
-  "notes": "0.2.4\n- 修复登录后“我的”页报 coroutine scope 错误、需点重试才显示\n- 修复首页帖子不显示内部配图（恢复全部卡片加载，保留并发限制防频控）\n- 修复发帖页板块：“更多城市”移出城市板块\n- 发帖页板块选择改为折叠分组，默认板块固定为「综合交流」",
-  "apk": "https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/MCE-latest.apk"
-}
+{ "versionName": "0.2.5", "versionCode": 28, "notes": "0.2.5\n- 发帖页新增表情面板（网页表情图/emoji 兜底）\n- 发帖页主题分类、标题、内容均不可留空\n- 签到提醒：设置存储层已加入，界面开关与启动提醒下一版补完", "apk": "https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/MCE-latest.apk" }

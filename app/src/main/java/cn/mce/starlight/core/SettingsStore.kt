@@ -3,6 +3,7 @@ package cn.mce.starlight.core
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,6 +23,8 @@ object SettingsStore {
     private const val KEY_SNOOZE_UNTIL = "update_snooze_until"
     private const val KEY_LAST_CHECK = "update_last_check"
     private const val KEY_DOWNLOADED_APK = "update_downloaded_apk"
+    private const val KEY_SIGNIN_REMIND = "signin_reminder_enabled"
+    private const val KEY_SIGNIN_REMIND_HOUR = "signin_reminder_hour"
 
     private var appContext: Context? = null
 
@@ -46,6 +49,12 @@ object SettingsStore {
     var downloadedApkPath by mutableStateOf<String?>(null)
         private set
 
+    var signinReminderEnabled by mutableStateOf(false)
+        private set
+
+    var signinReminderHour by mutableIntStateOf(20)
+        private set
+
     fun init(context: Context) {
         appContext = context.applicationContext
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -56,6 +65,8 @@ object SettingsStore {
         updateSnoozeUntil = prefs.getLong(KEY_SNOOZE_UNTIL, 0L)
         lastUpdateCheckAt = prefs.getLong(KEY_LAST_CHECK, 0L)
         downloadedApkPath = prefs.getString(KEY_DOWNLOADED_APK, null)
+        signinReminderEnabled = prefs.getBoolean(KEY_SIGNIN_REMIND, false)
+        signinReminderHour = prefs.getInt(KEY_SIGNIN_REMIND_HOUR, 20)
     }
 
     fun updateDarkMode(enabled: Boolean) {
@@ -100,6 +111,16 @@ object SettingsStore {
     fun markUpdateChecked() {
         lastUpdateCheckAt = System.currentTimeMillis()
         prefs()?.edit()?.putLong(KEY_LAST_CHECK, lastUpdateCheckAt)?.apply()
+    }
+
+    fun updateSigninReminder(enabled: Boolean) {
+        signinReminderEnabled = enabled
+        prefs()?.edit()?.putBoolean(KEY_SIGNIN_REMIND, enabled)?.apply()
+    }
+
+    fun updateSigninReminderHour(hour: Int) {
+        signinReminderHour = hour.coerceIn(0, 23)
+        prefs()?.edit()?.putInt(KEY_SIGNIN_REMIND_HOUR, signinReminderHour)?.apply()
     }
 
     fun updateDownloadedApk(path: String?) {

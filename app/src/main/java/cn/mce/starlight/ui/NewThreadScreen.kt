@@ -106,6 +106,12 @@ fun NewThreadScreen(
     var uploading by remember { mutableStateOf(false) }
 
     val fid = selectedFid
+    var showSmiley by remember { mutableStateOf(false) }
+    var smileys by remember { mutableStateOf(emptyList<cn.mce.starlight.data.SmileyClient.Smiley>()) }
+    LaunchedEffect(showSmiley, fid) {
+        if (showSmiley && smileys.isEmpty()) smileys = cn.mce.starlight.data.SmileyClient.load(fid)
+    }
+
 
     LaunchedEffect(selectedFid, SessionStore.isLoggedIn, reloadTick) {
         loadingForm = true
@@ -289,6 +295,7 @@ fun NewThreadScreen(
             ToolButton("代码") { wrap("[code]", "[/code]", "代码") }
             ToolButton("隐藏") { wrap("[hide]", "[/hide]", "隐藏内容（回复可见）") }
             ToolButton("@") { insertText("@") }
+            ToolButton("\u8868\u60c5") { showSmiley = true }
         }
 
         OutlinedTextField(
@@ -412,6 +419,28 @@ fun NewThreadScreen(
 
         Spacer(Modifier.height(8.dp))
         HorizontalDivider()
+    }
+
+    if (showSmiley) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showSmiley = false },
+            title = { Text("\u8868\u60c5") },
+            text = {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    smileys.chunked(8).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            row.forEach { s ->
+                                if (s.url != null) coil.compose.AsyncImage(s.url, null,
+                                    modifier = Modifier.size(32.dp).clickable { insertText("[img]${s.url}[/img]"); showSmiley = false })
+                                else Text(s.emoji ?: "", style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.clickable { insertText(s.emoji ?: ""); showSmiley = false }.padding(2.dp))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSmiley = false }) { Text("\u5173\u95ed") } },
+        )
     }
 
     ImmersiveTopBar(title = "发帖", onMenu = onMenu)
