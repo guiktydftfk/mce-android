@@ -97,11 +97,14 @@ fun MceApp() {
 
     fun checkUpdate(silent: Boolean) {
         scope.launch {
-            val release = UpdateClient.check(context)
+            val result = UpdateClient.checkDetailed(context)
             SettingsStore.markUpdateChecked()
-            when {
-                release != null -> updateRelease = release
-                !silent -> Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
+            when (result) {
+                is UpdateClient.CheckResult.Available -> updateRelease = result.release
+                is UpdateClient.CheckResult.Latest ->
+                    if (!silent) Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
+                is UpdateClient.CheckResult.Failed ->
+                    Toast.makeText(context, result.reason, Toast.LENGTH_LONG).show()
             }
         }
     }

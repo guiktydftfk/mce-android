@@ -22,7 +22,10 @@ import java.net.URL
  */
 object UpdateClient {
     private val MANIFEST_URLS = listOf(
-        "https://cdn.jsdelivr.net/gh/guiktydftfk/mce-android@main/version.json",
+        "https://fastly.jsdelivr.net/gh/guiktydftfk/mce-android@main/version.json",
+        "https://gcore.jsdelivr.net/gh/guiktydftfk/mce-android@main/version.json",
+        "https://testingcf.jsdelivr.net/gh/guiktydftfk/mce-android@main/version.json",
+        "https://gh-proxy.com/https://raw.githubusercontent.com/guiktydftfk/mce-android/main/version.json",
         "https://raw.githubusercontent.com/guiktydftfk/mce-android/main/version.json",
     )
     private const val API_LATEST =
