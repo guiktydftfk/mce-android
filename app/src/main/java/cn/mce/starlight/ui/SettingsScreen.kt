@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import cn.mce.starlight.core.SessionStore
 import cn.mce.starlight.core.SettingsStore
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import java.io.File
 
 /** Settings: appearance (dark mode / background image), account, about */
@@ -52,20 +53,30 @@ fun SettingsScreen(
     onCheckUpdate: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var message by remember { mutableStateOf<String?>(null) }
 
     val pickBackground = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        runCatching {
-            val target = File(context.filesDir, "background_${System.currentTimeMillis()}.jpg")
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                target.outputStream().use { output -> input.copyTo(output) }
-            }
-            SettingsStore.updateBackground(target.absolutePath)
-            message = "背景已更新"
-        }.onFailure { message = "设置背景失败：${it.message}" }
+        // v0.3.3 批 2：拷贝整张原图是 MB 级 IO，挪到 IO 协程（旧实现直接在 ActivityResult 主线程回调里 copyTo）
+        scope.launch {
+            runCatching {
+                val target = File(context.filesDir, "background.jpg")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        target.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }
+                // 清理历史遗留的 background_<时间戳>.jpg（旧实现每次选图都新建文件、从不删除）
+                context.filesDir.listFiles()
+                    ?.filter { it.isFile && it.name.startsWith("background_") && it.name.endsWith(".jpg") }
+                    ?.forEach { it.delete() }
+                SettingsStore.updateBackground(target.absolutePath)
+                message = "背景已更新"
+            }.onFailure { message = "设置背景失败：${it.message}" }
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -146,7 +157,11 @@ fun SettingsScreen(
                 )
                 Slider(
                     value = SettingsStore.backgroundAlpha,
-                    onValueChange = { SettingsStore.updateBackgroundAlpha(it) },
+                    // 拖动时只改内存 state（实时预览），松手才落盘
+                    onValueChange = { SettingsStore.updateBackgroundAlpha(it, persist = false) },
+                    onValueChangeFinished = {
+                        SettingsStore.updateBackgroundAlpha(SettingsStore.backgroundAlpha)
+                    },
                     valueRange = 0.05f..1f,
                 )
 
@@ -156,7 +171,10 @@ fun SettingsScreen(
                 )
                 Slider(
                     value = SettingsStore.backgroundBlur,
-                    onValueChange = { SettingsStore.updateBackgroundBlur(it) },
+                    onValueChange = { SettingsStore.updateBackgroundBlur(it, persist = false) },
+                    onValueChangeFinished = {
+                        SettingsStore.updateBackgroundBlur(SettingsStore.backgroundBlur)
+                    },
                     valueRange = 0f..25f,
                 )
             }

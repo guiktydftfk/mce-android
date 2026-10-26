@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,14 +9,11 @@ import java.io.IOException
  * (single network stack, cookies saved on every redirect hop).
  */
 class HttpForumRepository(
-    private val baseHost: String = "https://mce.msi.cn",
+    private val baseHost: String = Net.BASE,
 ) : ForumRepository {
 
     companion object {
-        const val MOBILE_UA =
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) " +
-                "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 " +
-                "Mobile/15E148 Safari/604.1"
+        const val MOBILE_UA = Net.MOBILE_UA
     }
 
     override suspend fun loadBoards(): List<ForumBoard> = Boards.all

@@ -1,5 +1,6 @@
 package cn.mce.starlight.data
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -14,70 +15,90 @@ import kotlinx.coroutines.withContext
  *  3. 失败不缓存 + 每张卡片整页拉取 → **请求风暴**，触发论坛频率限制，
  *     帖子页返回拦截页，表现为"所有帖子都解析不到楼层"。
  *
- * 现在：并发限制(2) + 失败负缓存(10 分钟) + 成功正缓存 + 同 tid 去重。
+ * v0.3.3（批 1）：
+ *  - 同一 tid 单飞：并发调用者用 [CompletableDeferred] 等同一个结果（旧实现直接返回 null → 丢图且不重试）
+ *  - 负缓存写时清理过期项并限容；正缓存改带容量上限的 LRU（访问序）
+ *  - 首图用 [ThreadDetailParser.firstImageUrl] 轻量提取，不再跑整页楼层解析
+ *  - 频率限制判定复用 [GenericPageClient.isBlockedPage]（去掉重复实现）
+ *  - 登录/退出时 [clear]（避免"登录了仍 10 分钟无图"）
  */
 object ThreadImageCache {
-    private val positive = mutableMapOf<Int, String>()
-    private val negative = mutableMapOf<Int, Long>()
-
     private const val NEGATIVE_TTL_MS = 10 * 60 * 1000L
-    private val semaphore = Semaphore(2)
-    private val inflight = mutableSetOf<Int>()
+    private const val POSITIVE_CAP = 512
+    private const val NEGATIVE_CAP = 256
+    private const val CONCURRENCY = 2
+
+    /** 访问序 LRU，避免无界增长 */
+    private val positive = object : LinkedHashMap<Int, String>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, String>?): Boolean =
+            size > POSITIVE_CAP
+    }
+    private val negative = mutableMapOf<Int, Long>()
+    private val semaphore = Semaphore(CONCURRENCY)
+    private val inflight = mutableMapOf<Int, CompletableDeferred<String?>>()
 
     suspend fun firstImage(tid: Int): String? = withContext(Dispatchers.IO) {
         synchronized(positive) { positive[tid] }?.let { return@withContext it }
-        ThumbCache.get(tid)?.let { synchronized(positive) { positive[tid] = it }; return@withContext it }
 
-        val failedAt = synchronized(negative) { negative[tid] }
-        if (failedAt != null && System.currentTimeMillis() - failedAt < NEGATIVE_TTL_MS) {
-            return@withContext null
+        ThumbCache.get(tid)?.let { url ->
+            synchronized(positive) { positive[tid] = url }
+            return@withContext url
         }
 
-        // 同一 tid 只发一次请求
-        val started = synchronized(inflight) {
-            if (inflight.contains(tid)) false else { inflight.add(tid); true }
+        val negativeAt = synchronized(negative) { negative[tid] }
+        if (negativeAt != null) {
+            if (System.currentTimeMillis() - negativeAt < NEGATIVE_TTL_MS) return@withContext null
+            synchronized(negative) { negative.remove(tid) }
         }
-        if (!started) return@withContext synchronized(positive) { positive[tid] }
+
+        // 同一 tid 只发一次请求：后来者等待同一个结果（而不是立刻拿到 null）
+        val (deferred, isOwner) = synchronized(inflight) {
+            val existing = inflight[tid]
+            if (existing != null) {
+                existing to false
+            } else {
+                CompletableDeferred<String?>().also { inflight[tid] = it } to true
+            }
+        }
+        if (!isOwner) return@withContext deferred.await()
 
         try {
-            semaphore.withPermit {
-                val url = runCatching {
-                    val html = GenericPageClient.get("https://mce.msi.cn/forum.php?mod=viewthread&tid=$tid")
-                    if (looksBlocked(html)) return@runCatching null
-                    val detail = ThreadDetailParser.parse(
-                        html,
-                        "https://mce.msi.cn/forum.php?mod=viewthread&tid=$tid",
-                        tid,
-                        1,
-                    )
-                    detail.posts.asSequence()
-                        .flatMap { it.images.asSequence() }
-                        .firstOrNull()
-                }.getOrNull()
-
-                if (url.isNullOrBlank()) {
-                    synchronized(negative) { negative[tid] = System.currentTimeMillis() }
-                    null
-                } else {
-                    synchronized(positive) { positive[tid] = url }
-                    ThumbCache.put(tid, url)
-                    url
+            val url = semaphore.withPermit { fetch(tid) }
+            if (!url.isNullOrBlank()) {
+                synchronized(positive) { positive[tid] = url }
+                ThumbCache.put(tid, url)
+                deferred.complete(url)
+                url
+            } else {
+                synchronized(negative) {
+                    negative[tid] = System.currentTimeMillis()
+                    if (negative.size > NEGATIVE_CAP) {
+                        val now = System.currentTimeMillis()
+                        negative.entries.removeAll { now - it.value >= NEGATIVE_TTL_MS }
+                    }
                 }
+                deferred.complete(null)
+                null
             }
+        } catch (t: Throwable) {
+            // 异常也要唤醒等待者，否则并发调用者会永久挂起
+            deferred.complete(null)
+            throw t
         } finally {
             synchronized(inflight) { inflight.remove(tid) }
         }
     }
 
-    /** 论坛频率限制/拦截页识别 */
-    fun looksBlocked(html: String): Boolean =
-        html.contains("\u9891\u7e41") ||
-            html.contains("\u8bf7\u7a0d\u540e") ||
-            html.contains("seccodeverify") ||
-            html.contains("\u8bbf\u95ee\u88ab\u62d2\u7edd")
+    private fun fetch(tid: Int): String? = runCatching {
+        val pageUrl = "https://mce.msi.cn/forum.php?mod=viewthread&tid=$tid"
+        val html = GenericPageClient.get(pageUrl)
+        if (GenericPageClient.isBlockedPage(html)) return@runCatching null
+        ThreadDetailParser.firstImageUrl(html, pageUrl)
+    }.getOrNull()
 
+    /** 登录 / 退出 / 手动刷新时清空（正缓存与负缓存一起清） */
     fun clear() {
-        positive.clear()
-        negative.clear()
+        synchronized(positive) { positive.clear() }
+        synchronized(negative) { negative.clear() }
     }
 }

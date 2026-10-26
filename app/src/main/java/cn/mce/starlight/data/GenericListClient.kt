@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,7 +10,10 @@ import org.jsoup.nodes.Element
  * 不依赖具体模板：抓取页面里「链接 + 文本 + 可选图片」构成的条目。
  */
 object GenericListClient {
-    private const val BASE = "https://mce.msi.cn"
+    private const val BASE = Net.BASE
+
+    private val tidRegex = Regex("""tid=(\d+)""")
+    private val uidRegex = Regex("""uid=(\d+)""")
 
     data class Item(
         val title: String,
@@ -27,15 +30,13 @@ object GenericListClient {
             val html = GenericPageClient.get(url)
             val doc = Jsoup.parse(html, url)
 
-            // 优先解析 li 条目，其次 img 卡片（勋章常是图片墙）
+            // v0.3.3 批 3：只遍历"含链接的 li"（旧实现遍历全部 li，再对每条 selectFirst 判断）
             val items = mutableListOf<Item>()
-
-            doc.select("li").forEach { li ->
+            doc.select("li:has(a[href])").forEach { li ->
                 val a = li.selectFirst("a[href]") ?: return@forEach
                 val text = li.text().trim()
                 if (text.length !in 2..200) return@forEach
-                val href = a.attr("href")
-                items += buildItem(li, a, text, href)
+                items += buildItem(li, a, text, a.attr("href"))
             }
 
             if (items.isEmpty()) {
@@ -52,16 +53,15 @@ object GenericListClient {
                 }
             }
 
-            items.map { it }
-                .filter { it.title.isNotBlank() }
+            items.filter { it.title.isNotBlank() }
                 .distinctBy { it.title to it.url }
                 .take(80)
         }.getOrDefault(emptyList())
     }
 
     private fun buildItem(li: Element, a: Element, text: String, href: String): Item {
-        val tid = Regex("""tid=(\d+)""").find(href)?.groupValues?.get(1)?.toIntOrNull()
-        val uid = Regex("""uid=(\d+)""").find(href)?.groupValues?.get(1)?.toIntOrNull()
+        val tid = tidRegex.find(href)?.groupValues?.get(1)?.toIntOrNull()
+        val uid = uidRegex.find(href)?.groupValues?.get(1)?.toIntOrNull()
         val image = li.selectFirst("img[src]")?.attr("src")
             ?.takeIf { it.isNotBlank() && !it.contains("filetype") }
             ?.let(::absolutize)
@@ -78,10 +78,5 @@ object GenericListClient {
         )
     }
 
-    private fun absolutize(src: String): String = when {
-        src.startsWith("//") -> "https:$src"
-        src.startsWith("http") -> src
-        src.startsWith("/") -> "$BASE$src"
-        else -> "$BASE/$src"
-    }
+    private fun absolutize(src: String): String = Net.absolutize(src)
 }

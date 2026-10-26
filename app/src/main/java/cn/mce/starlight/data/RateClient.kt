@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,7 +14,11 @@ import java.net.URLEncoder
  *   分值区间来自页面（示例：赞赏值 1~2，今日剩余 8）
  */
 object RateClient {
-    private const val BASE = "https://mce.msi.cn"
+    private const val BASE = Net.BASE
+    // v0.3.3 批 3：正则常量
+    private val rangeRegex = Regex("""\d+\s*[~-]\s*\d+""")
+    private val rangeMinRegex = Regex("""(\d+)\s*[~-]""")
+    private val rangeMaxRegex = Regex("""[~-]\s*(\d+)""")
 
     data class Form(
         val tid: Int,
@@ -47,9 +51,9 @@ object RateClient {
 
             // 评分区间：单元格文本形如 "1 ~ 2"
             val rangeText = doc.select("table.dt td").map { it.text() }
-                .firstOrNull { Regex("""\d+\s*[~-]\s*\d+""").containsMatchIn(it) }
-            val min = rangeText?.let { Regex("""(\d+)\s*[~-]""").find(it)?.groupValues?.get(1)?.toIntOrNull() } ?: 1
-            val max = rangeText?.let { Regex("""[~-]\s*(\d+)""").find(it)?.groupValues?.get(1)?.toIntOrNull() } ?: 2
+                .firstOrNull { rangeRegex.containsMatchIn(it) }
+            val min = rangeText?.let { rangeMinRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() } ?: 1
+            val max = rangeText?.let { rangeMaxRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() } ?: 2
 
             val reasons = doc.select("ul#reasonselect li, .reason_slct li").map { it.text().trim() }
                 .filter { it.isNotBlank() }
@@ -87,11 +91,13 @@ object RateClient {
                 }
                 val url = "$BASE/forum.php?mod=misc&action=rate&ratesubmit=yes&infloat=yes"
                 val resp = GenericPageClient.httpPost(url, body, null)
-                val text = Jsoup.parse(resp).text()
-                when {
-                    text.contains("error") || text.contains("抱歉") -> false to (text.take(40).ifBlank { "评分失败" })
-                    else -> true to "评分成功"
-                }
-            }.getOrDefault(false to "网络错误")
+                // v0.3.3 批 4：旧实现只认 "error"/"抱歉"，"您还可以评分 0 次""不能给自己评分" 等
+                // 中文失败文案会被判成成功；现在统一走 DiscuzResponse。
+                DiscuzResponse.judge(
+                    resp,
+                    successText = "\u8bc4\u5206\u6210\u529f",
+                    unknownText = "\u8bc4\u5206\u7ed3\u679c\u672a\u786e\u8ba4\uff0c\u8bf7\u5237\u65b0\u67e5\u770b",
+                )
+            }.getOrDefault(false to "\u7f51\u7edc\u9519\u8bef")
         }
 }

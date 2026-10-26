@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import cn.mce.starlight.core.DebugDump
 import cn.mce.starlight.core.WebCookies
@@ -13,7 +13,9 @@ import java.net.URL
  * 用于定位「某些帖子图片看不到」的通病。
  */
 object ImageDiagClient {
-    private const val BASE = "https://mce.msi.cn"
+    private const val BASE = Net.BASE
+    // v0.3.3 批 3：正则常量
+    private val whitespaceRegex = Regex("""\s+""")
     const val MOBILE_UA =
         "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 " +
             "(KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
@@ -111,7 +113,7 @@ object ImageDiagClient {
                 contentType = type,
                 length = len,
                 looksHtml = looksHtml,
-                preview = head.replace(Regex("\\s+"), " ").take(120),
+                preview = head.replace(whitespaceRegex, " ").take(120),
             )
         } catch (e: Exception) {
             Probe(url, -1, null, 0, false, "异常: ${e.javaClass.simpleName}: ${e.message}")

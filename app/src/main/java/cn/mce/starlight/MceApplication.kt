@@ -19,8 +19,11 @@ class MceApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // 只做必要的同步初始化；ThumbCache 的 200 条记录解析已改为懒加载（见 ThumbCache.ensureLoaded）
         SettingsStore.init(this)
         CookieJar.init(this)
+        // 兜底：清掉"强制电脑版模板"残留的 mobile Cookie（否则所有页面会按电脑版渲染、移动版解析全空）
+        CookieJar.removeMobileCookies()
         cn.mce.starlight.data.ThumbCache.init(this)
         DebugDump.init(this)
     }
@@ -28,7 +31,9 @@ class MceApplication : Application(), ImageLoaderFactory {
     override fun newImageLoader(): ImageLoader {
         val cookieInterceptor = Interceptor { chain ->
             val request = chain.request()
-            val isSite = request.url.host.contains("mce.msi.cn")
+            // 精确匹配站点域名（旧写法 host.contains 会把 Cookie 发给 mce.msi.cn.evil.com）
+            val host = request.url.host
+            val isSite = host == "mce.msi.cn" || host.endsWith(".mce.msi.cn")
             val builder = request.newBuilder()
             if (isSite) {
                 // 附件图片需要登录态 + Referer，否则服务端可能返回拒绝页
@@ -46,9 +51,9 @@ class MceApplication : Application(), ImageLoaderFactory {
             chain.proceed(builder.build())
         }
 
-        // 网络拦截器会在每次重定向时重新加头（附件图常 301/302 跳转）
+        // 只需要网络拦截器：它会跟随每次重定向重新加头（附件图常 301/302 跳转）。
+        // 旧实现同时注册 application + network 两遍，每个请求白跑两遍。
         val client = OkHttpClient.Builder()
-            .addInterceptor(cookieInterceptor)
             .addNetworkInterceptor(cookieInterceptor)
             .followRedirects(true)
             .followSslRedirects(true)

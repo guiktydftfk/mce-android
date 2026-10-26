@@ -1,4 +1,4 @@
-package cn.mce.starlight.ui
+﻿package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -70,7 +70,7 @@ fun MedalsScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    items(list) { medal ->
+                    items(list, key = { it.name }) { medal ->
                         Column(
                             Modifier
                                 .clip(RoundedCornerShape(12.dp))
@@ -132,7 +132,7 @@ fun FriendsScreen(
                 }
             } else {
                 LazyColumn(contentPadding = PaddingValues(top = topInset + 64.dp, bottom = 110.dp)) {
-                    items(list) { friend ->
+                    items(list, key = { it.uid }) { friend ->
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -182,5 +182,3 @@ fun FriendsScreen(
     }
 }
 
-@Composable
-private fun Spacer15() = Spacer(Modifier.height(15.dp))

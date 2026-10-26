@@ -1,4 +1,4 @@
-package cn.mce.starlight.ui
+﻿package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -252,7 +252,13 @@ fun ProfileScreen(
 
                     // 入口
                     if (p.entries.isNotEmpty()) {
-                        items(p.entries.filterNot { it.second.contains("do=thread") || it.second.contains("do=favorite") || it.second.contains("do=notice") || it.second.contains("do=friend") }) { (name, url) ->
+                        items(
+                            p.entries.filterNot {
+                                it.second.contains("do=thread") || it.second.contains("do=favorite") ||
+                                    it.second.contains("do=notice") || it.second.contains("do=friend")
+                            },
+                            key = { it.second },
+                        ) { (name, url) ->
                             Text(
                                 name,
                                 style = MaterialTheme.typography.bodyLarge,

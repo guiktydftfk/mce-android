@@ -1,0 +1,256 @@
+package cn.mce.starlight.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import cn.mce.starlight.data.ForumPage
+import cn.mce.starlight.data.ThreadSummary
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
+
+/**
+ * 帖子列表统一状态机（v0.3.3 批 5）。
+ *
+ * 首页 / 版块列表 / 我的主题三处原本各复制了一份 状态 + 刷新 + 加载更多 + 错误态 + FAB
+ * （约 180 行 × 3），且各自有同一批问题：
+ *  - 刷新与加载更多并发时用旧列表覆盖新结果、page 错位
+ *  - 换 tab 不重置 listState（新分类沿用旧滚动位置）
+ *  - 空列表被当成红色错误（没有下拉刷新通道）
+ *  - 顶部同时有 PullToRefresh 指示器和手写的 LinearProgressIndicator
+ *
+ * 现在统一到这里：请求代际号（generation）作废旧请求、刷新/加载更多互斥、
+ * 换 [resetKey] 重建状态与滚动位置、空态中性提示 + 下拉刷新、单一刷新指示器。
+ */
+private class PagedState {
+    var items by mutableStateOf<List<ThreadSummary>>(emptyList())
+    var loading by mutableStateOf(true)
+    var error by mutableStateOf<String?>(null)
+    var refreshing by mutableStateOf(false)
+    var loadingMore by mutableStateOf(false)
+    var hasNext by mutableStateOf(false)
+    var message by mutableStateOf<String?>(null)
+    var page = 1
+    var generation = 0
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PagedThreadList(
+    /** 变化即重置列表：导读 tab / 版块筛选 / 外部刷新信号 */
+    resetKey: Any?,
+    topPadding: Dp,
+    loader: suspend (page: Int) -> ForumPage,
+    onOpenThread: (ThreadSummary) -> Unit,
+    modifier: Modifier = Modifier,
+    horizontalPadding: Dp = 0.dp,
+    bottomPadding: Dp = 130.dp,
+    emptyText: String = "暂无内容，下拉刷新试试",
+    showDivider: Boolean = false,
+    showRefreshFab: Boolean = true,
+) {
+    val scope = rememberCoroutineScope()
+    val st = remember(resetKey) { PagedState() }
+    val listState = remember(resetKey) { LazyListState() }
+    val thumbnailWindow by rememberThumbnailWindow(listState)
+
+    suspend fun loadFirst() {
+        val gen = ++st.generation
+        st.loading = st.items.isEmpty()
+        st.error = null
+        runCatching { loader(1) }
+            .onSuccess { page ->
+                if (gen != st.generation) return@onSuccess
+                st.page = 1
+                st.items = page.threads
+                st.hasNext = page.threads.isNotEmpty()
+                st.error = null
+            }
+            .onFailure { if (gen == st.generation) st.error = it.message ?: "加载失败" }
+        if (gen == st.generation) st.loading = false
+    }
+
+    suspend fun loadMore() {
+        if (!st.hasNext || st.loadingMore || st.refreshing || st.items.isEmpty()) return
+        val gen = st.generation
+        st.loadingMore = true
+        runCatching { loader(st.page + 1) }
+            .onSuccess { page ->
+                if (gen != st.generation) return@onSuccess
+                if (page.threads.isEmpty()) {
+                    st.hasNext = false
+                } else {
+                    val merged = (st.items + page.threads).distinctBy { it.id }
+                    if (merged.size == st.items.size) st.hasNext = false
+                    st.items = merged
+                    st.page += 1
+                }
+            }
+            .onFailure { if (gen == st.generation) st.message = "加载更多失败，请下拉刷新重试" }
+        st.loadingMore = false
+    }
+
+    fun refresh() {
+        if (st.refreshing) return
+        st.refreshing = true
+        scope.launch {
+            val gen = ++st.generation
+            runCatching { loader(1) }
+                .onSuccess { page ->
+                    if (gen != st.generation) {
+                        st.refreshing = false
+                        return@onSuccess
+                    }
+                    st.page = 1
+                    st.items = page.threads
+                    st.hasNext = page.threads.isNotEmpty()
+                    st.error = null
+                    st.message = null
+                    runCatching { listState.requestScrollToItem(0) }
+                }
+                .onFailure {
+                    if (gen == st.generation) st.message = "刷新失败：" + (it.message ?: "网络错误")
+                }
+            st.refreshing = false
+        }
+    }
+
+    LaunchedEffect(resetKey) { loadFirst() }
+
+    // 触底自动加载（列表为空/没有下一页时不挂监听，避免空转）
+    LaunchedEffect(listState, st.hasNext, resetKey) {
+        if (!st.hasNext) return@LaunchedEffect
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .distinctUntilChanged()
+            .collect { last -> if (st.items.isNotEmpty() && last >= st.items.size - 3) loadMore() }
+    }
+
+    // 失败提示 3 秒后自动消失
+    LaunchedEffect(st.message) {
+        if (st.message != null) {
+            delay(3000)
+            st.message = null
+        }
+    }
+
+    Box(modifier.fillMaxSize()) {
+        when {
+            st.loading && st.items.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                CircularProgressIndicator()
+            }
+
+            st.items.isEmpty() && st.error != null -> ErrorBlock(st.error!!) {
+                scope.launch { loadFirst() }
+            }
+
+            else -> PullToRefreshBox(
+                isRefreshing = st.refreshing,
+                onRefresh = { refresh() },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        top = topPadding,
+                        bottom = bottomPadding,
+                        start = horizontalPadding,
+                        end = horizontalPadding,
+                    ),
+                ) {
+                    if (st.items.isEmpty()) {
+                        item { EmptyHint(emptyText) }
+                    }
+                    itemsIndexed(st.items, key = { _, thread -> thread.id }) { index, thread ->
+                        FeedCard(
+                            thread = thread,
+                            allowThumbnail = index in thumbnailWindow,
+                            onClick = { onOpenThread(thread) },
+                        )
+                        if (showDivider) CardDivider()
+                    }
+                    when {
+                        st.loadingMore -> item {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                Alignment.Center,
+                            ) { CircularProgressIndicator(Modifier.size(20.dp)) }
+                        }
+
+                        st.items.isNotEmpty() && !st.hasNext -> item {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                Alignment.Center,
+                            ) {
+                                Text(
+                                    "没有更多了",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        st.message?.let { msg ->
+            Text(
+                text = msg,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 96.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        RoundedCornerShape(8.dp),
+                    )
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
+
+        if (showRefreshFab) {
+            DraggableRefreshFab(
+                onClick = { refresh() },
+                modifier = Modifier.align(Alignment.BottomEnd),
+            )
+        }
+    }
+}

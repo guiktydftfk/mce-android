@@ -57,4 +57,36 @@ class ThreadImageParseTest {
         println("legacy images=${detail.posts.flatMap { it.images }}")
         assertTrue(detail.posts.isNotEmpty())
     }
+
+    /**
+     * v0.3.3（批 1）新接口：列表缩略图用的轻量首图提取。
+     * 不应该为了拿一个 URL 就跑完整楼层解析。
+     */
+    @Test
+    fun `firstImageUrl returns the same first image cheaply`() {
+        val html = load("thread38042.html")
+        val base = "https://mce.msi.cn/forum.php?mod=viewthread&tid=38042"
+        val full = ThreadDetailParser.parse(html, base, 38042, 1)
+            .posts.flatMap { it.images }.firstOrNull()
+        val fast = ThreadDetailParser.firstImageUrl(html, base)
+        println("full.first=$full fast=$fast")
+        assertTrue("全量解析应能取到图片", !full.isNullOrBlank())
+        assertTrue("轻量提取应与全量解析的首图一致", fast == full)
+    }
+
+    @Test
+    fun `firstImageUrl ignores avatars and placeholders`() {
+        val html = """
+            <div class="plc" id="pid1">
+              <div class="pi"><img src="uc_server/avatar.php?uid=2&size=middle" /></div>
+              <div class="message">
+                <img src="static/image/common/none.gif" data-src="static/image/common/none.gif" />
+                只有文字，没有配图
+              </div>
+            </div>
+        """.trimIndent()
+        val url = ThreadDetailParser.firstImageUrl(html, "https://mce.msi.cn/forum.php?mod=viewthread&tid=1")
+        println("avatar/placeholder only -> $url")
+        assertTrue("头像/占位图不应作为缩略图，实际：$url", url == null)
+    }
 }

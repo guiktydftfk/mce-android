@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -13,7 +13,20 @@ import org.jsoup.Jsoup
  *   dt/dd 或 li 里「性别 / 生日 / 家乡 / 居住地」等资料
  */
 object UserProfileClient {
-    private const val BASE = "https://mce.msi.cn"
+    private const val BASE = Net.BASE
+    // v0.3.3 批 3：正则常量 + 按标签动态编译的正则做缓存（标签只有固定几个）
+    private val uidRegex = Regex("""uid=(\d+)""")
+    private val usernameTitleRegex = Regex("""^(.{1,24}?)的个人资料""")
+    private val groupRegex = Regex("""用户组[:：]?\s*([^\s|]{1,20})""")
+    private val tidRegex = Regex("""tid=(\d+)""")
+    private val labelNumberCache = mutableMapOf<String, Regex>()
+    private val labelTextCache = mutableMapOf<String, Regex>()
+    private fun labelNumberRegex(label: String): Regex = synchronized(labelNumberCache) {
+        labelNumberCache.getOrPut(label) { Regex("""$label\s*[:：]?\s*(\d+)""") }
+    }
+    private fun labelTextRegex(label: String): Regex = synchronized(labelTextCache) {
+        labelTextCache.getOrPut(label) { Regex("""$label\s*[:：]?\s*([^\s|]{1,24})""") }
+    }
 
     data class Profile(
         val uid: Int,
@@ -30,39 +43,28 @@ object UserProfileClient {
 
     suspend fun load(uid: Int?): Profile? = withContext(Dispatchers.IO) {
         runCatching {
-            val url = if (uid == null) "$BASE/home.php?mod=space&do=profile"
-            else "$BASE/home.php?mod=space&uid=$uid&do=profile"
+            val url = if (uid == null) "${Net.BASE}/home.php?mod=space&do=profile"
+            else "${Net.BASE}/home.php?mod=space&uid=$uid&do=profile"
             val html = GenericPageClient.get(url)
             cn.mce.starlight.core.DebugDump.dump("space_${uid ?: 0}", html)
             val doc = Jsoup.parse(html, url)
             val text = doc.text()
 
-            val realUid = uid ?: Regex("""uid=(\d+)""").find(html)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val realUid = uid ?: uidRegex.find(html)?.groupValues?.get(1)?.toIntOrNull() ?: 0
 
             val avatar = doc.selectFirst("img[src*=avatar.php]")?.attr("src")
                 ?.takeIf { it.isNotBlank() }?.let(::absolutize)
 
-            val name = Regex("""^(.{1,24}?)的个人资料""").find(doc.title())?.groupValues?.get(1)?.trim()
-                ?: doc.selectFirst("h1, h2, .user_name, .xs2")?.text()?.trim()
-                ?.takeIf { it.length in 1..24 }
-                ?: "用户$realUid"
-
-            val group = Regex("""用户组[:：]?\s*([^\s|]{1,20})""").find(text)?.groupValues?.get(1)
-                ?: doc.selectFirst(".grouptitle, .xw1")?.text()?.trim()
-
-            val stats = mutableMapOf<String, String>()
-            listOf("主题", "回帖", "积分", "好友", "威望", "在线时间").forEach { label ->
-                Regex("""$label\s*[:：]?\s*(\d+)""").find(text)?.groupValues?.get(1)?.let { stats[label] = it }
-            }
-
-            val fields = mutableMapOf<String, String>()
-            FIELD_LABELS.forEach { label ->
-                Regex("""$label\s*[:：]?\s*([^\s|]{1,24})""").find(text)?.groupValues?.get(1)
-                    ?.trim()?.let { if (it.isNotBlank()) fields[label] = it }
-            }
+            val name = ProfileCommon.username(doc) ?: "用户$realUid"
+            val group = ProfileCommon.group(doc, text)
+            val stats = ProfileCommon.stats(
+                text,
+                listOf("主题", "回帖", "积分", "好友", "威望", "在线时间"),
+            )
+            val fields = ProfileCommon.fields(text, FIELD_LABELS)
 
             val threads = doc.select("a[href*=viewthread]").mapNotNull { a ->
-                val tid = Regex("""tid=(\d+)""").find(a.attr("href"))
+                val tid = tidRegex.find(a.attr("href"))
                     ?.groupValues?.get(1)?.toIntOrNull() ?: return@mapNotNull null
                 val title = a.text().trim()
                 if (title.length < 4) null else tid to title
@@ -81,10 +83,5 @@ object UserProfileClient {
         }.getOrNull()
     }
 
-    private fun absolutize(src: String): String = when {
-        src.startsWith("//") -> "https:$src"
-        src.startsWith("http") -> src
-        src.startsWith("/") -> "$BASE$src"
-        else -> "$BASE/$src"
-    }
+    private fun absolutize(src: String): String = Net.absolutize(src)
 }

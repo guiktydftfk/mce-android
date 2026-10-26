@@ -3,6 +3,7 @@ package cn.mce.starlight.ui
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +65,7 @@ fun NativePageScreen(
     var stack by remember { mutableStateOf(listOf(initialUrl)) }
     var state by remember { mutableStateOf<PageState>(PageState.Loading) }
     var submitting by remember { mutableStateOf(false) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
 
     val currentUrl = stack.last()
 
@@ -149,9 +151,18 @@ fun NativePageScreen(
                             onClick = {
                                 submitting = true
                                 scope.launch {
-                                    GenericPageClient.submit(block)
+                                    val resp = GenericPageClient.submit(block)
                                     submitting = false
-                                    reload()
+                                    if (resp == null) {
+                                        actionMessage = "\u63d0\u4ea4\u5931\u8d25\uff1a\u7f51\u7edc\u9519\u8bef"
+                                    } else {
+                                        val (ok, msg) = cn.mce.starlight.data.DiscuzResponse.judge(
+                                            resp,
+                                            successText = "\u63d0\u4ea4\u6210\u529f",
+                                        )
+                                        actionMessage = if (ok) msg else "\u63d0\u4ea4\u5931\u8d25\uff1a$msg"
+                                        reload()
+                                    }
                                 }
                             },
                             enabled = !submitting,
@@ -162,6 +173,22 @@ fun NativePageScreen(
             }
         }
 
+        actionMessage?.let { msg ->
+            Text(
+                text = msg,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 40.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    )
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
+
         ImmersiveTopBar(
             title = page?.title ?: fallbackTitle,
             modifier = Modifier.align(Alignment.TopStart),
@@ -170,5 +197,7 @@ fun NativePageScreen(
     }
 }
 
+private val tidRegex = Regex("""tid=(\d+)""")
+
 private fun tidOf(url: String): Int? =
-    Regex("""tid=(\d+)""").find(url)?.groupValues?.get(1)?.toIntOrNull()
+    tidRegex.find(url)?.groupValues?.get(1)?.toIntOrNull()

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  aMCE 自适应图标前景：一颗星光（starlight）。
+  108x108 画布，内容集中在中间 66x66 安全区内（约 61%），
+  四周留白给系统裁圆角 / 圆形 / 圆角方形，任何形状都不会切到主体。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 主星形 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,24 L61.35,43.89 L82.53,44.73 L65.89,57.86 L71.63,78.27 L54,66.5 L36.37,78.27 L42.11,57.86 L25.47,44.73 L46.65,43.89 Z" />
+
+    <!-- 右上小星芒 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.9"
+        android:pathData="M77,27 L79,32 L84,34 L79,36 L77,41 L75,36 L70,34 L75,32 Z" />
+
+    <!-- 左下小圆点 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.75"
+        android:pathData="M32,71.5 A2.5,2.5 0 1,0 32,76.5 A2.5,2.5 0 1,0 32,71.5 Z" />
+</vector>

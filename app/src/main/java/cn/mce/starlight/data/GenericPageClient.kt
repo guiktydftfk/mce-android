@@ -1,6 +1,5 @@
 package cn.mce.starlight.data
 
-import android.webkit.CookieManager
 import cn.mce.starlight.core.WebCookies
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,10 +38,11 @@ data class GenericPage(
  */
 object GenericPageClient {
 
-    const val MOBILE_UA =
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) " +
-            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 " +
-            "Mobile/15E148 Safari/604.1"
+    /** 兼容旧调用：UA 统一由 [Net] 维护 */
+    const val MOBILE_UA = Net.MOBILE_UA
+
+    /** 桌面版 UA（强制电脑版模板时用） */
+    const val DESKTOP_UA = Net.DESKTOP_UA
 
     suspend fun load(url: String): GenericPage = withContext(Dispatchers.IO) {
         val html = get(url)
@@ -117,8 +117,14 @@ object GenericPageClient {
         GenericPage(url = url, title = title, blocks = blocks.take(80), requiresLogin = requiresLogin)
     }
 
-    /** 提交表单（GET 拼参数 / POST 表单编码），返回是否成功 */
-    suspend fun submit(form: PageBlock.Form): Boolean = withContext(Dispatchers.IO) {
+    /**
+     * 提交表单（GET 拼参数 / POST 表单编码），返回响应体；失败返回 null。
+     *
+     * v0.3.3 批 4：以前只要 HTTP 200 就 `true`，签到/任务等表单的失败提示
+     * （需要验证码 / 已签到 / 无权操作）也被当成成功。现在把响应交给调用方，
+     * 用 [DiscuzResponse] 判定。
+     */
+    suspend fun submit(form: PageBlock.Form): String? = withContext(Dispatchers.IO) {
         runCatching {
             val cookie = WebCookies.cookieHeader()
             if (form.method.equals("post", true)) {
@@ -136,22 +142,28 @@ object GenericPageClient {
                     }
                 get(if (form.action.contains("?")) "${form.action}&$query" else "${form.action}?$query")
             }
-            true
-        }.getOrDefault(false)
+        }.getOrNull()
     }
 
     private fun isInternal(href: String): Boolean =
         !href.startsWith("http") || href.contains("mce.msi.cn")
 
-    private fun absolutize(href: String): String = when {
-        href.startsWith("//") -> "https:$href"
-        href.startsWith("http") -> href
-        href.startsWith("/") -> "https://mce.msi.cn$href"
-        else -> "https://mce.msi.cn/$href"
-    }
+    private fun absolutize(href: String): String = Net.absolutize(href)
 
-    fun get(url: String, cookieOverride: String? = null): String =
-        follow(url, "GET", cookieOverride ?: WebCookies.cookieHeader(url), null)
+    fun get(
+        url: String,
+        cookieOverride: String? = null,
+        userAgent: String? = null,
+        /** 不把本次响应的 Set-Cookie 写入 CookieJar（用于"强制电脑版模板"这类一次性探路请求） */
+        isolateCookies: Boolean = false,
+    ): String = follow(
+        url,
+        "GET",
+        cookieOverride ?: WebCookies.cookieHeader(url),
+        null,
+        userAgent,
+        isolateCookies,
+    )
 
     /**
      * 手动跟随 3xx：每跳都保存 Set-Cookie。
@@ -163,12 +175,15 @@ object GenericPageClient {
         method: String,
         cookie: String?,
         body: String?,
+        userAgent: String? = null,
+        isolateCookies: Boolean = false,
     ): String {
         var currentUrl = startUrl
         var currentCookie = cookie
         var currentMethod = method
         var currentBody = body
         var hops = 0
+        val ua = userAgent ?: MOBILE_UA
 
         while (true) {
             val conn = (URL(currentUrl).openConnection() as HttpURLConnection).apply {
@@ -176,7 +191,7 @@ object GenericPageClient {
                 readTimeout = 25_000
                 instanceFollowRedirects = false
                 requestMethod = currentMethod
-                setRequestProperty("User-Agent", MOBILE_UA)
+                setRequestProperty("User-Agent", ua)
                 currentCookie?.let { setRequestProperty("Cookie", it) }
                 if (currentMethod == "POST") {
                     doOutput = true
@@ -189,8 +204,8 @@ object GenericPageClient {
                 }
                 val code = conn.responseCode
 
-                // 逐跳保存 Cookie（这是关键）
-                storeCookies(currentUrl, conn)
+                // 逐跳保存 Cookie（这是关键）；一次性探路请求（强制电脑版模板）不落盘
+                if (!isolateCookies) storeCookies(currentUrl, conn)
 
                 if (code in 300..399 && hops < 6) {
                     val location = conn.getHeaderField("Location") ?: break
@@ -215,7 +230,7 @@ object GenericPageClient {
     fun httpPost(url: String, body: String, cookie: String?): String =
         follow(url, "POST", cookie ?: WebCookies.cookieHeader(url), body)
 
-    /** 保存响应 Cookie：写入自建 CookieJar（不依赖 WebView），并尽力兼容 CookieManager */
+    /** 保存响应 Cookie：只写入自建 CookieJar（v0.3.3 批 2 已删除 CookieManager 镜像/flush） */
     private fun storeCookies(url: String, conn: HttpURLConnection) {
         runCatching {
             val headers = conn.headerFields
@@ -225,15 +240,9 @@ object GenericPageClient {
         }
     }
 
-    /** 是否被重定向到登录页（会话失效） */
-    fun isLoginPage(html: String): Boolean =
-        html.contains("id=\"loginform\"") || html.contains("name=\"loginsubmit\"") ||
-            (html.contains("name=\"password\"") && html.contains("member.php?mod=logging"))
+    /** 是否被重定向到登录页（会话失效）；判定逻辑统一在 [Net] */
+    fun isLoginPage(html: String): Boolean = Net.isLoginPage(html)
 
-    /** 是否被论坛频率/安全策略拦截 */
-    fun isBlockedPage(html: String): Boolean =
-        html.contains("\u9891\u7e41") || html.contains("\u8bf7\u7a0d\u540e") ||
-            html.contains("seccodeverify") || html.contains("\u8bbf\u95ee\u88ab\u62d2\u7edd")
-
-    fun document(url: String): Document = Jsoup.parse(get(url), url)
+    /** 是否被论坛频率/安全策略拦截；判定逻辑统一在 [Net] */
+    fun isBlockedPage(html: String): Boolean = Net.isBlockedPage(html)
 }

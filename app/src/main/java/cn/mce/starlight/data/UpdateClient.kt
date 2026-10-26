@@ -30,6 +30,7 @@ object UpdateClient {
     private const val API_LATEST =
         "https://api.github.com/repos/guiktydftfk/mce-android/releases/latest"
     private const val UA = "MCE-Android-Updater"
+    private val versionNumberRegex = Regex("""(\d+)""")
 
     data class Release(
         val versionName: String,
@@ -73,52 +74,68 @@ object UpdateClient {
 
     /** 检查更新并能区分「已是最新 / 有新版 / 检查失败」 */
     suspend fun checkDetailed(context: Context): CheckResult = withContext(Dispatchers.IO) {
-        val reachable = MANIFEST_URLS.any { httpGet(it) != null }
-        if (!reachable) {
-            return@withContext CheckResult.Failed("\u65e0\u6cd5\u8fde\u63a5\u66f4\u65b0\u670d\u52a1\uff0c\u8bf7\u68c0\u67e5\u7f51\u7edc\u540e\u91cd\u8bd5")
-        }
-        val r = check(context)
-        if (r != null) CheckResult.Available(r) else CheckResult.Latest
-    }
+        // v0.3.3（批 1）：旧实现先对 4 个镜像逐个 httpGet 做"可达性预探测"，再调 check()
+        // 把同样的 URL 再抓一遍 → 启动最坏 8 次串行请求。现在每个镜像只抓一次，
+        // 并且某个镜像的清单不新时继续试下一个（避免 gh-proxy 缓存旧文件导致"永远已是最新"）。
+        val current = currentVersionCode(context)
+        var anyReachable = false
 
-    /** 检查更新；返回 null 表示已是最新或检查失败 */
-    suspend fun check(context: Context): Release? = withContext(Dispatchers.IO) {
-        // 1) 优先 version.json（多镜像，国内常用 jsDelivr）
         for (manifestUrl in MANIFEST_URLS) {
-        httpGet(manifestUrl + (if (manifestUrl.contains("?")) "&" else "?") + "t=" + System.currentTimeMillis())?.let { body ->
-            runCatching {
-                val json = JSONObject(body)
-                val code = json.optInt("versionCode", 0)
-                if (code <= currentVersionCode(context)) return@withContext null
-                Release(
-                    versionName = json.optString("versionName", "?"),
-                    versionCode = code,
-                    notes = json.optString("notes", ""),
-                    apkUrl = json.optString("apk").takeIf { it.isNotBlank() },
-                )
-            }.onSuccess { if (it?.versionCode ?: 0 > 0) return@withContext it }
-        }
+            val body = httpGet(withTimestamp(manifestUrl)) ?: continue
+            anyReachable = true
+            parseManifest(body, current)?.let { return@withContext CheckResult.Available(it) }
         }
 
-        // 2) 回退 GitHub Releases
+        // 回退 GitHub Releases
         httpGet(API_LATEST)?.let { body ->
-            runCatching {
-                val json = JSONObject(body)
-                val tag = json.optString("tag_name").trimStart('v', 'V')
-                val notes = json.optString("body", "")
-                val assetUrl = json.optJSONArray("assets")?.let { arr ->
-                    (0 until arr.length())
-                        .map { arr.getJSONObject(it) }
-                        .firstOrNull { it.optString("name").endsWith(".apk") }
-                        ?.optString("browser_download_url")
-                }
-                val code = Regex("""(\d+)""").find(tag)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                if (code > currentVersionCode(context)) {
-                    Release(tag.ifBlank { "新版本" }, code, notes, assetUrl)
-                } else null
-            }.getOrNull()
+            anyReachable = true
+            parseGithubRelease(body, current)?.let { return@withContext CheckResult.Available(it) }
+            return@withContext CheckResult.Latest
+        }
+
+        if (anyReachable) {
+            CheckResult.Latest
+        } else {
+            CheckResult.Failed("\u65e0\u6cd5\u8fde\u63a5\u66f4\u65b0\u670d\u52a1\uff0c\u8bf7\u68c0\u67e5\u7f51\u7edc\u540e\u91cd\u8bd5")
         }
     }
+
+    /** 兼容旧调用：只关心有没有新版（失败/最新都返回 null） */
+    suspend fun check(context: Context): Release? =
+        when (val r = checkDetailed(context)) {
+            is CheckResult.Available -> r.release
+            else -> null
+        }
+
+    /** 清单 URL 加时间戳绕 CDN 缓存（version.json 很小，开销可忽略；不加会误报"已是最新"） */
+    private fun withTimestamp(url: String): String =
+        url + (if (url.contains("?")) "&" else "?") + "t=" + System.currentTimeMillis()
+
+    private fun parseManifest(body: String, currentCode: Int): Release? = runCatching {
+        val json = JSONObject(body)
+        val code = json.optInt("versionCode", 0)
+        if (code <= currentCode) return@runCatching null
+        Release(
+            versionName = json.optString("versionName", "?"),
+            versionCode = code,
+            notes = json.optString("notes", ""),
+            apkUrl = json.optString("apk").takeIf { it.isNotBlank() },
+        )
+    }.getOrNull()
+
+    private fun parseGithubRelease(body: String, currentCode: Int): Release? = runCatching {
+        val json = JSONObject(body)
+        val tag = json.optString("tag_name").trimStart('v', 'V')
+        val notes = json.optString("body", "")
+        val assetUrl = json.optJSONArray("assets")?.let { arr ->
+            (0 until arr.length())
+                .map { arr.getJSONObject(it) }
+                .firstOrNull { it.optString("name").endsWith(".apk") }
+                ?.optString("browser_download_url")
+        }
+        val code = versionNumberRegex.find(tag)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        if (code > currentCode) Release(tag.ifBlank { "\u65b0\u7248\u672c" }, code, notes, assetUrl) else null
+    }.getOrNull()
 
     /** 静默下载 APK，返回本地文件 */
     suspend fun download(

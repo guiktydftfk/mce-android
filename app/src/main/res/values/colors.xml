@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- aMCE 品牌色（与 Compose 主题 primary 一致） -->
+    <color name="ic_launcher_background">#1B6FF1</color>
+</resources>

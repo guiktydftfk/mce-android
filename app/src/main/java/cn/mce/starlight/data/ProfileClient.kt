@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,7 +9,18 @@ import org.jsoup.Jsoup
  * 输出头像、昵称、用户组、统计（主题/回帖/积分）、资料字段、入口链接。
  */
 object ProfileClient {
-    private const val BASE = "https://mce.msi.cn"
+    private const val BASE = Net.BASE
+    // v0.3.3 批 3：正则常量 + 按标签动态编译的正则做缓存
+    private val usernameTitleRegex = Regex("""^(.{1,24}?)的个人资料""")
+    private val groupRegex = Regex("""用户组[:：]?\s*([^\s|]{1,20})""")
+    private val labelNumberCache = mutableMapOf<String, Regex>()
+    private val labelTextCache = mutableMapOf<String, Regex>()
+    private fun labelNumberRegex(label: String): Regex = synchronized(labelNumberCache) {
+        labelNumberCache.getOrPut(label) { Regex("""$label\s*[:：]?\s*(\d+)""") }
+    }
+    private fun labelTextRegex(label: String): Regex = synchronized(labelTextCache) {
+        labelTextCache.getOrPut(label) { Regex("""$label\s*[:：]?\s*([^\s|]{1,24})""") }
+    }
     private const val URL = "$BASE/home.php?mod=space&do=profile"
 
     data class Profile(
@@ -32,22 +43,10 @@ object ProfileClient {
             val avatar = doc.selectFirst("img[src*=avatar.php]")?.attr("src")
                 ?.takeIf { it.isNotBlank() }?.let(::absolutize)
 
-            val username = Regex("""^(.{1,24}?)的个人资料""").find(doc.title())?.groupValues?.get(1)?.trim()
-                ?: doc.selectFirst("h1")?.text()?.trim()?.takeIf { it.length in 1..24 }
-
-            val group = Regex("""用户组[:：]?\s*([^\s|]{1,20})""").find(text)?.groupValues?.get(1)
-                ?: doc.selectFirst(".grouptitle, .xw1")?.text()?.trim()
-
-            val stats = mutableMapOf<String, String>()
-            listOf("主题", "回帖", "积分", "好友", "威望").forEach { label ->
-                Regex("""$label\s*[:：]?\s*(\d+)""").find(text)?.groupValues?.get(1)?.let { stats[label] = it }
-            }
-
-            val fields = mutableMapOf<String, String>()
-            FIELD_LABELS.forEach { label ->
-                val m = Regex("""$label\s*[:：]?\s*([^\s|]{1,24})""").find(text)
-                m?.groupValues?.get(1)?.trim()?.let { if (it.isNotBlank()) fields[label] = it }
-            }
+            val username = ProfileCommon.username(doc)
+            val group = ProfileCommon.group(doc, text)
+            val stats = ProfileCommon.stats(text, listOf("主题", "回帖", "积分", "好友", "威望"))
+            val fields = ProfileCommon.fields(text, FIELD_LABELS)
 
             val entries = doc.select("a[href]").mapNotNull { a ->
                 val href = a.attr("href")
@@ -71,13 +70,5 @@ object ProfileClient {
         }.getOrNull()
     }
 
-    private fun absolutize(href: String): String {
-        val h = href.replace("&amp;", "&")
-        return when {
-            h.startsWith("//") -> "https:$h"
-            h.startsWith("http") -> h
-            h.startsWith("/") -> "$BASE$h"
-            else -> "$BASE/$h"
-        }
-    }
+    private fun absolutize(href: String): String = Net.absolutize(href)
 }

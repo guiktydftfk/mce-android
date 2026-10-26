@@ -67,6 +67,8 @@ fun SearchScreen(
     var keyword by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // 空结果用中性提示（旧实现塞进 error → 红色报错色，把"没搜到"显示成"出错了"）
+    var notice by remember { mutableStateOf<String?>(null) }
     var threads by remember { mutableStateOf(emptyList<SearchClient.Hit>()) }
     var users by remember { mutableStateOf(emptyList<SearchClient.UserHit>()) }
 
@@ -86,13 +88,14 @@ fun SearchScreen(
     fun doSearch() {
         loading = true
         error = null
+        notice = null
         threads = emptyList()
         users = emptyList()
         scope.launch {
             runCatching {
                 if (mode == "user") {
                     users = SearchClient.searchUsers(keyword.trim())
-                    if (users.isEmpty()) error = "没有找到相关用户"
+                    if (users.isEmpty()) notice = "没有找到相关用户"
                 } else {
                     val adv = !showAdvanced && author.isBlank() && boardIndex < 0 && daysIndex == 0
                     threads = if (adv) {
@@ -108,9 +111,16 @@ fun SearchScreen(
                             ),
                         )
                     }
-                    if (threads.isEmpty()) error = "没有找到相关帖子"
+                    if (threads.isEmpty()) notice = "没有找到相关帖子"
                 }
-            }.onFailure { error = it.message ?: "搜索失败" }
+            }.onFailure {
+                val raw = it.message ?: "搜索失败"
+                error = if (mode == "user" && (raw.contains("503") || raw.contains("模板"))) {
+                    "论坛用户搜索页暂时不可用（服务端模板缺失），已尝试兼容模式仍失败，请稍后再试或先搜帖子"
+                } else {
+                    raw
+                }
+            }
             loading = false
         }
     }
@@ -304,6 +314,14 @@ fun SearchScreen(
                         it,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+                notice?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }

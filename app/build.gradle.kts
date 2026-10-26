@@ -23,6 +23,20 @@ android {
         compose = true
     }
 
+    /**
+     * v0.3.3 批 6：release 包用 debug keystore 签名（仓库内 keystore/debug.keystore），
+     * 保证与历史 debug 包**同签名、可覆盖升级**；同时避免依赖用户目录下 ~/.android 的 keystore
+     * （CI/沙箱环境对该路径无写权限，release 签名校验会失败）。
+     */
+    signingConfigs {
+        create("mceRelease") {
+            storeFile = rootProject.file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -34,7 +48,14 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // v0.3.3 批 6：发行包开启 R8（裁剪 + 资源压缩），并用 debug 签名便于侧载安装
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("mceRelease")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 

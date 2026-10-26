@@ -1,4 +1,4 @@
-package cn.mce.starlight.ui
+﻿package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -166,9 +167,9 @@ fun ProfileEditScreen(
                         onClick = {
                             saving = true
                             scope.launch {
-                                val ok = ProfileEditClient.submit(f, values.toMap())
+                                val (ok, msg) = ProfileEditClient.submit(f, values.toMap())
                                 saving = false
-                                message = if (ok) "已保存" else "保存失败"
+                                message = if (ok) msg else "\u4fdd\u5b58\u5931\u8d25\uff1a$msg"
                                 if (ok) onSaved()
                             }
                         },
@@ -206,7 +207,7 @@ fun GenericListScreen(
                 }
             } else {
                 LazyColumn(contentPadding = PaddingValues(top = topInset + 64.dp, bottom = 110.dp)) {
-                    items(list) { item ->
+                    itemsIndexed(list, key = { index, item -> "${item.url ?: item.title}#$index" }) { _, item ->
                         Row(
                             Modifier
                                 .fillMaxWidth()

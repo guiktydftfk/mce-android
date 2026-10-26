@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import cn.mce.starlight.core.WebCookies
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +15,15 @@ import java.net.URLEncoder
  *  3. GET 论坛首页校验是否出现「退出」链接
  */
 object AuthClient {
-    private const val BASE = "https://mce.msi.cn"
+    private const val BASE = Net.BASE
+    // v0.3.3 批 3：正则常量
+    private val formhashQueryRegex = Regex("""formhash=([a-z0-9]+)""")
+    private val errorPatterns = listOf(
+        Regex("""登录失败[^。]{0,40}"""),
+        Regex("""密码错误[^。]{0,30}"""),
+        Regex("""(?:请|需要)[^。]{0,20}登录[^。]{0,20}"""),
+        Regex("""验证码[^。]{0,20}"""),
+    )
 
     sealed interface Result {
         data object Success : Result
@@ -68,6 +76,10 @@ object AuthClient {
             val ok = check != null && (check.contains("action=logout") || check.contains("action=logout"))
 
             if (ok) {
+                // 登录成功后旧会话的缩略图 URL/负缓存都不可信（负缓存里可能是游客期抓不到的图）
+                ThreadImageCache.clear()
+                // formhash 跟会话绑定：换账号后必须重新取
+                FormhashStore.invalidate()
                 Result.Success
             } else {
                 val msg = extractError(response)
@@ -79,25 +91,20 @@ object AuthClient {
     suspend fun logout(): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             val forumHtml = GenericPageClient.get("$BASE/forum.php")
-            val formhash = Regex("""formhash=([a-z0-9]+)""")
-                .find(forumHtml)?.groupValues?.get(1).orEmpty()
+            val formhash = Net.formhashOf(forumHtml).orEmpty()
             if (formhash.isNotEmpty()) {
                 GenericPageClient.get("$BASE/member.php?mod=logging&action=logout&formhash=$formhash")
             }
             cn.mce.starlight.core.WebCookies.clear()
+            ThreadImageCache.clear()
+            FormhashStore.invalidate()
             true
         }.getOrDefault(false)
     }
 
     private fun extractError(html: String): String? {
         val text = Jsoup.parse(html).text()
-        val patterns = listOf(
-            Regex("""登录失败[^。]{0,40}"""),
-            Regex("""密码错误[^。]{0,30}"""),
-            Regex("""(?:请|需要)[^。]{0,20}登录[^。]{0,20}"""),
-            Regex("""验证码[^。]{0,20}"""),
-        )
-        for (p in patterns) {
+        for (p in errorPatterns) {
             p.find(text)?.let { return it.value.take(60) }
         }
         return null

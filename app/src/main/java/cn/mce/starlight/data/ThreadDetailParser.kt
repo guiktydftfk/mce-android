@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -21,6 +21,11 @@ object ThreadDetailParser {
 
     private val pidRegex = Regex("""pid(\d+)""")
     private val imageExtRegex = Regex("""\.(jpe?g|png|gif|webp|bmp)(\?|$)""", RegexOption.IGNORE_CASE)
+    // v0.3.3 批 3：每帖/每楼都会用到的正则提升为常量
+    private val fidRegex = Regex("""action=reply&(?:amp;)?fid=(\d+)""")
+    private val uidRegex = Regex("""uid=(\d+)""")
+    private val trailingSpaceNewlineRegex = Regex("""[ \t]+\n""")
+    private val multiNewlineRegex = Regex("""\n{3,}""")
 
     private val blockSelectors = listOf(
         "div.plc[id^=pid]",
@@ -42,7 +47,7 @@ object ThreadDetailParser {
 
         val posts = blocks.mapNotNull { block -> parsePost(block, blocks.indexOf(block)) }
 
-        val fid = Regex("""action=reply&(?:amp;)?fid=(\d+)""").find(html)
+        val fid = fidRegex.find(html)
             ?.groupValues?.get(1)?.toIntOrNull()
 
         val rewardCount = doc.selectFirst("div.view_reward .reward_num span")
@@ -56,9 +61,38 @@ object ThreadDetailParser {
             page = page,
             hasNextPage = doc.select("a").any { it.text().contains("\u4e0b\u4e00\u9875") },
             fid = fid,
-            formhash = Regex("""name="formhash"\s+value="([a-z0-9]+)"""").find(html)?.groupValues?.get(1),
+            formhash = Net.formhashOf(html),
             rewardCount = rewardCount,
         )
+    }
+
+    /**
+     * 轻量首图提取：只解析一次 DOM，取第一张正文图（不做楼层/分块解析）。
+     * 供列表卡片缩略图使用 —— 旧实现为了拿一个图片 URL 会跑完整楼层解析，
+     * 首屏 8 张卡片就等于 8 次全楼层解析，纯浪费 CPU。
+     */
+    fun firstImageUrl(html: String, baseUrl: String): String? {
+        val doc = Jsoup.parse(html, baseUrl)
+        val containers = blockSelectors
+            .map { doc.select(it) }
+            .firstOrNull { it.isNotEmpty() }
+            ?: listOf(doc)
+
+        for (container in containers) {
+            // 1) 正文容器内的图片（相册/附件图也常在这里）
+            val scope = container.selectFirst("div.message") ?: container.selectFirst(".message")
+            scope?.select("img")?.forEach { img -> imageUrlOf(img)?.let { return it } }
+            // 2) 同楼层其余图片（message 之外的相册/附件容器）
+            container.select("img").forEach { img -> imageUrlOf(img)?.let { return it } }
+            // 3) 纯链接形式的附件图
+            container.select("a[href]").forEach { a ->
+                val href = a.attr("href").replace("&amp;", "&")
+                if (isImageAttachmentLink(href, a.text())) {
+                    return absolutize(href).replace(" ", "%20")
+                }
+            }
+        }
+        return null
     }
 
     private fun parsePost(el: Element, index: Int): Post? {
@@ -76,7 +110,7 @@ object ThreadDetailParser {
         val avatar = authi?.selectFirst("a.avatars img, img")?.attr("src")
             ?.takeIf { it.isNotBlank() }?.let(::absolutize)
 
-        val authorUid = Regex("""uid=(\d+)""").find(authorLink?.attr("href").orEmpty())
+        val authorUid = uidRegex.find(authorLink?.attr("href").orEmpty())
             ?.groupValues?.get(1)?.toIntOrNull()
         val message = el.selectFirst("div.message") ?: el.selectFirst(".message")
 
@@ -121,8 +155,8 @@ object ThreadDetailParser {
         fun flush() {
             val text = sb.toString()
                 .replace("\u00a0", " ")
-                .replace(Regex("""[ \t]+\n"""), "\n")
-                .replace(Regex("""\n{3,}"""), "\n\n")
+                .replace(trailingSpaceNewlineRegex, "\n")
+                .replace(multiNewlineRegex, "\n\n")
                 .trim()
             if (text.isNotEmpty()) blocks.add(ContentBlock.Text(text))
             sb.setLength(0)
@@ -171,14 +205,17 @@ object ThreadDetailParser {
         val raw = sequenceOf("zoomfile", "file", "data-src", "data-original", "src")
             .map { img.attr(it) }
             .firstOrNull { v ->
+                val isStaticSmiley = v.startsWith("static/image") && v.contains("/smiley/")
                 v.isNotBlank() &&
                     !v.contains("avatar.php") &&
                     !v.contains("filetype/") &&
                     (allowSmiley || !v.contains("smiley")) &&
                     !v.contains("none.gif") &&
-                    !v.startsWith("static/image")
+                    // 模板静态图（含表情）默认当装饰过滤；正文表情（allowSmiley）保留
+                    (!v.startsWith("static/image") || (allowSmiley && isStaticSmiley))
             } ?: return null
-        return absolutize(raw.replace("&amp;", "&"))
+        // 表情文件名里带空格（red dragon (12).jpg），URL 需要 %20
+        return absolutize(raw.replace("&amp;", "&")).replace(" ", "%20")
     }
 
     private fun isImageAttachmentLink(href: String, label: String): Boolean {
@@ -220,21 +257,6 @@ object ThreadDetailParser {
         return result.toList()
     }
 
-    /** Flat image list (used by list thumbnails). */
-    fun collectImages(root: Element): List<String> {
-        val result = LinkedHashSet<String>()
-        root.select("img").forEach { img -> imageUrlOf(img)?.let { result.add(it) } }
-        root.select("a[href]").forEach { a ->
-            val href = a.attr("href").replace("&amp;", "&")
-            if (isImageAttachmentLink(href, a.text())) result.add(absolutize(href))
-        }
-        return result.toList()
-    }
 
-    private fun absolutize(src: String): String = when {
-        src.startsWith("//") -> "https:$src"
-        src.startsWith("http") -> src
-        src.startsWith("/") -> "https://mce.msi.cn$src"
-        else -> "https://mce.msi.cn/$src"
-    }
+    private fun absolutize(src: String): String = Net.absolutize(src)
 }

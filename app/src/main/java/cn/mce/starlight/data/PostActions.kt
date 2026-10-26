@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -17,11 +17,18 @@ import java.net.URLEncoder
  *   options: hiddenreplies / ordertype / allownoticeauthor / smileyoff / parseurloff / usesig
  *   reply credit: replycredit_times / replycredit_extcredits
  *   draft: save=1
+ * poll:   GET forum.php?mod=post&action=newthread&fid=X&special=1  (mobile 模板「发投票」)
+ *         POST 同发帖地址 + special=1 / polls=yes / tpolloption=2 /
+ *              polloptions（每行一个选项）/ maxchoices / expiration /
+ *              visibilitypoll（投票后结果可见）/ overt（公开投票参与人）
  * reply: POST forum.php?mod=post&action=reply&fid=X&tid=Y&replysubmit=yes (+reppost)
  * upload: POST misc.php?mod=swfupload&action=swfupload&operation=upload&simple=1&type=image&fid=X (Filedata)
  */
 object PostActions {
-    private const val BASE = "https://mce.msi.cn"
+    private const val BASE = Net.BASE
+    // v0.3.3 批 3：正则常量（避免每次调用编译）
+    private val aidJsonRegex = Regex(""""aid"\s*:\s*"?(\d+)""")
+    private val aidQueryRegex = Regex("""aid=(\d+)""")
 
     data class Result(val ok: Boolean, val message: String?)
 
@@ -46,36 +53,53 @@ object PostActions {
         val draft: Boolean = false,
     )
 
-    private fun formhash(html: String): String =
-        Regex("""name="formhash"\s+value="([a-z0-9]+)"""").find(html)?.groupValues?.get(1)
-            ?: Regex("""formhash=([a-z0-9]+)""").find(html)?.groupValues?.get(1)
-            ?: ""
+    /** 投票参数（对应移动模板「发投票」表单） */
+    data class Poll(
+        val choices: List<String>,
+        val maxChoices: Int? = null,
+        val expireDays: Int? = null,
+        /** visibilitypoll：投票后结果可见 */
+        val resultVisible: Boolean = false,
+        /** overt：公开投票参与人 */
+        val publicVoters: Boolean = false,
+    ) {
+        val validChoices: List<String>
+            get() = choices.map { it.trim() }.filter { it.isNotBlank() }.distinct().take(MAX_CHOICES)
+
+        companion object {
+            const val MAX_CHOICES = 20
+        }
+    }
+
+    private fun formhash(html: String): String = Net.formhashOf(html).orEmpty()
 
     private fun encode(vararg pairs: Pair<String, String>): String =
         pairs.joinToString("&") {
             URLEncoder.encode(it.first, "UTF-8") + "=" + URLEncoder.encode(it.second, "UTF-8")
         }
 
-    /** Load compose form: formhash + topic categories */
-    suspend fun loadComposeForm(fid: Int): ComposeForm? = withContext(Dispatchers.IO) {
-        runCatching {
-            val html = GenericPageClient.get("$BASE/forum.php?mod=post&action=newthread&fid=$fid")
-            val doc = Jsoup.parse(html, BASE)
-            val hash = formhash(html)
-            if (hash.isEmpty()) return@runCatching null
+    /** Load compose form: formhash + topic categories (poll = 使用「发投票」表单) */
+    suspend fun loadComposeForm(fid: Int, poll: Boolean = false): ComposeForm? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val special = if (poll) "&special=1" else ""
+                val html = GenericPageClient.get("$BASE/forum.php?mod=post&action=newthread&fid=$fid$special")
+                val doc = Jsoup.parse(html, BASE)
+                val hash = formhash(html)
+                if (hash.isEmpty()) return@runCatching null
 
-            val categories = doc.select("select[name=typeid] option").mapNotNull { opt ->
-                val id = opt.attr("value")
-                val name = opt.text().trim()
-                if (id.isBlank() || id == "0" || name.contains("\u9009\u62e9")) null
-                else Category(id, name)
-            }
+                val categories = doc.select("select[name=typeid] option").mapNotNull { opt ->
+                    val id = opt.attr("value")
+                    val name = opt.text().trim()
+                    if (id.isBlank() || id == "0" || name.contains("\u9009\u62e9")) null
+                    else Category(id, name)
+                }
 
-            val posttime = doc.selectFirst("input[name=posttime]")?.attr("value")
+                val posttime = doc.selectFirst("input[name=posttime]")?.attr("value")
 
-            ComposeForm(fid, hash, categories, posttime)
-        }.getOrNull()
-    }
+                ComposeForm(fid, hash, categories, posttime)
+            }.getOrNull()
+        }
 
     /** Upload one image, returns attachment id (aid) or null */
     suspend fun uploadImage(fid: Int, bytes: ByteArray, filename: String): String? =
@@ -106,8 +130,8 @@ object PostActions {
                 }
                 val resp = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                 conn.disconnect()
-                Regex(""""aid"\s*:\s*"?(\d+)""").find(resp)?.groupValues?.get(1)
-                    ?: Regex("""aid=(\d+)""").find(resp)?.groupValues?.get(1)
+                aidJsonRegex.find(resp)?.groupValues?.get(1)
+                    ?: aidQueryRegex.find(resp)?.groupValues?.get(1)
             }.getOrNull()
         }
 
@@ -118,9 +142,13 @@ object PostActions {
         typeid: String? = null,
         aids: List<String> = emptyList(),
         options: Options = Options(),
+        poll: Poll? = null,
     ): Result = withContext(Dispatchers.IO) {
         if (subject.isBlank()) return@withContext Result(false, "\u6807\u9898\u4e0d\u80fd\u4e3a\u7a7a")
         if (message.isBlank()) return@withContext Result(false, "\u5185\u5bb9\u4e0d\u80fd\u4e3a\u7a7a")
+        if (poll != null && poll.validChoices.size < 2) {
+            return@withContext Result(false, "\u6295\u7968\u81f3\u5c11\u9700\u8981 2 \u4e2a\u9009\u9879")
+        }
         runCatching {
             // formhash 由 UI 预热到 FormhashStore，避免重复抓页面
             val hash = FormhashStore.get()
@@ -149,14 +177,26 @@ object PostActions {
             if (options.draft) fields += "save" to "1"
             aids.forEach { aid -> fields += "attachnew[$aid]" to "1" }
 
+            // 投票：special=1 + polls=yes；tpolloption=2 表示单框（换行分隔）模式
+            if (poll != null) {
+                fields += "special" to "1"
+                fields += "polls" to "yes"
+                fields += "tpolloption" to "2"
+                fields += "polloptions" to poll.validChoices.joinToString("\n")
+                poll.maxChoices?.let { if (it > 0) fields += "maxchoices" to it.toString() }
+                poll.expireDays?.let { if (it > 0) fields += "expiration" to it.toString() }
+                if (poll.resultVisible) fields += "visibilitypoll" to "1"
+                if (poll.publicVoters) fields += "overt" to "1"
+            }
+
             val body = fields.joinToString("&") {
                 URLEncoder.encode(it.first, "UTF-8") + "=" + URLEncoder.encode(it.second, "UTF-8")
             }
             val url = "$BASE/forum.php?mod=post&action=newthread&fid=$fid&topicsubmit=yes&mobile=2"
             val resp = GenericPageClient.httpPost(url, body, null)
-            val ok = resp.contains("\u53d1\u5e03\u6210\u529f") || resp.contains("\u611f\u8c22\u60a8\u7684\u53c2\u4e0e") ||
-                resp.contains("\u5df2\u53d1\u5e03") || resp.contains("\u8f6c\u5165\u4e3b\u9898")
-            Result(ok, if (ok) "\u53d1\u5e03\u6210\u529f" else (extractMessage(resp) ?: "\u53d1\u5e03\u5931\u8d25\uff08\u8bf7\u770b\u8fd4\u56de\u63d0\u793a\uff09: " + resp.take(120)))
+            // v0.3.3 批 4：统一走 DiscuzResponse（显式成功标记 + 失败原文）
+            val (ok, msg) = DiscuzResponse.judge(resp, "\u53d1\u5e03\u6210\u529f")
+            Result(ok, msg)
         }.getOrElse { Result(false, it.message) }
     }
 
@@ -178,8 +218,10 @@ object PostActions {
                 )
                 val url = "$BASE/forum.php?mod=post&action=reply&fid=$fid&tid=$tid&replysubmit=yes&mobile=2"
                 val resp = GenericPageClient.httpPost(url, body, null)
-                val ok = !resp.contains("\u767b\u5f55\u540e") && !resp.contains("\u8bf7\u8f93\u5165\u5185\u5bb9")
-                Result(ok, if (ok) "\u56de\u590d\u6210\u529f" else extractMessage(resp))
+                // v0.3.3 批 4：旧判定 `!resp.contains("登录后") && !resp.contains("请输入内容")` 几乎恒真，
+                // 失败（来路不正确 / 两次发表间隔 / 内容过短…）也会提示"回复成功"。
+                val (ok, msg) = DiscuzResponse.judge(resp, "\u56de\u590d\u6210\u529f")
+                Result(ok, msg)
             }.getOrElse { Result(false, it.message) }
         }
 
@@ -194,17 +236,12 @@ object PostActions {
             if (page.contains("action=unfavorite")) {
                 return@withContext Result(false, "\u5df2\u7ecf\u6536\u85cf\u8fc7\u4e86")
             }
-            GenericPageClient.get(
+            val resp = GenericPageClient.get(
                 "$BASE/home.php?mod=spacecp&ac=favorite&type=thread&id=$tid&formhash=$hash&handlekey=favorite",
             )
-            Result(true, "\u5df2\u6536\u85cf")
+            // v0.3.3 批 4：以前收藏后无条件返回成功，现在按响应判定
+            val (ok, msg) = DiscuzResponse.judge(resp, "\u5df2\u6536\u85cf")
+            Result(ok, msg)
         }.getOrElse { Result(false, it.message) }
-    }
-
-    private fun extractMessage(html: String): String? {
-        val text = Jsoup.parse(html).text()
-        Regex("""(?:\u767b\u5f55|\u9700\u8981|\u8bf7\u8f93\u5165|\u62b1\u6b49|\u60a8)[^\u3002]{0,40}""")
-            .find(text)?.let { return it.value.take(60) }
-        return null
     }
 }

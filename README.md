@@ -1,9 +1,9 @@
-# MCE 星光班 · Android 原生客户端
+﻿# MCE 星光班 · Android 原生客户端
 
 > 面向 Discuz! X3.5 论坛 [mce.msi.cn](https://mce.msi.cn) 的原生 Android 客户端。
 > Kotlin + Jetpack Compose，无 WebView（纯原生抓取与解析），支持自动更新。
 
-**当前版本：`0.3.1`（versionCode 34）**
+**当前版本：`0.3.2`（versionCode 36）**
 
 ## 📦 下载即安装
 
@@ -21,8 +21,8 @@
 | 首页动态流 | 卡片式信息流（头像/作者/分类/摘要/配图/回复数），导读分类：最新 / 热帖 / 精华 / 沙发 |
 | 板块浏览 | 4 个分组 34 个板块（全国交流 / 项目和活动 / 城市板块 / 星光大厅），侧边栏分组折叠 |
 | 帖子详情 | 完整楼层、图文按原顺序内联、翻页、收藏、赞赏（评分）、楼层回复 |
-| 发帖 | 板块折叠选择（默认综合交流）、主题分类必选、标题/内容必填、BBCode 工具条、图片上传、表情面板（网页表情集）、附加选项、存草稿 |
-| 签到 | 今日排名/连续/累计、排行榜（今日/本月/总榜）、一键签到 |
+| 发帖 | 板块折叠选择（默认综合交流）、主题分类必选、标题/内容必填、BBCode 工具条、图片上传、表情面板（网页表情集）、**发起投票**（选项/最多可选/记票天数/结果可见/公开参与人）、附加选项、存草稿 |
+| 签到 | 今日排名/连续/累计、完整排行榜（今日/本月/总榜，触底自动翻页）、一键签到 |
 | 任务中心 | 任务列表、申请与领奖 |
 | 搜索 | 搜帖子 / 搜用户、高级搜索（作者/版块/时间/排序） |
 | 排行榜 | 帖子 / 投票 / 版块多榜 |
@@ -69,7 +69,8 @@ app/src/main/java/cn/mce/starlight/
 powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -Bump -ToDesktop
 ```
 
-工具链位置：`../android-dev/{jdk,sdk,gradle,gradle-home}`；已配置 `android.overridePathCheck=true`（中文路径）与 Kotlin in-process 编译。
+- 工具链位置：`../android-dev/{jdk,sdk,gradle,gradle-home}`；已配置 `android.overridePathCheck=true`（中文路径）与 Kotlin in-process 编译。
+- **0.3.2 起发行包改为 `assembleRelease` + R8（`isMinifyEnabled`/`isShrinkResources`）**：APK 从 ~9.9MB 降到 ~1.7MB，冷启动更快；release 用仓库内 `keystore/debug.keystore`（与历史 debug 包同签名，可覆盖升级），R8 规则见 `app/proguard-rules.pro`。
 
 ## 🔄 自动更新机制
 
@@ -88,8 +89,8 @@ powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -Bump -ToDesktop
 ## ⚠️ 已知限制
 
 - 普通应用无法完全静默安装：系统安装器需用户点一次「安装」（Android 安全限制）
-- 门户资讯（`portal.php`）、投票/活动发帖、附件（非图片）上传尚未实现
-- 表情面板依赖登录态页面抓取，未登录时表情列表可能为空
+- 门户资讯（`portal.php`）、活动发帖、附件（非图片）上传尚未实现（投票发帖 0.3.2 已支持）
+- **用户搜索**（搜用户）在论坛手机模板缺失 `mytpl/menubottom.htm` 时服务端会 503：客户端已内置电脑版模板回退，可正常使用；根治需论坛后台补模板文件
 
 ## 📁 版本规则
 
@@ -98,6 +99,41 @@ powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -Bump -ToDesktop
 ---
 
 ## 更新记录
+
+## 0.3.2 · 签到榜单 + 发起投票 + 表情修复 + 稳定性/速度优化（六批）
+
+> 本版把原计划的 0.3.2 功能与 0.3.3 的六批优化**合并为一个发布版**；逐条问题清单与修改顺序见 `docs/CODE-REVIEW-0.3.2.md`（含 file:line 证据）。详情页分页交互按计划保留未改。
+
+### 新功能与修复
+
+- 修复：**签到排行榜显示不完整** —— 真实根因有两条：① 旧实现只取第一页并 `take(30)`（今日榜实测 155 人、本月 394 人、总榜 400+）；
+  ② `format=ajax` 的排行榜片段没有外层 `<table>`（直接是 `<tbody id="autolist_uid">`），Jsoup 会把游离的 tbody/tr 丢掉 → 0 条。
+  现补齐 `<table>` 外壳解析 + 按真实分页（每页 200）触底自动加载，页头显示「已加载/共 N 人」，行内显示名次、时间、月签到、奖励与总天数
+- 新增：发帖页 **发起投票** 页签（移动端真实入口 `special=1`）：投票选项（每行一个，2~20 项）、最多可选、记票天数、
+  投票后结果可见（`visibilitypoll`）、公开投票参与人（`overt`），发布走原发帖接口
+- 修复：**表情缺小红龙（reddragon）** —— 改为解析论坛表情定义 `data/cache/common_smilies_var.js`，
+  4 套表情（小红龙 24 / 小红龙2 24 / 经典 24 / 小表情 30）全部可用，文件名含空格也不再被截断（`%20` 编码），
+  插入用论坛原生表情代码；帖子正文里的表情图也按小图显示
+- 新增：**自适应应用图标**（品牌蓝渐变背景 + 白色星光前景，含 roundIcon 与 monochrome 层），系统按圆形/圆角遮罩裁切
+- 变更：发帖页整页可滚动（原来内容框用 weight 固定高度，投票字段放不下）
+- 修复：从板块页进入发帖时预选对应板块（`initialFid` 之前未被使用）
+
+### 稳定性与速度优化（六批）
+
+- 假成功修复：回复 / 发帖 / 收藏 / 评分 / 资料保存 / 任务申请 / 通用表单提交统一走 `DiscuzResponse` 判定（显式成功标记 + 服务端失败原文），不再"失败也提示成功"
+- formhash：登录/退出时失效缓存 + 并发单飞（换账号后不再报"请求来路不正确"）
+- 刷新卡死修复：首页/版块列表刷新不再因未组合的 `scrollToItem` 永久挂起；排行榜"重试"接上真实加载
+- 缩略图：从"下标 < 8"改为**可见窗口 + 预取 3 条**；并发去重改用 `CompletableDeferred`（不再丢图）；首图提取轻量化；失败负缓存/正缓存 LRU；登录/退出清缓存
+- 启动提速：删掉重复的 `SettingsStore.init`、`ThumbCache` 懒加载、`DebugDump` 生产关停并后台清理旧文件、启动网络请求并行、签到提醒只查状态不拉排行榜、更新检查去掉重复预探测
+- 网络/图片：Coil 只保留一个网络拦截器 + host 精确匹配；Cookie header 内存缓存；**删除 WebView CookieManager 兼容层**（每响应 `flush()` 的开销消失）
+- 解析 CPU：全库循环内正则提升为常量；搜索页单次 DOM 解析；删除 `li.html()` 全量序列化；`hasNext` 死计算清理
+- 列表架构：新增 `PagedThreadList` 统一首页/版块/我的主题的列表状态（请求代际号防覆盖、换 tab 重置、单一刷新指示器、空态中性提示）；`StateBlocks` 统一空态/错误态；11 处列表补稳定 key
+- 用户搜索：新增**电脑版模板回退**（`mobile=no` + 桌面 UA），绕过论坛手机模板缺失导致的 503；并用 `isolateCookies` + 启动自愈防止 `mobile=no` Cookie 污染（踩坑已修复）
+- 工程：数据层 `Net` 收敛 BASE/UA/absolutize/formhash/拦截页判定；`ProfileCommon` 复用资料解析；删除 `ForumBoardScreen`、`Dest.Compose`、`loadProfileInfo`、`collectImages` 等死代码；release 开启 R8（APK **~9.9MB → ~1.7MB**）
+- 测试：新增 7 个解析回归 + 用户搜索桌面解析 + 成功判定等用例，当前 **26 个单元测试全绿**
+- 实测（MuMu 模拟器）：冷启动 3.15–3.82s → **1.15–1.33s**；签到/帖子/发帖表情/搜索/收藏/消息/勋章/好友/排行榜/道具/设置/更新检查逐项验证
+- 版本：**0.3.2 / versionCode 36**
+
 
 ## 0.3.1 · 批次合并（请求瘦身 + 启动/图片性能）+ 更名 aMCE
 - 网络：仓储统一走 `GenericPageClient`（逐跳保存 Cookie），删除重复网络实现；登录页/拦截页提示更准确

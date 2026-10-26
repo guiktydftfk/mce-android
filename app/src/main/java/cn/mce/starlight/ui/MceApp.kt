@@ -36,9 +36,8 @@ import cn.mce.starlight.data.AuthClient
 import cn.mce.starlight.data.Boards
 import cn.mce.starlight.data.HttpForumRepository
 import cn.mce.starlight.data.UpdateClient
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-
-private const val BASE = "https://mce.msi.cn"
 
 /** 导航栈 */
 sealed interface Route {
@@ -67,7 +66,6 @@ private enum class Dest(val label: String) {
     Search("搜索"),
     Ranklist("排行榜"),
     Notice("消息提醒"),
-    Compose("发帖"),
     Settings("设置"),
 }
 
@@ -117,19 +115,30 @@ fun MceApp() {
     }
 
     LaunchedEffect(Unit) {
-        // 只有「确定未登录」才弹登录框；网络异常(null)保持静默，避免误判踢人
-        val probe = SessionStore.probeLoginState()
-        if (probe == false) showLogin = true
-        // 签到提醒：已过提醒时间且今日未签到 → 启动时提示
-        if (SettingsStore.signinReminderEnabled &&
-            java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) >= SettingsStore.signinReminderHour
-        ) {
-            runCatching { cn.mce.starlight.data.SigninClient.load() }.getOrNull()?.let { s ->
-                if (!s.alreadySigned) showSigninReminder = true
+        // 启动三项网络请求并行（旧实现串行：登录探测 → 签到提醒 → 检查更新，
+        // 最坏要把三条请求排完才结束，启动初期 4~8 个请求排队抢带宽）。
+        coroutineScope {
+            // 只有「确定未登录」才弹登录框；网络异常(null)保持静默，避免误判踢人
+            launch {
+                val probe = SessionStore.probeLoginState()
+                if (probe == false) showLogin = true
+            }
+            // 签到提醒：已过提醒时间且今日未签到 → 启动时提示（只查状态，不拉排行榜）
+            launch {
+                if (SettingsStore.signinReminderEnabled &&
+                    java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) >=
+                    SettingsStore.signinReminderHour
+                ) {
+                    runCatching { cn.mce.starlight.data.SigninClient.loadStateOnly() }.getOrNull()?.let { s ->
+                        if (!s.alreadySigned) showSigninReminder = true
+                    }
+                }
+            }
+            // 启动后自动检查更新（暂停更新期间跳过）
+            launch {
+                if (!SettingsStore.isUpdateSnoozed()) checkUpdate(silent = true)
             }
         }
-        // 启动后自动检查更新（暂停更新期间跳过）
-        if (!SettingsStore.isUpdateSnoozed()) checkUpdate(silent = true)
     }
 
     ModalNavigationDrawer(
@@ -193,7 +202,7 @@ fun MceApp() {
 
                 HorizontalDivider(Modifier.padding(vertical = 6.dp))
 
-                DrawerItem("发帖", dest == Dest.Compose) {
+                DrawerItem("发帖", false) {
                     dest = Dest.Feed
                     stack = listOf(Route.Compose(null))
                     closeDrawer()
@@ -378,11 +387,6 @@ fun MceApp() {
                 Dest.Notice -> NoticesScreen(
                     onMenu = ::openDrawer,
                     onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
-                )
-
-                Dest.Compose -> NewThreadScreen(
-                    onMenu = ::openDrawer,
-                    onPosted = { dest = Dest.Feed; dataVersion += 1 },
                 )
 
                 Dest.Settings -> SettingsScreen(

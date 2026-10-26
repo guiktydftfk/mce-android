@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 // ---------------- 模型 ----------------
 
@@ -56,7 +56,6 @@ data class ThreadDetail(
     val fid: Int? = null,
     val formhash: String? = null,
     val rewardCount: Int? = null,
-    val rewardUrl: String? = null,
 )
 
 // ---------------- 协议 ----------------

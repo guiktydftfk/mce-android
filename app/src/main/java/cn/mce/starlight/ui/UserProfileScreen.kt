@@ -1,4 +1,4 @@
-package cn.mce.starlight.ui
+﻿package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -233,7 +233,7 @@ fun UserProfileScreen(
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
-                        items(p.recentThreads) { (tid, title) ->
+                        items(p.recentThreads, key = { it.first }) { (tid, title) ->
                             Text(
                                 title,
                                 style = MaterialTheme.typography.bodyMedium,

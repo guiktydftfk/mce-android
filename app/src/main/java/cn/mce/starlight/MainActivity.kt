@@ -12,7 +12,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        SettingsStore.init(this)
+        // SettingsStore.init 已由 MceApplication.onCreate 完成；
+        // 旧实现在这里又 init 一次，等于每次 Activity 创建/旋转都重新读一遍 prefs 并覆盖全部 Compose state。
         setContent {
             AppTheme(darkTheme = SettingsStore.darkMode) {
                 MceApp()

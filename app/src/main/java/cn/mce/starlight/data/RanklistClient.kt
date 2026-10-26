@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -13,7 +13,9 @@ import org.jsoup.Jsoup
  *     ul.rank_thread > li > a  条目，i.rank_hot 名次，span.threadhot[title] 热度
  */
 object RanklistClient {
-    private const val BASE = "https://mce.msi.cn"
+    private const val BASE = Net.BASE
+    // v0.3.3 批 3：正则常量
+    private val tidRegex = Regex("""tid=(\d+)""")
 
     data class RankItem(
         val title: String,
@@ -36,7 +38,7 @@ object RanklistClient {
             boxes.mapIndexedNotNull { index, box ->
                 val items = box.select("ul.rank_thread > li > a, ul.rank_thread li a").mapNotNull { a ->
                     val href = a.attr("href")
-                    val tid = Regex("""tid=(\d+)""").find(href)?.groupValues?.get(1)?.toIntOrNull()
+                    val tid = tidRegex.find(href)?.groupValues?.get(1)?.toIntOrNull()
                     val rank = a.selectFirst("i")?.text()?.trim()
                     val hot = a.selectFirst("span.threadhot")?.attr("title")?.trim()
                     val hotText = a.selectFirst("span.threadhot")?.text()?.trim().orEmpty()

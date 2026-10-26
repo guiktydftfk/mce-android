@@ -393,7 +393,15 @@ private fun PostItem(
                     text = block.text,
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                is ContentBlock.Image -> AsyncImage(
+                is ContentBlock.Image -> if (block.url.contains("/smiley/")) {
+                    // 正文表情（小红龙等）：按原尺寸小图显示，不要拉满整行
+                    AsyncImage(
+                        model = block.url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(30.dp),
+                    )
+                } else AsyncImage(
                     model = block.url,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,

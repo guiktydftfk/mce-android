@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -13,7 +13,7 @@ import java.net.URLEncoder
  * 因此按 form 分组解析并逐个提交。
  */
 object ProfileEditClient {
-    private const val BASE = "https://mce.msi.cn"
+    private const val BASE = Net.BASE
     private const val BASE_URL = "$BASE/home.php?mod=spacecp&ac=profile"
 
     enum class Kind { TEXT, TEXTAREA, SELECT, OPTIONS, HIDDEN }
@@ -109,12 +109,13 @@ object ProfileEditClient {
         }.getOrNull()
     }
 
-    /** 逐个表单提交；返回是否至少有一个成功 */
-    suspend fun submit(form: EditForm, values: Map<String, String>): Boolean =
+    /** 逐个表单提交；返回 (是否至少一个成功, 提示语) */
+    suspend fun submit(form: EditForm, values: Map<String, String>): Pair<Boolean, String> =
         withContext(Dispatchers.IO) {
             var anyOk = false
+            var failure: String? = null
             form.sections.forEach { section ->
-                val ok = runCatching {
+                runCatching {
                     val merged = section.fields.associate { field ->
                         field.name to (values[field.name] ?: field.value)
                     }
@@ -128,10 +129,12 @@ object ProfileEditClient {
                             section.action + (if (section.action.contains("?")) "&" else "?") + body,
                         )
                     }
-                    !resp.contains("\u8d85\u65f6") && !resp.contains("\u9519\u8bef")
-                }.getOrDefault(false)
-                if (ok) anyOk = true
+                    // v0.3.3 批 4：旧判定 `!resp.contains("超时") && !resp.contains("错误")` 恒真，
+                    // 资料保存失败也会提示"已保存"。现在按 Discuz 响应判定（AJAX 成功是 parent.show_success）。
+                    val (ok, msg) = DiscuzResponse.judge(resp, "\u5df2\u4fdd\u5b58")
+                    if (ok) anyOk = true else if (failure == null) failure = msg
+                }.onFailure { if (failure == null) failure = it.message }
             }
-            anyOk
+            anyOk to (failure ?: "\u5df2\u4fdd\u5b58")
         }
 }

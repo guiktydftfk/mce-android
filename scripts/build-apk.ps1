@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$Bump,
     [switch]$NoCopy,
     [switch]$ToDesktop
@@ -54,12 +54,12 @@ $env:GRADLE_USER_HOME = $gradleHome
 $env:PATH             = "$jdk\bin;$env:PATH"
 
 $log = Join-Path $projectRoot 'build.log'
-cmd /c "`"$gradle\bin\gradle.bat`" --project-dir `"$projectRoot`" --gradle-user-home `"$gradleHome`" :app:assembleDebug --no-daemon --console=plain > `"$log`" 2>&1"
+cmd /c "`"$gradle\bin\gradle.bat`" --project-dir `"$projectRoot`" --gradle-user-home `"$gradleHome`" :app:assembleRelease --no-daemon --console=plain > `"$log`" 2>&1"
 $code = $LASTEXITCODE
 Write-Host "[build] gradle exit = $code"
 Get-Content $log -Tail 12
 
-$apk = Join-Path $projectRoot 'app\build\outputs\apk\debug\app-debug.apk'
+$apk = Join-Path $projectRoot 'app\build\outputs\apk\release\app-release.apk'
 if ($code -ne 0 -or -not (Test-Path $apk)) {
     Write-Host '[build] FAILED - see build.log'
     exit 1

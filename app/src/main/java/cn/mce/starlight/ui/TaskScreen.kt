@@ -1,4 +1,4 @@
-package cn.mce.starlight.ui
+﻿package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -57,8 +57,7 @@ fun TaskScreen(
         state = TaskState.Loading
         runCatching { TaskClient.load() }
             .onSuccess {
-                state = if (it.isEmpty()) TaskState.Error("没有解析到任务（可能未登录或无开放任务）")
-                else TaskState.Content(it)
+                state = TaskState.Content(it)
             }
             .onFailure { state = TaskState.Error(it.message ?: "加载失败") }
     }
@@ -95,6 +94,7 @@ fun TaskScreen(
                         )
                     }
                 }
+                if (s.tasks.isEmpty()) { item { EmptyHint("当前没有可申请的任务") } }
                 items(s.tasks, key = { it.id }) { task ->
                     Column(
                         Modifier
@@ -139,9 +139,9 @@ fun TaskScreen(
                                 busyId = task.id
                                 message = null
                                 scope.launch {
-                                    val ok = TaskClient.apply(task)
+                                    val (ok, msg) = TaskClient.apply(task)
                                     busyId = null
-                                    message = if (ok) "已提交申请：${task.title}" else "提交失败"
+                                    message = if (ok) "${msg}\uff1a${task.title}" else msg
                                     load()
                                 }
                             },

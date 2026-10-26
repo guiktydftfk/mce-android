@@ -79,14 +79,20 @@ object SettingsStore {
         prefs()?.edit()?.putString(KEY_BG, path)?.apply()
     }
 
-    fun updateBackgroundAlpha(value: Float) {
+    /**
+     * 更新背景透明度。
+     * @param persist false 时只更新内存 state（拖动滑杆的实时预览），松手后再调一次 persist=true 落盘。
+     *                旧实现 onValueChange 每帧都写一次 SharedPreferences（一次拖动 60+ 次整份 XML 重写）。
+     */
+    fun updateBackgroundAlpha(value: Float, persist: Boolean = true) {
         backgroundAlpha = value.coerceIn(0.05f, 1f)
-        prefs()?.edit()?.putFloat(KEY_BG_ALPHA, backgroundAlpha)?.apply()
+        if (persist) prefs()?.edit()?.putFloat(KEY_BG_ALPHA, backgroundAlpha)?.apply()
     }
 
-    fun updateBackgroundBlur(value: Float) {
+    /** 更新背景模糊度；persist 语义同 [updateBackgroundAlpha] */
+    fun updateBackgroundBlur(value: Float, persist: Boolean = true) {
         backgroundBlur = value.coerceIn(0f, 25f)
-        prefs()?.edit()?.putFloat(KEY_BG_BLUR, backgroundBlur)?.apply()
+        if (persist) prefs()?.edit()?.putFloat(KEY_BG_BLUR, backgroundBlur)?.apply()
     }
 
     fun snoozeUpdates(days: Int) {

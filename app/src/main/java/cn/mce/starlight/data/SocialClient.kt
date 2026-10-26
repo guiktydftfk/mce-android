@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -8,7 +8,9 @@ import org.jsoup.Jsoup
  * 我的勋章 / 我的好友：专用解析，避免通用列表把导航等无关条目也抓进来。
  */
 object SocialClient {
-    private const val BASE = "https://mce.msi.cn"
+    private const val BASE = Net.BASE
+
+    private val uidRegex = Regex("""uid=(\d+)""")
 
     data class Medal(val name: String, val desc: String?, val image: String?)
     data class Friend(val uid: Int, val name: String, val avatar: String?, val extra: String?)
@@ -18,27 +20,31 @@ object SocialClient {
         runCatching {
             val url = "$BASE/home.php?mod=space&do=medal"
             val html = GenericPageClient.get(url)
-            cn.mce.starlight.core.DebugDump.dump("medals", html)
             val doc = Jsoup.parse(html, url)
 
-            val medals = mutableListOf<Medal>()
-            doc.select("li, div").forEach { box ->
-                val img = box.selectFirst("img[src]") ?: return@forEach
+            // v0.3.3 批 3：旧实现 `doc.select("li, div")` 遍历整页并集（嵌套盒重复命中、近似 O(节点×深度)），
+            // 现在用 :has() 一次筛出"含勋章图标的容器"，再按名称去重。
+            val boxes = doc.select(
+                "li:has(img[src*=medal]), div:has(img[src*=medal]), " +
+                    "li:has(img[src*=static/image/common/]), " +
+                    "div:has(img[src*=static/image/common/])",
+            )
+            boxes.mapNotNull { box ->
+                val img = box.selectFirst("img[src]") ?: return@mapNotNull null
                 val src = img.attr("src")
-                if (!src.contains("medal") && !src.contains("static/image/common/")) return@forEach
+                if (!src.contains("medal") && !src.contains("static/image/common/")) return@mapNotNull null
                 val name = img.attr("alt").trim().ifBlank {
                     box.selectFirst("h3, h4, .xs2, dt")?.text()?.trim().orEmpty()
                 }
-                if (name.isBlank() || name.length > 20) return@forEach
+                if (name.isBlank() || name.length > 20) return@mapNotNull null
                 val desc = box.selectFirst("p, dd, .xg1")?.text()?.trim()
                     ?.takeIf { it.isNotBlank() && it != name && it.length <= 60 }
-                medals += Medal(name, desc, absolutize(src))
-            }
-            medals.distinctBy { it.name }
+                Medal(name, desc, absolutize(src))
+            }.distinctBy { it.name }
         }.getOrDefault(emptyList())
     }
 
-    /** 好友列表：多入口兜底（不同模板路径不同），并把每个响应落盘便于排查 */
+    /** 好友列表：多入口兜底（不同模板路径不同） */
     suspend fun loadFriends(): List<Friend> = withContext(Dispatchers.IO) {
         val candidates = listOf(
             "home.php?mod=space&do=friend&view=me",
@@ -48,15 +54,7 @@ object SocialClient {
         )
         for (path in candidates) {
             val url = "$BASE/$path"
-            var html: String? = null
-            runCatching { GenericPageClient.get(url) }
-                .onSuccess { html = it }
-                .onFailure {
-                    cn.mce.starlight.core.DebugDump.dump("friends_err_${path.hashCode()}", it.toString())
-                }
-            val pageHtml = html ?: continue
-            html
-            cn.mce.starlight.core.DebugDump.dump("friends_${path.hashCode()}", pageHtml)
+            val pageHtml = runCatching { GenericPageClient.get(url) }.getOrNull() ?: continue
             val list = runCatching { parseFriendsHtml(pageHtml, url) }.getOrDefault(emptyList())
             if (list.isNotEmpty()) return@withContext list
         }
@@ -83,9 +81,9 @@ object SocialClient {
                 ?: return@mapNotNull null
             val link = li.selectFirst("h1 a") ?: li.selectFirst("a.friendavatar")
                 ?: return@mapNotNull null
-            val uid = Regex("""uid=(\d+)""").find(link.attr("href"))
+            val uid = uidRegex.find(link.attr("href"))
                 ?.groupValues?.get(1)?.toIntOrNull()
-                ?: Regex("""uid=(\d+)""").find(avatarImg.attr("src"))
+                ?: uidRegex.find(avatarImg.attr("src"))
                     ?.groupValues?.get(1)?.toIntOrNull()
                 ?: return@mapNotNull null
             val name = link.text().trim()
@@ -96,10 +94,5 @@ object SocialClient {
             Friend(uid, name, absolutize(avatarImg.attr("src")), extra)
         }.distinctBy { it.uid }
     }
-    private fun absolutize(src: String): String = when {
-        src.startsWith("//") -> "https:$src"
-        src.startsWith("http") -> src
-        src.startsWith("/") -> "$BASE$src"
-        else -> "$BASE/$src"
-    }
+    private fun absolutize(src: String): String = Net.absolutize(src)
 }

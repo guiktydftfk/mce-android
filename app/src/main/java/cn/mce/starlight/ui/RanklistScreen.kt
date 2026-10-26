@@ -1,4 +1,4 @@
-package cn.mce.starlight.ui
+﻿package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.data.RanklistClient
+import kotlinx.coroutines.launch
 
 private sealed interface RankState {
     data object Loading : RankState
@@ -48,6 +52,7 @@ fun RanklistScreen(
     onMenu: () -> Unit,
     onOpenThread: (Int, String) -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<RankState>(RankState.Loading) }
     var tabIndex by remember { mutableStateOf(0) }
 
@@ -73,8 +78,9 @@ fun RanklistScreen(
             is RankState.Error -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(s.message, style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.padding(4.dp))
-                    TextButton(onClick = { /* retry */ }) { Text("重试") }
+                    Spacer(Modifier.height(4.dp))
+                    // v0.3.3 批 4：以前这里是空 lambda（{ /* retry */ }），出错后页面不可恢复
+                    TextButton(onClick = { scope.launch { load() } }) { Text("重试") }
                 }
             }
 
@@ -121,7 +127,7 @@ fun RanklistScreen(
                         Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(top = 10.dp, bottom = 110.dp),
                     ) {
-                        items(current.items) { item ->
+                        itemsIndexed(current.items, key = { index, item -> "${item.tid ?: item.title}#$index" }) { _, item ->
                             Row(
                                 Modifier
                                     .fillMaxWidth()
@@ -165,5 +171,11 @@ fun RanklistScreen(
         }
 
         ImmersiveTopBar(title = "排行榜", modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
+
+        // 榜单页出错时不再只能退出重进
+        DraggableRefreshFab(
+            onClick = { scope.launch { load() } },
+            modifier = Modifier.align(Alignment.BottomEnd),
+        )
     }
 }

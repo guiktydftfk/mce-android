@@ -16,11 +16,14 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,6 +39,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,12 +56,15 @@ import androidx.compose.ui.unit.dp
 import cn.mce.starlight.core.SessionStore
 import cn.mce.starlight.data.Boards
 import cn.mce.starlight.data.PostActions
+import cn.mce.starlight.data.SmileyClient
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 
 /**
  * Compose page (native), covering the web compose essentials:
  *  board + topic category + title + BBCode content
+ *  tabs: 发表帖子 / 发起投票 (v0.3.2 新增投票)
+ *  poll: 选项（每行一个）/ 最多可选 / 记票天数 / 投票后结果可见 / 公开投票参与人
  *  image upload (multi) via misc.php?mod=swfupload
  *  extra options (hidden replies / order / notify / signature / disable smiley / no-parse url)
  *  reply credit, draft saving
@@ -71,13 +78,16 @@ fun NewThreadScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val boards = Boards.all
+    val pageScroll = rememberScrollState()
 
-    // 发帖默认板块固定为「综合交流」
-    var selectedFid by remember { mutableStateOf(Boards.default.fid) }
+    // 发帖默认板块固定为「综合交流」；从板块页进入时用传入的 fid
+    var selectedFid by remember { mutableStateOf(initialFid ?: Boards.default.fid) }
     var expandedBoardGroups by remember { mutableStateOf(setOf("全国交流")) }
     var boardExpanded by remember { mutableStateOf(false) }
     var categoryExpanded by remember { mutableStateOf(false) }
+
+    // 页签：帖子 / 投票
+    var pollMode by remember { mutableStateOf(false) }
 
     var categories by remember { mutableStateOf(emptyList<PostActions.Category>()) }
     var selectedCategory by remember { mutableStateOf<PostActions.Category?>(null) }
@@ -89,6 +99,13 @@ fun NewThreadScreen(
     var contentField by remember { mutableStateOf(TextFieldValue("")) }
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    // 投票字段
+    var pollOptions by remember { mutableStateOf("") }
+    var maxChoices by remember { mutableStateOf("") }
+    var expireDays by remember { mutableStateOf("") }
+    var resultVisible by remember { mutableStateOf(false) }
+    var publicVoters by remember { mutableStateOf(false) }
 
     // extra options
     var hiddenReplies by remember { mutableStateOf(false) }
@@ -106,21 +123,29 @@ fun NewThreadScreen(
     var uploading by remember { mutableStateOf(false) }
 
     val fid = selectedFid
+    val pollChoices = pollOptions.split('\n').map { it.trim() }.filter { it.isNotBlank() }.distinct()
+
+    // 表情：完整表情集（含小红龙 reddragon 全套）
     var showSmiley by remember { mutableStateOf(false) }
-    var smileys by remember { mutableStateOf(emptyList<cn.mce.starlight.data.SmileyClient.Smiley>()) }
-    LaunchedEffect(showSmiley, fid) {
-        if (showSmiley && smileys.isEmpty()) smileys = cn.mce.starlight.data.SmileyClient.load(fid)
+    var smileySets by remember { mutableStateOf(emptyList<SmileyClient.SmileySet>()) }
+    var smileySetIndex by remember { mutableIntStateOf(0) }
+    LaunchedEffect(showSmiley) {
+        if (showSmiley && smileySets.isEmpty()) smileySets = SmileyClient.load(fid)
     }
 
-
-    LaunchedEffect(selectedFid, SessionStore.isLoggedIn, reloadTick) {
+    LaunchedEffect(selectedFid, SessionStore.isLoggedIn, reloadTick, pollMode) {
         loadingForm = true
         formError = null
         categories = emptyList()
         selectedCategory = null
-        val form = PostActions.loadComposeForm(fid)
+        val form = PostActions.loadComposeForm(fid, poll = pollMode)
         loadingForm = false
-        if (form == null) formError = "无法加载发帖表单（可能未登录）" else categories = form.categories
+        if (form == null) {
+            formError = if (pollMode) "无法加载投票表单（可能未登录 / 该板块不允许投票）" else "无法加载发帖表单（可能未登录）"
+        } else {
+            categories = form.categories
+            form.formhash?.let { cn.mce.starlight.data.FormhashStore.seed(it) }
+        }
     }
 
     val pickImages = rememberLauncherForActivityResult(
@@ -163,6 +188,17 @@ fun NewThreadScreen(
     suspend fun submit(draft: Boolean) {
         sending = true
         error = null
+        val poll = if (pollMode) {
+            PostActions.Poll(
+                choices = pollChoices,
+                maxChoices = maxChoices.trim().toIntOrNull(),
+                expireDays = expireDays.trim().toIntOrNull(),
+                resultVisible = resultVisible,
+                publicVoters = publicVoters,
+            )
+        } else {
+            null
+        }
         val r = PostActions.newThread(
             fid = fid,
             subject = subject.trim(),
@@ -180,19 +216,34 @@ fun NewThreadScreen(
                 replyCreditValue = creditValue,
                 draft = draft,
             ),
+            poll = poll,
         )
         sending = false
         if (r.ok) onPosted() else error = r.message ?: "发布失败"
     }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val canSubmit = !sending && subject.isNotBlank() && contentField.text.isNotBlank() &&
+        (categories.isEmpty() || selectedCategory != null) &&
+        (!pollMode || pollChoices.size >= 2)
 
     Column(
         Modifier
             .fillMaxSize()
+            .verticalScroll(pageScroll)
             .padding(top = topInset + 64.dp, start = 14.dp, end = 14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // 页签：发表帖子 / 发起投票
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            ModeTab("\u53d1\u8868\u5e16\u5b50", !pollMode) { pollMode = false }
+            ModeTab("\u53d1\u8d77\u6295\u7968", pollMode) { pollMode = true }
+        }
+        HorizontalDivider()
+
         // board selector
         ExposedDropdownMenuBox(expanded = boardExpanded, onExpandedChange = { boardExpanded = !boardExpanded }) {
             OutlinedTextField(
@@ -267,7 +318,7 @@ fun NewThreadScreen(
                 }
             }
         } else if (loadingForm) {
-            Text("正在加载发帖表单…", style = MaterialTheme.typography.bodySmall)
+            Text("正在加载表单…", style = MaterialTheme.typography.bodySmall)
         }
 
         OutlinedTextField(
@@ -302,11 +353,58 @@ fun NewThreadScreen(
             value = contentField,
             onValueChange = { contentField = it },
             label = { Text("内容（支持 BBCode）") },
-            minLines = 8,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            minLines = if (pollMode) 4 else 8,
+            modifier = Modifier.fillMaxWidth(),
         )
+
+        // ---------- 投票设置 ----------
+        if (pollMode) {
+            OutlinedTextField(
+                value = pollOptions,
+                onValueChange = { pollOptions = it },
+                label = { Text("投票选项（每行 1 个，2~${PostActions.Poll.MAX_CHOICES} 项）") },
+                placeholder = { Text("选项一\n选项二\n选项三") },
+                minLines = 4,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (pollChoices.isNotEmpty()) {
+                Text(
+                    "已填写 ${pollChoices.size} 个选项" +
+                        if (pollChoices.size < 2) "（至少 2 个才能发布）" else "",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (pollChoices.size < 2) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = maxChoices,
+                    onValueChange = { maxChoices = it.filter { c -> c.isDigit() }.take(2) },
+                    label = { Text("最多可选") },
+                    placeholder = { Text("1") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = expireDays,
+                    onValueChange = { expireDays = it.filter { c -> c.isDigit() }.take(3) },
+                    label = { Text("记票天数") },
+                    placeholder = { Text("不限") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            OptionRow("投票后结果可见", resultVisible) { resultVisible = it }
+            OptionRow("公开投票参与人", publicVoters) { publicVoters = it }
+            HorizontalDivider()
+        }
 
         // image upload row
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -406,20 +504,30 @@ fun NewThreadScreen(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                enabled = !sending && subject.isNotBlank() && contentField.text.isNotBlank() &&
-                    (categories.isEmpty() || selectedCategory != null),
+                enabled = canSubmit,
                 onClick = { scope.launch { submit(false) } },
                 modifier = Modifier.weight(1f),
-            ) { Text(if (sending) "提交中…" else "发布") }
+            ) {
+                Text(
+                    when {
+                        sending -> "提交中…"
+                        pollMode -> "发布投票"
+                        else -> "发布"
+                    },
+                )
+            }
 
-            TextButton(
-                enabled = !sending && contentField.text.isNotBlank(),
-                onClick = { scope.launch { submit(true) } },
-            ) { Text("存草稿") }
+            if (!pollMode) {
+                TextButton(
+                    enabled = !sending && contentField.text.isNotBlank(),
+                    onClick = { scope.launch { submit(true) } },
+                ) { Text("存草稿") }
+            }
         }
 
         Spacer(Modifier.height(8.dp))
         HorizontalDivider()
+        Spacer(Modifier.height(24.dp))
     }
 
     if (showSmiley) {
@@ -427,23 +535,63 @@ fun NewThreadScreen(
             onDismissRequest = { showSmiley = false },
             title = { Text("\u8868\u60c5") },
             text = {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (smileys.isEmpty()) {
-                        Text("\u6b63\u5728\u52a0\u8f7d\u8868\u60c5\u2026", style = MaterialTheme.typography.bodySmall)
-                    }
-                    smileys.chunked(8).forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            row.forEach { s ->
-                                coil.compose.AsyncImage(
-                                    model = s.url,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clickable {
-                                            insertText("[img]${s.url}[/img]")
-                                            showSmiley = false
-                                        },
-                                )
+                Column(Modifier.fillMaxWidth()) {
+                    when {
+                        smileySets.isEmpty() -> Text(
+                            "\u6b63\u5728\u52a0\u8f7d\u8868\u60c5\u2026",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+
+                        else -> {
+                            val set = smileySets.getOrNull(smileySetIndex) ?: smileySets.first()
+                            if (smileySets.size > 1) {
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                ) {
+                                    smileySets.forEachIndexed { index, item ->
+                                        Text(
+                                            item.name,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = if (index == smileySetIndex) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (index == smileySetIndex) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                            modifier = Modifier
+                                                .clickable { smileySetIndex = index }
+                                                .padding(vertical = 6.dp),
+                                        )
+                                    }
+                                }
+                            }
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 320.dp)
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                set.smileys.chunked(8).forEach { row ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        row.forEach { s ->
+                                            AsyncImage(
+                                                model = s.url,
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Fit,
+                                                modifier = Modifier
+                                                    .size(34.dp)
+                                                    .clickable {
+                                                        insertText(s.code)
+                                                        showSmiley = false
+                                                    },
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -452,8 +600,35 @@ fun NewThreadScreen(
             confirmButton = { TextButton(onClick = { showSmiley = false }) { Text("\u5173\u95ed") } },
         )
     }
-    ImmersiveTopBar(title = "发帖", onMenu = onMenu)
+    ImmersiveTopBar(title = if (pollMode) "发起投票" else "发帖", onMenu = onMenu)
 }
+
+@Composable
+private fun ModeTab(label: String, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.titleSmall,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.padding(vertical = 6.dp),
+        )
+        Box(
+            Modifier
+                .width(selectedWidth(selected))
+                .height(2.dp)
+                .background(
+                    if (selected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
+                    RoundedCornerShape(1.dp),
+                ),
+        )
+    }
+}
+
+private fun selectedWidth(selected: Boolean) = if (selected) 28.dp else 0.dp
 
 @Composable
 private fun ToolButton(label: String, onClick: () -> Unit) {
