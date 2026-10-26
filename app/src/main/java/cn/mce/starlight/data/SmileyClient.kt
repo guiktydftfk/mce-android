@@ -30,7 +30,7 @@ object SmileyClient {
             doc.select("img[smilieid], #smilies img, div.smilies img").mapNotNull { img ->
                 val src = img.attr("src")
                 if (src.isBlank() || !src.contains("smiley")) null
-                else Smiley(absolutize(src), null)
+                else Smiley(absolutize(src).replace(" ", "%20"), null)
             }.distinctBy { it.url }
         }.getOrDefault(emptyList())
 

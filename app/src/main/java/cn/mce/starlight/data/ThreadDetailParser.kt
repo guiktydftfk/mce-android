@@ -135,7 +135,7 @@ object ThreadDetailParser {
                     when (node.tagName().lowercase()) {
                         "br" -> sb.append('\n')
                         "img" -> {
-                            imageUrlOf(node)?.let { url ->
+                            imageUrlOf(node, allowSmiley = true)?.let { url ->
                                 flush()
                                 blocks.add(ContentBlock.Image(url))
                             }
@@ -167,14 +167,14 @@ object ThreadDetailParser {
     }
 
     /** Real url of an <img>, preferring lazy-loading attributes. */
-    private fun imageUrlOf(img: Element): String? {
+    private fun imageUrlOf(img: Element, allowSmiley: Boolean = false): String? {
         val raw = sequenceOf("zoomfile", "file", "data-src", "data-original", "src")
             .map { img.attr(it) }
             .firstOrNull { v ->
                 v.isNotBlank() &&
                     !v.contains("avatar.php") &&
                     !v.contains("filetype/") &&
-                    !v.contains("smiley") &&
+                    (allowSmiley || !v.contains("smiley")) &&
                     !v.contains("none.gif") &&
                     !v.startsWith("static/image")
             } ?: return null

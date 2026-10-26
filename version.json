@@ -1,1 +1,1 @@
-{ "versionName": "0.2.5", "versionCode": 28, "notes": "0.2.5\n- 发帖页新增表情面板（网页表情图/emoji 兜底）\n- 发帖页主题分类、标题、内容均不可留空\n- 签到提醒：设置存储层已加入，界面开关与启动提醒下一版补完", "apk": "https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/MCE-latest.apk" }
+{ "versionName": "0.2.6", "versionCode": 29, "notes": "0.2.6\n- 修复表情显示：帖子正文内联显示表情图；表情地址空格编码，避免部分表情 404\n- 修复发帖必填：主题分类自动选中首个但仍校验必选，文案改为（必选），未选分类时发布按钮禁用\n- 修复自动更新：新增 jsDelivr 镜像，并区分「已是最新」与「无法连接/检查失败」，失败时提示错误而不是误报最新", "apk": "https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/MCE-latest.apk" }

@@ -406,7 +406,8 @@ fun NewThreadScreen(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                enabled = !sending && subject.isNotBlank() && contentField.text.isNotBlank(),
+                enabled = !sending && subject.isNotBlank() && contentField.text.isNotBlank() &&
+                    (categories.isEmpty() || selectedCategory != null),
                 onClick = { scope.launch { submit(false) } },
                 modifier = Modifier.weight(1f),
             ) { Text(if (sending) "提交中…" else "发布") }

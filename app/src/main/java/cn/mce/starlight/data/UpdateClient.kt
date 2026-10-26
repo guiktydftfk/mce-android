@@ -21,8 +21,10 @@ import java.net.URL
  *  4. 安装后下次启动即为新版
  */
 object UpdateClient {
-    private const val RAW_MANIFEST =
-        "https://raw.githubusercontent.com/guiktydftfk/mce-android/main/version.json"
+    private val MANIFEST_URLS = listOf(
+        "https://cdn.jsdelivr.net/gh/guiktydftfk/mce-android@main/version.json",
+        "https://raw.githubusercontent.com/guiktydftfk/mce-android/main/version.json",
+    )
     private const val API_LATEST =
         "https://api.github.com/repos/guiktydftfk/mce-android/releases/latest"
     private const val UA = "MCE-Android-Updater"
@@ -61,10 +63,27 @@ object UpdateClient {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
     }.getOrDefault("?")
 
+    sealed interface CheckResult {
+        data class Available(val release: Release) : CheckResult
+        data object Latest : CheckResult
+        data class Failed(val reason: String) : CheckResult
+    }
+
+    /** 检查更新并能区分「已是最新 / 有新版 / 检查失败」 */
+    suspend fun checkDetailed(context: Context): CheckResult = withContext(Dispatchers.IO) {
+        val reachable = MANIFEST_URLS.any { httpGet(it) != null }
+        if (!reachable) {
+            return@withContext CheckResult.Failed("\u65e0\u6cd5\u8fde\u63a5\u66f4\u65b0\u670d\u52a1\uff0c\u8bf7\u68c0\u67e5\u7f51\u7edc\u540e\u91cd\u8bd5")
+        }
+        val r = check(context)
+        if (r != null) CheckResult.Available(r) else CheckResult.Latest
+    }
+
     /** 检查更新；返回 null 表示已是最新或检查失败 */
     suspend fun check(context: Context): Release? = withContext(Dispatchers.IO) {
-        // 1) 优先 version.json
-        httpGet(RAW_MANIFEST)?.let { body ->
+        // 1) 优先 version.json（多镜像，国内常用 jsDelivr）
+        for (manifestUrl in MANIFEST_URLS) {
+        httpGet(manifestUrl)?.let { body ->
             runCatching {
                 val json = JSONObject(body)
                 val code = json.optInt("versionCode", 0)
@@ -76,6 +95,7 @@ object UpdateClient {
                     apkUrl = json.optString("apk").takeIf { it.isNotBlank() },
                 )
             }.onSuccess { if (it?.versionCode ?: 0 > 0) return@withContext it }
+        }
         }
 
         // 2) 回退 GitHub Releases
