@@ -1,1 +1,1 @@
-{ "versionName": "0.3.0", "versionCode": 33, "notes": "0.3.0\n- 修复自动更新永远显示“已是最新”：清单请求加时间戳绕过 CDN 缓存，并改用国内可达镜像\n- 更新包下载走 gh-proxy，失败自动切换直连源\n- 检查更新失败时明确提示原因", "apk": "https://gh-proxy.com/https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/MCE-latest.apk" }
+{ "versionName": "0.3.0", "versionCode": 33, "notes": "0.3.0\n- 修复自动更新永远显示“已是最新”：清单请求加时间戳并优先走 gh-proxy（无 CDN 长缓存），镜像顺序调整\n- 更新包下载走 gh-proxy，失败自动切换直连源\n- 检查更新失败时明确提示原因", "apk": "https://gh-proxy.com/https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/MCE-latest.apk" }
