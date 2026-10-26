@@ -73,9 +73,9 @@ fun NewThreadScreen(
     val scope = rememberCoroutineScope()
     val boards = Boards.all
 
-    var boardIndex by remember {
-        mutableStateOf(boards.indexOfFirst { it.fid == initialFid }.coerceAtLeast(0))
-    }
+    // 发帖默认板块固定为「综合交流」
+    var selectedFid by remember { mutableStateOf(Boards.default.fid) }
+    var expandedBoardGroups by remember { mutableStateOf(setOf("全国交流")) }
     var boardExpanded by remember { mutableStateOf(false) }
     var categoryExpanded by remember { mutableStateOf(false) }
 
@@ -105,9 +105,9 @@ fun NewThreadScreen(
     val uploaded = remember { mutableStateListOf<Pair<Uri, String>>() }
     var uploading by remember { mutableStateOf(false) }
 
-    val fid = boards[boardIndex].fid
+    val fid = selectedFid
 
-    LaunchedEffect(boardIndex, SessionStore.isLoggedIn, reloadTick) {
+    LaunchedEffect(selectedFid, SessionStore.isLoggedIn, reloadTick) {
         loadingForm = true
         formError = null
         categories = emptyList()
@@ -190,7 +190,7 @@ fun NewThreadScreen(
         // board selector
         ExposedDropdownMenuBox(expanded = boardExpanded, onExpandedChange = { boardExpanded = !boardExpanded }) {
             OutlinedTextField(
-                value = boards[boardIndex].name,
+                value = Boards.byFid(selectedFid)?.let { "${it.group} · ${it.name}" } ?: "选择板块",
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("板块") },
@@ -200,11 +200,32 @@ fun NewThreadScreen(
                     .fillMaxWidth(),
             )
             ExposedDropdownMenu(expanded = boardExpanded, onDismissRequest = { boardExpanded = false }) {
-                boards.forEachIndexed { index, board ->
+                // 与侧边栏同款：分组折叠
+                Boards.groups.forEach { (groupName, groupBoards) ->
+                    val expanded = groupName in expandedBoardGroups
                     DropdownMenuItem(
-                        text = { Text("${board.name}（${board.group}）") },
-                        onClick = { boardIndex = index; boardExpanded = false },
+                        text = {
+                            Text(
+                                (if (expanded) "\u25be " else "\u25b8 ") + groupName,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        },
+                        onClick = {
+                            expandedBoardGroups = if (expanded) expandedBoardGroups - groupName
+                            else expandedBoardGroups + groupName
+                        },
                     )
+                    if (expanded) {
+                        groupBoards.forEach { board ->
+                            DropdownMenuItem(
+                                text = { Text("    " + board.name) },
+                                onClick = {
+                                    selectedFid = board.fid
+                                    boardExpanded = false
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }

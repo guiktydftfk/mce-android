@@ -48,7 +48,6 @@ object Boards {
             ForumBoard(191, "晋中", "城市板块"),
             ForumBoard(193, "天水", "城市板块"),
             ForumBoard(192, "合肥", "城市板块"),
-            ForumBoard(77, "更多城市", "城市板块"),
         ),
         "星光大厅" to listOf(
             ForumBoard(159, "礼品中心", "星光大厅", "星光值兑换礼品"),

@@ -64,20 +64,25 @@ fun ProfileScreen(
 ) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<ProfileState>(ProfileState.Loading) }
+    var reloadTick by remember { mutableStateOf(0) }
 
     suspend fun load() {
         if (!SessionStore.isLoggedIn) {
             state = ProfileState.Error("未登录")
             return
         }
-        runCatching { ProfileClient.load() }
-            .onSuccess { p ->
-                state = if (p == null) ProfileState.Error("资料加载失败") else ProfileState.Content(p)
-            }
-            .onFailure { state = ProfileState.Error(it.message ?: "加载失败") }
+        try {
+            val p = ProfileClient.load()
+            state = if (p == null) ProfileState.Error("资料加载失败") else ProfileState.Content(p)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // 组合被重建导致请求取消：保持加载态，交给下一次 LaunchedEffect 重试
+            return
+        } catch (e: Exception) {
+            state = ProfileState.Error(e.message?.takeIf { it.isNotBlank() } ?: "加载失败")
+        }
     }
 
-    LaunchedEffect(reloadKey, SessionStore.isLoggedIn) { load() }
+    LaunchedEffect(reloadKey, SessionStore.isLoggedIn, reloadTick) { load() }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
@@ -98,7 +103,7 @@ fun ProfileScreen(
                 if (!SessionStore.isLoggedIn) {
                     TextButton(onClick = onLogin) { Text("登录 / 注册") }
                 } else {
-                    TextButton(onClick = { scope.launch { load() } }) { Text("重试") }
+                    TextButton(onClick = { reloadTick += 1 }) { Text("重试") }
                 }
             }
 

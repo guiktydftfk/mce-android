@@ -178,7 +178,7 @@ fun HomeFeedScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     itemsIndexed(s.threads, key = { _, t -> t.id }) { index, thread ->
-                        FeedCard(thread, allowThumbnail = index < 6) { onOpenThread(thread) }
+                        FeedCard(thread, allowThumbnail = true) { onOpenThread(thread) }
                     }
                     if (loadingMore) {
                         item {
