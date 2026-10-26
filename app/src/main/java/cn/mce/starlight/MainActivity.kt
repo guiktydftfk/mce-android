@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight
+package cn.mce.starlight
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -18,8 +18,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val base = LocalDensity.current
             CompositionLocalProvider(
+                // 只保留「字体大小」一个滑杆（原「界面大小」已并入），不再缩放 dp
                 LocalDensity provides Density(
-                    density = base.density * SettingsStore.uiScale,
+                    density = base.density,
                     fontScale = base.fontScale * SettingsStore.fontScale,
                 ),
             ) {

@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.ui
+package cn.mce.starlight.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -112,18 +112,17 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // v0.3.5：界面尺寸 / 字体大小
-            Text("界面大小 ${(SettingsStore.uiScale * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
-            Slider(
-                value = SettingsStore.uiScale,
-                onValueChange = { SettingsStore.updateUiScale(it) },
-                valueRange = 0.8f..1.3f,
-            )
+            // v0.3.6：界面大小与字体大小合并为单一「字体大小」
             Text("字体大小 ${(SettingsStore.fontScale * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
             Slider(
                 value = SettingsStore.fontScale,
                 onValueChange = { SettingsStore.updateFontScale(it) },
                 valueRange = 0.8f..1.4f,
+            )
+            Text(
+                "只缩放文字，不改变整体布局；即时生效，重启后保持",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             // 主题色（保留原有「莫奈蓝」为默认，新增 Edge 风格配色）

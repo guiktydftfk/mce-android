@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.core
+package cn.mce.starlight.core
 
 import android.content.Context
 import androidx.compose.runtime.getValue
@@ -24,7 +24,7 @@ object SettingsStore {
     private const val KEY_SNOOZE_UNTIL = "update_snooze_until"
     private const val KEY_LAST_CHECK = "update_last_check"
     private const val KEY_DOWNLOADED_APK = "update_downloaded_apk"
-    private const val KEY_UI_SCALE = "ui_scale"
+    private const val KEY_UI_SCALE = "ui_scale" // 已废弃（0.3.6 起并入 font_scale），仅用于清理
     private const val KEY_FONT_SCALE = "font_scale"
     private const val KEY_SIGNIN_REMIND = "signin_reminder_enabled"
     private const val KEY_SIGNIN_REMIND_HOUR = "signin_reminder_hour"
@@ -56,8 +56,6 @@ object SettingsStore {
     var downloadedApkPath by mutableStateOf<String?>(null)
         private set
 
-    var uiScale by mutableFloatStateOf(1f)
-        private set
     var fontScale by mutableFloatStateOf(1f)
         private set
     var signinReminderEnabled by mutableStateOf(false)
@@ -77,8 +75,9 @@ object SettingsStore {
         updateSnoozeUntil = prefs.getLong(KEY_SNOOZE_UNTIL, 0L)
         lastUpdateCheckAt = prefs.getLong(KEY_LAST_CHECK, 0L)
         downloadedApkPath = prefs.getString(KEY_DOWNLOADED_APK, null)
-        uiScale = prefs.getFloat(KEY_UI_SCALE, 1f)
         fontScale = prefs.getFloat(KEY_FONT_SCALE, 1f)
+        // 0.3.6：界面大小与字体大小合并为单一「字体大小」，清掉旧键
+        if (prefs.contains(KEY_UI_SCALE)) prefs.edit().remove(KEY_UI_SCALE)?.apply()
         signinReminderEnabled = prefs.getBoolean(KEY_SIGNIN_REMIND, false)
         signinReminderHour = prefs.getInt(KEY_SIGNIN_REMIND_HOUR, 20)
     }
@@ -138,11 +137,7 @@ object SettingsStore {
         prefs()?.edit()?.putLong(KEY_LAST_CHECK, lastUpdateCheckAt)?.apply()
     }
 
-    fun updateUiScale(value: Float) {
-        uiScale = value.coerceIn(0.8f, 1.3f)
-        prefs()?.edit()?.putFloat(KEY_UI_SCALE, uiScale)?.apply()
-    }
-
+    /** 字体缩放（0.8–1.4，即 80%–140%）；原「界面大小」滑杆 0.3.6 起已并入此项 */
     fun updateFontScale(value: Float) {
         fontScale = value.coerceIn(0.8f, 1.4f)
         prefs()?.edit()?.putFloat(KEY_FONT_SCALE, fontScale)?.apply()

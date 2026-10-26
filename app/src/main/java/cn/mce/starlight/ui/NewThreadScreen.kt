@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.ui
+package cn.mce.starlight.ui
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -188,22 +188,13 @@ fun NewThreadScreen(
         }
     }
 
-    // 在光标处插入 BBCode（有选区则包裹选区，否则插入占位文本并把光标放到标签中间）
+    // 在光标处插入 BBCode（实现见 ui/TextEditing.kt，与回帖框共用）
     fun wrap(open: String, close: String, placeholder: String) {
-        val tv = contentField
-        val start = tv.selection.min
-        val end = tv.selection.max
-        val selected = tv.text.substring(start, end).ifBlank { placeholder }
-        val newText = tv.text.replaceRange(start, end, open + selected + close)
-        val cursor = start + open.length + selected.length
-        contentField = TextFieldValue(newText, TextRange(cursor))
+        contentField = contentField.wrapSelection(open, close, placeholder)
     }
 
     fun insertText(text: String) {
-        val tv = contentField
-        val start = tv.selection.min
-        val newText = tv.text.replaceRange(start, tv.selection.max, text)
-        contentField = TextFieldValue(newText, TextRange(start + text.length))
+        contentField = contentField.insertAtCursor(text)
     }
 
     /** 存草稿：只存本地（Discuz 手机模板没有草稿箱），不会发布 */
@@ -586,73 +577,15 @@ fun NewThreadScreen(
     }
 
     if (showSmiley) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showSmiley = false },
-            title = { Text("\u8868\u60c5") },
-            text = {
-                Column(Modifier.fillMaxWidth()) {
-                    when {
-                        smileySets.isEmpty() -> Text(
-                            "\u6b63\u5728\u52a0\u8f7d\u8868\u60c5\u2026",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-
-                        else -> {
-                            val set = smileySets.getOrNull(smileySetIndex) ?: smileySets.first()
-                            if (smileySets.size > 1) {
-                                Row(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                ) {
-                                    smileySets.forEachIndexed { index, item ->
-                                        Text(
-                                            item.name,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = if (index == smileySetIndex) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (index == smileySetIndex) {
-                                                MaterialTheme.colorScheme.primary
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            },
-                                            modifier = Modifier
-                                                .clickable { smileySetIndex = index }
-                                                .padding(vertical = 6.dp),
-                                        )
-                                    }
-                                }
-                            }
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 320.dp)
-                                    .verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                set.smileys.chunked(8).forEach { row ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        row.forEach { s ->
-                                            AsyncImage(
-                                                model = s.url,
-                                                contentDescription = null,
-                                                contentScale = ContentScale.Fit,
-                                                modifier = Modifier
-                                                    .size(34.dp)
-                                                    .clickable {
-                                                        insertText(s.code)
-                                                        showSmiley = false
-                                                    },
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        SmileyPickerDialog(
+            sets = smileySets,
+            selectedIndex = smileySetIndex,
+            onSelectSet = { smileySetIndex = it },
+            onPick = { smile ->
+                contentField = contentField.insertAtCursor(smile.code)
+                showSmiley = false
             },
-            confirmButton = { TextButton(onClick = { showSmiley = false }) { Text("\u5173\u95ed") } },
+            onDismiss = { showSmiley = false },
         )
     }
     ImmersiveTopBar(title = if (pollMode) "发起投票" else "发帖", onMenu = onMenu)
