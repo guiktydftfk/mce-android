@@ -1,64 +1,99 @@
-# MCE 星光班 · Android 客户端
+# MCE 星光班 · Android 原生客户端
 
-## 📦 下载即安装（推荐）
+> 面向 Discuz! X3.5 论坛 [mce.msi.cn](https://mce.msi.cn) 的原生 Android 客户端。
+> Kotlin + Jetpack Compose，无 WebView（纯原生抓取与解析），支持自动更新。
 
-1. 在 GitHub 页面点 **Code → Download ZIP**
-2. 解压后，仓库**根目录**里的 `MCE-starlight.apk` 就是可直接安装的安装包
-3. 传到手机点击安装即可（首次需允许“安装未知应用”）
+**当前版本：`0.3.0`（versionCode 33）**
 
-> 备用位置：`release/MCE-latest.apk`（自动更新下载用的同一文件）
-> 当前版本：**0.3.0（versionCode 33）**
-mce.msi.cn（Discuz! X3.5 论坛）的原生 Android 客户端：Kotlin + Jetpack Compose 外壳，
-内容页逐步从 WebView 替换为原生实现（绞杀者模式）。
+## 📦 下载即安装
 
-## 快速开始
+1. GitHub 页面点 **Code → Download ZIP**
+2. 解压后，仓库**根目录**的 `MCE-starlight.apk` 即安装包
+3. 传到手机点击安装（首次需允许「安装未知应用」）
 
-```powershell
-# 一键构建（JDK / Android SDK / Gradle 都在 <工作区>\android-dev）
-powershell -ExecutionPolicy Bypass -File .\scripts\build-apk.ps1 -Bump -ToDesktop
-```
+备用位置：`release/MCE-latest.apk`（自动更新下载用的同一个文件）
+国内网络下载不便时，可用 `version.json` 里的 gh-proxy 地址。
 
-产物：`dist/MCE-starlight-v<版本>.apk`，`-ToDesktop` 会同时复制到桌面。
+## ✨ 功能
 
-## 结构
+| 模块 | 说明 |
+| --- | --- |
+| 首页动态流 | 卡片式信息流（头像/作者/分类/摘要/配图/回复数），导读分类：最新 / 热帖 / 精华 / 沙发 |
+| 板块浏览 | 4 个分组 34 个板块（全国交流 / 项目和活动 / 城市板块 / 星光大厅），侧边栏分组折叠 |
+| 帖子详情 | 完整楼层、图文按原顺序内联、翻页、收藏、赞赏（评分）、楼层回复 |
+| 发帖 | 板块折叠选择（默认综合交流）、主题分类必选、标题/内容必填、BBCode 工具条、图片上传、表情面板（网页表情集）、附加选项、存草稿 |
+| 签到 | 今日排名/连续/累计、排行榜（今日/本月/总榜）、一键签到 |
+| 任务中心 | 任务列表、申请与领奖 |
+| 搜索 | 搜帖子 / 搜用户、高级搜索（作者/版块/时间/排序） |
+| 排行榜 | 帖子 / 投票 / 版块多榜 |
+| 我的 | 个人资料、我的主题 / 回复 / 收藏 / 消息提醒 / 勋章 / 好友 / 道具 / 编辑资料 |
+| 个人空间 | 头像/昵称/用户组/统计/资料、打招呼/发消息/加好友、最近主题；可从帖子作者头像进入 |
+| 设置 | 深色模式、自定义背景（透明度/模糊度）、签到提醒、检查更新与暂停更新、自检报告、图片自检 |
+| 自动更新 | 启动检查 → 弹窗展示更新内容 → 后台静默下载 → 拉起安装（下次启动即为新版） |
+
+## 🏗 项目结构
 
 ```
 app/src/main/java/cn/mce/starlight/
-├── MainActivity.kt          Compose 入口（edge-to-edge）
+├── MceApplication.kt          # 初始化 Cookie/设置/Coil（Cookie 注入 + Referer）
 ├── core/
-│   ├── SiteScope.kt         站内域名判定
-│   ├── WebCookies.kt        WebView Cookie ↔ 原生请求桥接
-│   └── SessionStore.kt      登录态与当前用户
-├── data/
-│   ├── ForumRepository.kt   模型 + 协议
-│   ├── Boards.kt            版块种子数据
-│   ├── MobileForumParser.kt 列表页解析（forumdisplay / guide）
-│   ├── ThreadDetailParser.kt 详情页解析（楼层/作者/图片）
-│   └── HttpForumRepository.kt 抓取 + 解析实现
-├── ui/
-│   ├── MceApp.kt            抽屉 + 导航栈
-│   ├── ForumBoardScreen.kt  版块列表
-│   ├── ThreadListScreen.kt  帖子列表（沉浸式 + 拖动刷新）
-│   ├── ThreadDetailScreen.kt 帖子详情
-│   └── Chrome.kt            悬浮顶栏 + 可拖动刷新按钮
-└── web/
-    └── WebContentView.kt    仅用于登录/签到/插件页
+│   ├── CookieJar.kt           # 自建 Cookie 存储（不依赖 WebView）
+│   ├── WebCookies.kt          # Cookie 访问入口（jar 优先）
+│   ├── SessionStore.kt        # 登录态探测与用户信息
+│   ├── SettingsStore.kt       # 设置持久化（主题/背景/更新/签到提醒）
+│   ├── Diagnostics.kt         # 自检报告（一键复制）
+│   └── DebugDump.kt           # 抓取页面落盘（adb run-as 可拉取排查）
+├── data/                      # 网络与解析层（无 UI 依赖）
+│   ├── GenericPageClient.kt   # 通用抓取：手动跟随 3xx、逐跳保存 Set-Cookie
+│   ├── HttpForumRepository.kt # 论坛仓储（列表/详情）
+│   ├── MobileForumParser.kt   # 列表解析
+│   ├── ThreadDetailParser.kt  # 详情解析（文本/图片分块、附件容器、表情）
+│   ├── PostActions.kt         # 发帖/回帖/收藏/图片上传
+│   ├── SigninClient/TaskClient/RateClient/SearchClient/RanklistClient
+│   ├── PersonalClient/SocialClient/UserProfileClient/ProfileClient/ProfileEditClient
+│   └── UpdateClient.kt        # 版本清单、镜像回退、APK 下载
+└── ui/                        # Compose 界面
+    ├── MceApp.kt              # 导航、抽屉、登录、更新与签到提醒弹窗
+    ├── HomeFeedScreen/ThreadListScreen/ThreadDetailScreen/FeedCard
+    ├── NewThreadScreen/SettingsScreen/SigninScreen/TaskScreen/SearchScreen
+    ├── PersonalScreens/ProfileScreen/UserProfileScreen/SocialScreens
+    └── Theme/Chrome/DraggableRefreshFab/UpdateDialog/SigninReminder
 ```
 
-## 测试
+## 🔧 构建
 
-`app/src/test/resources` 里是真实抓取的页面样本（forumdisplay / guide / viewthread），
-`ParserTest` 用 Jsoup 在 JVM 上验证解析器选择器。
+工程使用本地化工具链（不依赖系统安装）：
 
 ```powershell
-# 在 CI 或本机（需可运行的 Gradle 测试进程）
-gradle :app:testDebugUnitTest
+# 一键构建（自动 +0.0.1 版本，输出 dist/ 并复制到桌面）
+powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -Bump -ToDesktop
 ```
 
-## 说明
+工具链位置：`../android-dev/{jdk,sdk,gradle,gradle-home}`；已配置 `android.overridePathCheck=true`（中文路径）与 Kotlin in-process 编译。
 
-- 站点未启用「掌上论坛」JSON API（实测 `module_not_exists`），因此数据层基于移动版 HTML 解析
-- 登录、发帖、签到等含 formhash 动态表单的页面保留 WebView
+## 🔄 自动更新机制
+
+- 清单：仓库根目录 `version.json`（`versionName` / `versionCode` / `notes` / `apk`）
+- 镜像优先级：`gh-proxy` → `fastly.jsdelivr` → `gcore.jsdelivr` → `raw.githubusercontent`（国内实测可达性排序）
+- 清单请求带时间戳绕过 CDN 缓存；失败会明确提示，不再误报「已是最新」
+- 下载：APK 经 gh-proxy，失败回退直连；完成后拉起系统安装器
+- 暂停：设置内可暂停 7 / 15 天
+
+## 🐞 问题自查（无需连电脑）
+
+- **自检报告**：设置 → 诊断 → 自检报告（版本/设备/登录态/设置/最近抓取页面，一键复制）
+- **图片自检**：设置 → 诊断 → 图片自检，输入帖子 ID，逐张探测图片请求（状态码/Content-Type/是否返回 HTML）
+- **开发者**：抓取过的页面会落盘到应用私有目录，可 `adb shell run-as cn.mce.starlight cat files/debug_xxx.html` 查看原始 HTML
+
+## ⚠️ 已知限制
+
+- 普通应用无法完全静默安装：系统安装器需用户点一次「安装」（Android 安全限制）
+- 门户资讯（`portal.php`）、投票/活动发帖、附件（非图片）上传尚未实现
+- 表情面板依赖登录态页面抓取，未登录时表情列表可能为空
+
+## 📁 版本规则
+
+`主.次.补丁`，**每 10 进 1**：`0.3.9 → 0.4.0`；每版 README 记录内容与 versionCode。
 
 ---
 
