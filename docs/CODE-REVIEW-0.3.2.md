@@ -24,7 +24,7 @@
 >   - **R8 真机回归抓到并修复 2 个问题**：① 批 5 给通用列表/排行榜加的 `key` 在 URL 重复时会抛 `IllegalArgumentException: Key ... was already used`（道具中心直接崩）→ 改为 `itemsIndexed` + 带下标 key；② R8 后需确认 jsoup/Coil/Compose 反射链正常 → 首页/帖子/表情/搜索/个人页/排行榜/道具/设置/更新检查逐项实测通过，无崩溃
 >   - 实测：APK **9.94MB → 1.71MB（-83%）**；冷启动 **1.15/1.21/1.33s**（批 5 为 1.57–1.59s，基线 3.15–3.82s）；26 个单测全绿；`versionName=0.3.3 / versionCode=36` 已安装
 >   - 发布物料已就绪：README 更新至 0.3.3、`version.json` → 0.3.3/36、APK 已复制 `MCE-starlight.apk` / `release/MCE-latest.apk` / 桌面（**尚未 git push，等用户确认**）
-> - 六批全部完成。**最终发布版按用户要求定名为 `0.3.2` / versionCode 36**（0.3.3 开发内容并入 0.3.2 发布说明），已重新构建、安装验证并更新 README/version.json/APK 副本；**本机环境无 git 且无外网，push 未执行**（详见 PROGRESS.md「推送受阻」）。
+> - 六批全部完成。**最终发布版按用户要求定名为 `0.3.2` / versionCode 36**（0.3.3 开发内容并入 0.3.2 发布说明），已重新构建、安装验证并更新 README/version.json/APK 副本。**已推送成功**：commit `ff78d80` → `origin/main`（推送方式：GitHub Desktop 自带 git + 原生 OpenSSH，见 `scripts/push-release.ps1`）。
 
 > 审查时间：0.3.2（versionCode 35）构建通过后
 > 方式：三路只读审查（data/ 层、ui/ 层、core+图片缓存链路）+ Lead 逐条核实，**未改动任何业务代码**
