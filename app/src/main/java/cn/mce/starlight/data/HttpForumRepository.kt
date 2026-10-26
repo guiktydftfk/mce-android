@@ -40,7 +40,7 @@ class HttpForumRepository(
 
     override suspend fun loadGuide(view: String, page: Int): ForumPage =
         withContext(Dispatchers.IO) {
-            val url = "$baseHost/forum.php?mod=guide&view=$view&page=$page"
+            val url = "$baseHost/forum.php?mod=guide&view=$view&page=$page&t=${System.currentTimeMillis()}"
             MobileForumParser.parse(fetch(url), url, page)
         }
 

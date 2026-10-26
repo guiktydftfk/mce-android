@@ -1,1 +1,1 @@
-{ "versionName": "0.2.7", "versionCode": 30, "notes": "0.2.7\n- 表情：改为纯网页表情集（含小红龙），修复方框/部分表情不显示；帖子内联显示表情\n- 发帖：分类必选、按钮禁用逻辑修正；发布结果按论坛真实提示判定，失败显示原文\n- 签到提醒：设置内开关 + 提醒时间（18~23 点），过点未签到启动时弹窗提醒", "apk": "https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/MCE-latest.apk" }
+{ "versionName": "0.2.8", "versionCode": 31, "notes": "0.2.8\n- 表情：改为扫描页面内全部 smiley 资源（含 JS 表情数据），补齐小红龙等缺失表情\n- 发帖：识别“已发布/转入主题”等真实成功文案，发布后自动返回并刷新\n- 列表刷新加时间戳，新帖发布后能立即出现在首页\n- 主题分类占位文案改为（必选）", "apk": "https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/MCE-latest.apk" }
