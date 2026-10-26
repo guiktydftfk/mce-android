@@ -122,10 +122,8 @@ object PostActions {
         if (subject.isBlank()) return@withContext Result(false, "\u6807\u9898\u4e0d\u80fd\u4e3a\u7a7a")
         if (message.isBlank()) return@withContext Result(false, "\u5185\u5bb9\u4e0d\u80fd\u4e3a\u7a7a")
         runCatching {
-            val form = loadComposeForm(fid)
-            val hash = form?.formhash ?: formhash(
-                GenericPageClient.get("$BASE/forum.php?mod=forumdisplay&fid=$fid"),
-            )
+            // formhash 由 UI 预热到 FormhashStore，避免重复抓页面
+            val hash = FormhashStore.get()
             if (hash.isEmpty()) {
                 return@withContext Result(false, "\u672a\u83b7\u53d6 formhash\uff08\u53ef\u80fd\u672a\u767b\u5f55\uff09")
             }
@@ -135,7 +133,7 @@ object PostActions {
                 "typeid" to (typeid ?: "0"),
                 "subject" to subject,
                 "message" to message,
-                "posttime" to (form?.posttime ?: (System.currentTimeMillis() / 1000).toString()),
+                "posttime" to (System.currentTimeMillis() / 1000).toString(),
                 "wysiwyg" to "0",
                 "usesig" to if (options.useSign) "1" else "",
             )
@@ -166,8 +164,7 @@ object PostActions {
         withContext(Dispatchers.IO) {
             if (message.isBlank()) return@withContext Result(false, "\u56de\u590d\u5185\u5bb9\u4e0d\u80fd\u4e3a\u7a7a")
             runCatching {
-                val page = GenericPageClient.get("$BASE/forum.php?mod=viewthread&tid=$tid")
-                val hash = formhash(page)
+                val hash = FormhashStore.get()
                 if (hash.isEmpty()) {
                     return@withContext Result(false, "\u672a\u83b7\u53d6 formhash\uff08\u53ef\u80fd\u672a\u767b\u5f55\uff09")
                 }

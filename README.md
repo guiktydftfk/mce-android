@@ -3,7 +3,7 @@
 > 面向 Discuz! X3.5 论坛 [mce.msi.cn](https://mce.msi.cn) 的原生 Android 客户端。
 > Kotlin + Jetpack Compose，无 WebView（纯原生抓取与解析），支持自动更新。
 
-**当前版本：`0.3.0`（versionCode 33）**
+**当前版本：`0.3.1`（versionCode 34）**
 
 ## 📦 下载即安装
 
@@ -98,6 +98,17 @@ powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -Bump -ToDesktop
 ---
 
 ## 更新记录
+
+## 0.3.1 · 批次合并（请求瘦身 + 启动/图片性能）+ 更名 aMCE
+- 网络：仓储统一走 `GenericPageClient`（逐跳保存 Cookie），删除重复网络实现；登录页/拦截页提示更准确
+- 请求：`FormhashStore` 会话级 formhash 缓存 → 发帖 2→1、回帖 3→2、搜索 2→1 次请求
+- 首页：缩略图上限 8 张 + 磁盘 LRU(200) + 失败负缓存(10min)，降低请求风暴风险
+- 启动：登录探测 2→1 请求；移除生产路径抓页落盘
+- 图片：Coil 内存 25%、磁盘 100MB 上限
+- 更名：应用名 **aMCE**
+- 自检报告：新增设备品牌/厂商/型号/代号/硬件/主板、系统版本号、安全补丁、内核、语言地区、屏幕尺寸与密度
+
+
 
 ## 0.3.0 · 自动更新链路修复（国内可用镜像）
 

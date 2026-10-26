@@ -180,7 +180,7 @@ fun ThreadListScreen(
                     ),
                 ) {
                     itemsIndexed(s.threads, key = { _, t -> t.id }) { index, thread ->
-                        FeedCard(thread = thread, allowThumbnail = true, onClick = { onOpenThread(thread) })
+                        FeedCard(thread = thread, allowThumbnail = index < 8, onClick = { onOpenThread(thread) })
                         CardDivider()
                     }
                     if (loadingMore) {

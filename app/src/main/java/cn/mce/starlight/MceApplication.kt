@@ -21,6 +21,7 @@ class MceApplication : Application(), ImageLoaderFactory {
         super.onCreate()
         SettingsStore.init(this)
         CookieJar.init(this)
+        cn.mce.starlight.data.ThumbCache.init(this)
         DebugDump.init(this)
     }
 
@@ -56,6 +57,15 @@ class MceApplication : Application(), ImageLoaderFactory {
         return ImageLoader.Builder(this)
             .okHttpClient(client)
             .crossfade(true)
+            .memoryCache {
+                coil.memory.MemoryCache.Builder(this).maxSizePercent(0.25).build()
+            }
+            .diskCache {
+                coil.disk.DiskCache.Builder()
+                    .directory(cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(100L * 1024 * 1024)
+                    .build()
+            }
             .build()
     }
 }

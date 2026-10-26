@@ -26,6 +26,7 @@ object ThreadImageCache {
 
     suspend fun firstImage(tid: Int): String? = withContext(Dispatchers.IO) {
         synchronized(positive) { positive[tid] }?.let { return@withContext it }
+        ThumbCache.get(tid)?.let { synchronized(positive) { positive[tid] = it }; return@withContext it }
 
         val failedAt = synchronized(negative) { negative[tid] }
         if (failedAt != null && System.currentTimeMillis() - failedAt < NEGATIVE_TTL_MS) {
@@ -59,6 +60,7 @@ object ThreadImageCache {
                     null
                 } else {
                     synchronized(positive) { positive[tid] = url }
+                    ThumbCache.put(tid, url)
                     url
                 }
             }

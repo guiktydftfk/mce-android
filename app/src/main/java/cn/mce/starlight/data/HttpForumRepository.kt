@@ -1,17 +1,12 @@
 package cn.mce.starlight.data
 
-import cn.mce.starlight.core.WebCookies
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
- * 数据仓库实现：HttpURLConnection + Jsoup。
- * 请求统一携带：
- *  - 移动 UA（让 Discuz 返回触屏模板）
- *  - WebView 的 Cookie（登录态自然共享）
+ * Forum repository: all requests go through GenericPageClient
+ * (single network stack, cookies saved on every redirect hop).
  */
 class HttpForumRepository(
     private val baseHost: String = "https://mce.msi.cn",
@@ -52,28 +47,13 @@ class HttpForumRepository(
         }
 
     private fun fetch(url: String): String {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15_000
-            readTimeout = 20_000
-            requestMethod = "GET"
-            setRequestProperty("User-Agent", MOBILE_UA)
-            setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9")
-            WebCookies.cookieHeader(url)?.let { setRequestProperty("Cookie", it) }
-            instanceFollowRedirects = true
+        val html = GenericPageClient.get(url)
+        if (GenericPageClient.isBlockedPage(html)) {
+            throw IOException("\u8bbf\u95ee\u8fc7\u4e8e\u9891\u7e41\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5")
         }
-        try {
-            val code = conn.responseCode
-            if (code !in 200..299) throw IOException("HTTP $code")
-            val html = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            if (GenericPageClient.isBlockedPage(html)) {
-                throw java.io.IOException("\u8bbf\u95ee\u8fc7\u4e8e\u9891\u7e41\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5")
-            }
-            if (GenericPageClient.isLoginPage(html)) {
-                throw java.io.IOException("\u767b\u5f55\u5df2\u5931\u6548\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55")
-            }
-            return html
-        } finally {
-            conn.disconnect()
+        if (GenericPageClient.isLoginPage(html)) {
+            throw IOException("\u9700\u8981\u767b\u5f55\uff0c\u8bf7\u5148\u767b\u5f55\u540e\u518d\u8bd5")
         }
+        return html
     }
 }

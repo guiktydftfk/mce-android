@@ -46,25 +46,8 @@ object SessionStore {
             return@withContext false
         }
 
-        val forumHtml = runCatching { fetch("$BASE/forum.php", cookie) }.getOrNull()
-        forumHtml?.let { DebugDump.dump("probe_forum", it) }
-
-        // 网络失败：保持现状，不清理、不判定
-        if (forumHtml == null) {
-            lastProbe = null
-            return@withContext null
-        }
-
-        if (hasLogoutEvidence(forumHtml)) {
-            isLoggedIn = true
-            lastProbe = true
-            loadProfileInfo(cookie)
-            return@withContext true
-        }
-
-        // 论坛页没有退出链接：再用个人资料页确认（有些模板不在首页放退出入口）
         val profileHtml = runCatching { fetch("$BASE/home.php?mod=space&do=profile", cookie) }.getOrNull()
-        profileHtml?.let { DebugDump.dump("probe_profile", it) }
+
         if (profileHtml == null) {
             lastProbe = null
             return@withContext null

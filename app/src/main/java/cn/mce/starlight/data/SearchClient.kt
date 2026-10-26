@@ -30,10 +30,7 @@ object SearchClient {
         val orderBy: String = "lastpost",
     )
 
-    private fun formhash(): String {
-        val html = runCatching { GenericPageClient.get("$BASE/forum.php") }.getOrDefault("")
-        return Regex("""formhash=([a-z0-9]+)""").find(html)?.groupValues?.get(1).orEmpty()
-    }
+    private suspend fun formhash(): String = FormhashStore.get()
 
     private fun post(fields: List<Pair<String, String>>): String {
         val body = fields.joinToString("&") {

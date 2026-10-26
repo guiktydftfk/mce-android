@@ -24,9 +24,20 @@ object Diagnostics {
         sb.appendLine("版本：${pi?.versionName ?: "?"}（code ${pi?.versionCode ?: "?"}）")
 
         // 设备
-        sb.appendLine("设备：${Build.MANUFACTURER} ${Build.MODEL}")
+        sb.appendLine("设备品牌：${Build.BRAND}")
+        sb.appendLine("设备厂商：${Build.MANUFACTURER}")
+        sb.appendLine("设备型号：${Build.MODEL}")
+        sb.appendLine("设备代号：${Build.DEVICE}（产品 ${Build.PRODUCT}）")
+        sb.appendLine("硬件：${Build.HARDWARE} / 主板 ${Build.BOARD}")
         sb.appendLine("系统：Android ${Build.VERSION.RELEASE}（API ${Build.VERSION.SDK_INT}）")
+        sb.appendLine("系统版本号：${Build.DISPLAY}")
+        if (Build.VERSION.SDK_INT >= 23) sb.appendLine("安全补丁：${Build.VERSION.SECURITY_PATCH}")
+        sb.appendLine("内核：${System.getProperty("os.version") ?: "?"}")
         sb.appendLine("ABI：${Build.SUPPORTED_ABIS.joinToString(",")}")
+        sb.appendLine("语言/地区：${java.util.Locale.getDefault()}")
+        val dm = context.resources.displayMetrics
+        val density = context.resources.displayMetrics.density
+        sb.appendLine("屏幕：${dm.widthPixels}x${dm.heightPixels} @ ${"%.2f".format(density)}x（${dm.densityDpi}dpi）")
 
         // 登录态（不输出 Cookie 值）
         sb.appendLine("登录状态：" + if (SessionStore.isLoggedIn) "已登录（${SessionStore.username ?: "?"}）" else "未登录")

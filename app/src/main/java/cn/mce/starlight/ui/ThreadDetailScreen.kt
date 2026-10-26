@@ -85,6 +85,7 @@ fun ThreadDetailScreen(
         page = 1
         runCatching { repo.loadThreadDetail(tid, 1) }
             .onSuccess { detail ->
+                cn.mce.starlight.data.FormhashStore.seed(detail.formhash)
                 state = if (detail.posts.isEmpty()) DetailState.Error("没有解析到楼层内容")
                 else DetailState.Content(detail)
             }
