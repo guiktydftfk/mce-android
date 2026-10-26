@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight
+package cn.mce.starlight
 
 import android.app.Application
 import cn.mce.starlight.core.CookieJar
@@ -27,6 +27,7 @@ class MceApplication : Application(), ImageLoaderFactory {
         cn.mce.starlight.data.ThumbCache.init(this)
         cn.mce.starlight.core.DraftStore.init(this)
         cn.mce.starlight.core.MessageCenter.init(this)
+        cn.mce.starlight.core.PmReadStore.init(this)
         DebugDump.init(this)
     }
 

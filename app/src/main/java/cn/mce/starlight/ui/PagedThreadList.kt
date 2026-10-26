@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.ui
+package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +26,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -36,8 +37,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.data.ForumPage
+import cn.mce.starlight.data.ThreadImageCache
 import cn.mce.starlight.data.ThreadSummary
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -86,7 +89,41 @@ fun PagedThreadList(
     val scope = rememberCoroutineScope()
     val st = remember(resetKey) { PagedState() }
     val listState = remember(resetKey) { LazyListState() }
-    val thumbnailWindow by rememberThumbnailWindow(listState)
+
+    // v0.3.7：缩略图改为「列表级 + 滚动停止后再抓」。
+    // 旧实现每张卡片在自己的 LaunchedEffect 里抓一次完整 viewthread 页面（网络 + 整页 DOM 解析），
+    // 滑动穿过一屏就并发十几次整页请求，是首页卡顿的主因。
+    // 现在：滚动中完全不请求；停下后只给「可见 + 预取 3 条」批量抓，结果写入列表级 map，
+    // item 滚出再滚回也不会重新请求/重新跳动。
+    val thumbs = remember(resetKey) { mutableStateMapOf<Int, String>() }
+
+    suspend fun fetchThumbWindow() {
+        val info = listState.layoutInfo.visibleItemsInfo
+        if (info.isEmpty()) return
+        val headerOffset = if (header != null) 1 else 0
+        for (index in info.first().index..(info.last().index + THUMBNAIL_PREFETCH)) {
+            val thread = st.items.getOrNull(index - headerOffset) ?: continue
+            if (thumbs.containsKey(thread.id)) continue
+            val url = runCatching { ThreadImageCache.firstImage(thread.id) }.getOrNull()
+            thumbs[thread.id] = url.orEmpty() // 空串 = 已查过、该帖没有图
+        }
+    }
+
+    LaunchedEffect(listState, resetKey, header) {
+        snapshotFlow { listState.isScrollInProgress }
+            .collectLatest { scrolling ->
+                if (scrolling) return@collectLatest
+                fetchThumbWindow()
+            }
+    }
+
+    // 首屏：snapshotFlow 的初值可能在列表完成布局前就发出（那时 visibleItemsInfo 为空），
+    // 所以数据到达后再补一次延迟抓取，保证不滚动也能看到首屏缩略图
+    LaunchedEffect(st.items, resetKey) {
+        if (st.items.isEmpty()) return@LaunchedEffect
+        delay(350)
+        if (!listState.isScrollInProgress) fetchThumbWindow()
+    }
 
     suspend fun loadFirst() {
         val gen = ++st.generation
@@ -169,9 +206,11 @@ fun PagedThreadList(
 
     Box(modifier.fillMaxSize()) {
         when {
-            st.loading && st.items.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            // v0.3.7：首屏用骨架屏代替整屏转圈，减少"转圈一闪"的闪烁感
+            st.loading && st.items.isEmpty() -> ThreadListSkeleton(
+                topPadding = topPadding,
+                horizontalPadding = horizontalPadding,
+            )
 
             st.items.isEmpty() && st.error != null -> ErrorBlock(st.error!!) {
                 scope.launch { loadFirst() }
@@ -196,10 +235,14 @@ fun PagedThreadList(
                     if (st.items.isEmpty()) {
                         item { EmptyHint(emptyText) }
                     }
-                    itemsIndexed(st.items, key = { _, thread -> thread.id }) { index, thread ->
+                    itemsIndexed(
+                        items = st.items,
+                        key = { _, thread -> thread.id },
+                        contentType = { _, _ -> "thread" },
+                    ) { _, thread ->
                         FeedCard(
                             thread = thread,
-                            allowThumbnail = index in thumbnailWindow,
+                            thumbUrl = thumbs[thread.id],
                             onClick = { onOpenThread(thread) },
                         )
                         if (showDivider) CardDivider()

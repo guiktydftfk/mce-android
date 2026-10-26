@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -110,10 +110,13 @@ object PersonalClient {
         }
         // 同一个好友可能有多条往来消息：按 touid 合并（保留最新一条，未读数取该会话最大值），
         // 否则"我对他说"和"他对我说"会被 distinctBy 丢掉未读那条 → 新私信弹窗不触发。
-        items.groupBy { it.touid }.values.map { group ->
+        val merged = items.groupBy { it.touid }.values.map { group ->
             val first = group.first()
             first.copy(unread = group.maxOf { it.unread })
         }
+        // v0.3.7：论坛手机模板在「APP 里读完私信」后仍会返回 span.num 未读（网页端同样如此，属论坛侧问题），
+        // 这里叠加客户端本地已读记录：签名未变的会话未读归零，一旦来新消息签名变化会重新显示未读。
+        cn.mce.starlight.core.PmReadStore.overlay(merged)
     }
 
     /** 消息提醒：li.notice_item */

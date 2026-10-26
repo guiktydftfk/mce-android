@@ -37,8 +37,13 @@ object ThreadDetailParser {
     fun parse(html: String, baseUrl: String, tid: Int, page: Int): ThreadDetail {
         val doc = Jsoup.parse(html, baseUrl)
 
-        val title = doc.selectFirst("h1")?.text()?.trim()
-            ?: doc.title().substringBefore(" - ").trim()
+        // v0.3.7：移动模板里 <h1> 是版块名（如"综合交流"），真题面在 div.thname/#myshares 的链接里
+        val title = doc.selectFirst("div.thname a")?.text()?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: doc.selectFirst("#myshares a")?.text()?.trim()?.takeIf { it.isNotBlank() }
+            ?: doc.title().substringBefore(" - ").trim().takeIf { it.isNotBlank() }
+            ?: doc.selectFirst("h1")?.text()?.trim()
+            ?: ""
 
         val blocks = blockSelectors
             .map { doc.select(it) }
@@ -71,12 +76,17 @@ object ThreadDetailParser {
     private val pollVoteCountRegex = Regex("""(\d+)\s*票""")
     private val pollOptionIndexRegex = Regex("""^\d+[.、]\s*""")
     private val pollMaxObjRegex = Regex("""max_obj\s*=\s*(\d+)""")
+    private val pollPercentRegex = Regex("""width\s*:\s*([\d.]+)%""")
+    private val pollVotersRegex = Regex("""(\d+)\s*投票人数""")
+    private val pollTotalVotesRegex = Regex("""(\d+)\s*累计投票数""")
 
     /**
      * Discuz touch 模板投票：
      *  - `form#poll` 的 action/formhash + `input[name=pollanswers[]]`（radio/checkbox，value=选项 id）
      *  - 选项文本在 `.poll_text > .poll_op_name`："8票 1. 基于安卓的系统"
-     *  - 多选上限来自页面脚本 `var max_obj = N`
+     *  - 结果条比例在 `div.poll_bar > div.poll_ct` 的 `style="width:42%"`
+     *  - 参与人数/累计票数在 `div.ss_data`："64 浏览人数 5 投票人数 5 累计投票数"
+     *  - 多选上限来自页面脚本 `var max_obj = N`（Discuz 用 0 表示不限）
      *  - 已投票时没有 input、选项带 `.poll_done`，并有 `div.poll_note4`「您已经投过票」
      */
     private fun parsePoll(doc: Document): PollData? {
@@ -89,32 +99,57 @@ object ThreadDetailParser {
             val nameEl = el.selectFirst(".poll_op_name") ?: return@mapNotNull null
             val raw = nameEl.text().trim()
             if (raw.isBlank()) return@mapNotNull null
-            val id = el.selectFirst("input[name^=pollanswers]")?.attr("value")?.trim().orEmpty()
+            val input = el.selectFirst("input[name^=pollanswers]")
+            val id = input?.attr("value")?.trim().orEmpty()
             val votes = pollVoteCountRegex.find(raw)?.groupValues?.get(1)?.toIntOrNull() ?: 0
             val label = pollOptionIndexRegex.replace(raw.replace(pollVoteCountRegex, "").trim(), "").trim()
             if (label.isBlank()) return@mapNotNull null
-            PollOption(id = id.ifBlank { "voted_${el.siblingIndex()}" }, label = label, votes = votes)
-        }.distinctBy { it.label }
+            val percent = el.selectFirst("div.poll_bar div.poll_ct, div.poll_ct")
+                ?.attr("style")
+                ?.let { pollPercentRegex.find(it)?.groupValues?.get(1)?.toFloatOrNull() }
+            PollOption(
+                id = id.ifBlank { "voted_${el.siblingIndex()}" },
+                label = label,
+                votes = votes,
+                percent = percent,
+                chosen = input?.hasAttr("checked") == true,
+            )
+        }.distinctBy { it.id.ifBlank { it.label } }
         if (options.isEmpty()) return null
 
         val firstInput = form?.selectFirst("input[name^=pollanswers]")
         val multi = firstInput?.attr("type").equals("checkbox", ignoreCase = true)
         val maxObj = doc.select("script").joinToString("\n") { it.data() }
             .let { pollMaxObjRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() } ?: 1
-        val voted = form == null || list == null ||
-            (form != null && firstInput == null) ||
+        val note = doc.selectFirst("div.poll_note4")?.text().orEmpty()
+        val closed = note.contains("已结束") || note.contains("已关闭") || note.contains("投票关闭")
+        val voted = !closed && (form == null || list == null ||
+            firstInput == null ||
             doc.selectFirst(".poll_done") != null ||
-            doc.selectFirst("div.poll_note4") != null
+            doc.selectFirst("div.poll_note4") != null)
+
+        // 参与人数 / 累计票数（散落在首楼正文的 ss_data 里）
+        val ssData = doc.selectFirst("div.ss_data")?.text().orEmpty()
+        val totalVoters = pollVotersRegex.find(ssData)?.groupValues?.get(1)?.toIntOrNull()
+        val totalVotes = pollTotalVotesRegex.find(ssData)?.groupValues?.get(1)?.toIntOrNull()
 
         return PollData(
             action = form?.attr("action")?.replace("&amp;", "&").orEmpty(),
             formhash = form?.selectFirst("input[name=formhash]")?.attr("value").orEmpty(),
             multi = multi,
-            maxChoices = if (multi) maxOf(1, maxObj) else 1,
+            // Discuz 用 max_obj=0 表示「不限项数」，旧实现压成 1 导致多选只能选一项
+            maxChoices = when {
+                !multi -> 1
+                maxObj <= 0 -> Int.MAX_VALUE
+                else -> maxObj
+            },
             options = options,
             voted = voted,
             viewVoteUrl = doc.selectFirst("a[href*=action=viewvote]")
                 ?.attr("href")?.replace("&amp;", "&")?.let(Net::absolutize),
+            closed = closed,
+            totalVoters = totalVoters,
+            totalVotes = totalVotes,
         )
     }
 
@@ -219,7 +254,16 @@ object ThreadDetailParser {
                 is TextNode -> sb.append(node.text())
                 is Element -> {
                     // 投票块由 PollCard 单独渲染，不要混进正文文字里
-                    if (node.id() == "poll" || node.classNames().any { it.startsWith("poll_") }) return
+                    // v0.3.7：移动模板里投票首楼正文还夹着 ss_data（浏览数/投票人数/累计票数）与
+                    // ss_line（"投票项目"）等结构文字，旧实现只过滤 poll_* 导致正文出现一堆残句。
+                    if (node.id() == "poll" ||
+                        node.classNames().any {
+                            it.startsWith("poll_") || it == "ss_data" || it == "ss_line" ||
+                                it == "polls" || it == "poll_list"
+                        }
+                    ) {
+                        return
+                    }
                     when (node.tagName().lowercase()) {
                         "br" -> sb.append('\n')
                         "img" -> {

@@ -1,5 +1,7 @@
 package cn.mce.starlight.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -100,29 +103,20 @@ fun ThreadDetailScreen(
     var showMention by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
 
-    // 切换帖子必须重置状态，避免上一个帖子的错误/内容串到新帖子
-    LaunchedEffect(tid) {
-        state = DetailState.Loading
-        page = 1
-        runCatching { repo.loadThreadDetail(tid, 1) }
-            .onSuccess { detail ->
-                cn.mce.starlight.data.FormhashStore.seed(detail.formhash)
-                state = if (detail.posts.isEmpty()) DetailState.Error("没有解析到楼层内容")
-                else DetailState.Content(detail)
-            }
-            .onFailure { state = DetailState.Error(it.message ?: "加载失败") }
-    }
-
     suspend fun load(targetPage: Int = page) {
         runCatching { repo.loadThreadDetail(tid, targetPage) }
             .onSuccess {
+                cn.mce.starlight.data.FormhashStore.seed(it.formhash)
                 state = if (it.posts.isEmpty()) DetailState.Error("没有解析到楼层内容")
                 else DetailState.Content(it)
             }
             .onFailure { state = DetailState.Error(it.message ?: "加载失败") }
     }
 
+    // v0.3.7：首屏只发一次请求（旧实现 LaunchedEffect(tid) 与 LaunchedEffect(tid, reloadKey) 同时跑，
+    // 进帖子必然连发 2 次整页 GET，加载态被置两次，既慢又闪）
     LaunchedEffect(tid, reloadKey) {
+        state = DetailState.Loading
         page = 1
         load(1)
     }
@@ -149,9 +143,7 @@ fun ThreadDetailScreen(
 
     Box(modifier.fillMaxSize()) {
         when (val s = state) {
-            is DetailState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            is DetailState.Loading -> DetailSkeleton(topPadding = topInset + 56.dp)
 
             is DetailState.Error -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -448,7 +440,12 @@ fun ThreadDetailScreen(
     }
 }
 
-/** 帖子内投票卡片（v0.3.3）：单选 / 多选 + 提交 + 已投票只读结果 */
+/**
+ * 帖子内投票卡片（v0.3.3 新增，v0.3.7 重做可读性）：
+ *  - 标题区显示「单选/多选 · 参与人数 · 累计票数」
+ *  - 每个选项：选中图标 + 选项文字 + 结果条 + 票数/百分比（未投票时按服务端是否公开结果显示）
+ *  - 已投票 / 投票已结束分别提示，不再用「禁用的单选框 + 一行 N 票」糊在一起
+ */
 @Composable
 private fun PollCard(
     poll: PollData,
@@ -456,15 +453,30 @@ private fun PollCard(
     onSubmit: (List<String>) -> Unit,
     onOpenVoters: () -> Unit,
 ) {
-    var selected by remember(poll.action, poll.voted) { mutableStateOf(setOf<String>()) }
+    var selected by remember(poll.action, poll.voted, poll.options) { mutableStateOf(setOf<String>()) }
+    var overLimitHint by remember(poll.action) { mutableStateOf(false) }
+
+    val sumVotes = poll.totalVotes ?: poll.options.sumOf { it.votes }
+    val showResult = poll.voted || poll.closed || sumVotes > 0
+    val canVote = !poll.voted && !poll.closed
 
     fun toggle(id: String) {
-        if (poll.voted || submitting) return
+        if (!canVote || submitting) return
+        if (!poll.multi) {
+            selected = if (id in selected) emptySet() else setOf(id)
+            overLimitHint = false
+            return
+        }
         selected = when {
-            !poll.multi -> setOf(id)
             id in selected -> selected - id
-            selected.size < poll.maxChoices -> selected + id
-            else -> selected
+            poll.maxChoices == Int.MAX_VALUE || selected.size < poll.maxChoices -> {
+                overLimitHint = false
+                selected + id
+            }
+            else -> {
+                overLimitHint = true
+                selected
+            }
         }
     }
 
@@ -474,67 +486,114 @@ private fun PollCard(
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Text("投票", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        if (poll.multi) {
-            Text(
-                "多选，最多可选 ${poll.maxChoices} 项",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.height(4.dp))
+        // 类型 + 参与数据
+        val meta = buildList {
+            add(if (poll.multi) "多选" else "单选")
+            if (poll.multi && poll.maxChoices != Int.MAX_VALUE) add("最多 ${poll.maxChoices} 项")
+            poll.totalVoters?.let { add("$it 人参与") }
+            if (sumVotes > 0) add("共 $sumVotes 票")
+        }.joinToString(" · ")
+        Text(
+            meta,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp, bottom = 6.dp),
+        )
 
-        poll.options.forEachIndexed { index, option ->
-            val checked = option.id in selected
+        poll.options.forEach { option ->
+            val checked = option.chosen || option.id in selected
+            val percent = option.percent
+                ?: if (sumVotes > 0) option.votes * 100f / sumVotes else 0f
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = !poll.voted && !submitting) { toggle(option.id) }
-                    .padding(vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(enabled = canVote && !submitting) { toggle(option.id) }
+                    .padding(vertical = 6.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.Top,
             ) {
-                if (poll.multi) {
-                    Checkbox(
-                        checked = checked,
-                        enabled = !poll.voted && !submitting,
-                        onCheckedChange = { toggle(option.id) },
-                    )
+                if (canVote) {
+                    if (poll.multi) {
+                        Checkbox(
+                            checked = checked,
+                            enabled = !submitting,
+                            onCheckedChange = { toggle(option.id) },
+                            modifier = Modifier.size(24.dp),
+                        )
+                    } else {
+                        RadioButton(
+                            selected = checked,
+                            enabled = !submitting,
+                            onClick = { toggle(option.id) },
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
                 } else {
-                    RadioButton(
-                        selected = checked,
-                        enabled = !poll.voted && !submitting,
-                        onClick = { toggle(option.id) },
+                    // 已投票/已结束：用圆点标记我投的选项，而不是禁用控件
+                    Box(
+                        Modifier
+                            .size(24.dp)
+                            .padding(5.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (checked) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                            ),
                     )
                 }
-                Column(Modifier.padding(start = 4.dp)) {
+                Column(Modifier.padding(start = 8.dp).weight(1f)) {
                     Text(
-                        "${index + 1}. ${option.label}",
+                        option.label,
                         style = MaterialTheme.typography.bodyMedium,
+                        color = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     )
-                    if (poll.voted) {
+                    if (showResult) {
+                        Spacer(Modifier.height(4.dp))
+                        PollBar(
+                            fraction = (percent / 100f).coerceIn(0f, 1f),
+                            highlight = checked,
+                        )
                         Text(
-                            "${option.votes} 票",
+                            "${option.votes} 票 · ${percent.toInt()}%",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 3.dp),
                         )
                     }
                 }
             }
         }
 
-        if (poll.voted) {
+        if (overLimitHint) {
             Text(
+                "最多只能选 ${poll.maxChoices} 项",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+
+        when {
+            poll.closed -> Text(
+                "投票已结束",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            poll.voted -> Text(
                 "您已经投过票，谢谢您的参与",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = 6.dp),
             )
-        } else {
-            Spacer(Modifier.height(8.dp))
-            Button(
-                enabled = selected.isNotEmpty() && !submitting,
-                onClick = { onSubmit(selected.toList()) },
-            ) {
-                Text(if (submitting) "提交中…" else "提交投票")
+            else -> {
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    enabled = selected.isNotEmpty() && !submitting,
+                    onClick = { onSubmit(selected.toList()) },
+                ) {
+                    Text(if (submitting) "提交中…" else "提交投票")
+                }
             }
         }
 
@@ -548,6 +607,34 @@ private fun PollCard(
                     .padding(vertical = 6.dp),
             )
         }
+    }
+}
+
+/** 投票结果条：6dp 圆角，带增长动画 */
+@Composable
+private fun PollBar(fraction: Float, highlight: Boolean) {
+    val animated by animateFloatAsState(
+        targetValue = fraction,
+        animationSpec = tween(durationMillis = 420),
+        label = "pollBar",
+    )
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(6.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(animated.coerceIn(0f, 1f))
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(3.dp))
+                .background(
+                    if (highlight) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                ),
+        )
     }
 }
 

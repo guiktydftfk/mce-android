@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import cn.mce.starlight.core.DarkMode
 import cn.mce.starlight.core.Diagnostics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
@@ -95,19 +96,38 @@ fun SettingsScreen(
         ) {
             SectionTitle("外观")
 
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("深色模式", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        "跟随开关即时切换明暗主题",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            // v0.3.7：明暗模式三态（浅色 / 深色 / 跟随系统）
+            Text("明暗模式", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "「跟随系统」会随手机的深色模式自动切换",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DarkMode.entries.forEach { mode ->
+                    val active = SettingsStore.darkModeSetting == mode
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (active) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            .clickable { SettingsStore.updateDarkModeSetting(mode) }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = mode.label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                            color = if (active) MaterialTheme.colorScheme.onPrimaryContainer
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                Switch(
-                    checked = SettingsStore.darkMode,
-                    onCheckedChange = { SettingsStore.updateDarkMode(it) },
-                )
             }
 
             Spacer(Modifier.height(8.dp))

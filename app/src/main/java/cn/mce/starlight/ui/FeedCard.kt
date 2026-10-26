@@ -17,11 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,7 +24,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cn.mce.starlight.data.ThreadImageCache
 import cn.mce.starlight.data.ThreadSummary
 import coil.compose.AsyncImage
 
@@ -43,15 +37,13 @@ fun FeedCard(
     thread: ThreadSummary,
     modifier: Modifier = Modifier,
     showBoard: Boolean = true,
-    allowThumbnail: Boolean = true,
+    /**
+     * 缩略图 URL（v0.3.7 起由列表层统一管理：滚动停止后再批量抓取，命中后写入列表级 map）。
+     * null = 还没抓过；"" = 抓过但该帖没有图。
+     */
+    thumbUrl: String? = null,
     onClick: () -> Unit,
 ) {
-    var image by remember(thread.id) { mutableStateOf<String?>(null) }
-    // 只有前几张卡片才去拉缩略图：一屏十几张卡片各拉一次整页会触发论坛频率限制
-    LaunchedEffect(thread.id, allowThumbnail) {
-        if (allowThumbnail) image = ThreadImageCache.firstImage(thread.id)
-    }
-
     Column(
         modifier
             .fillMaxWidth()
@@ -110,9 +102,10 @@ fun FeedCard(
             )
         }
 
-        image?.let { url ->
+        // 缩略图：URL 由列表层在滚动停止后统一抓取（见 PagedThreadList），这里只负责渲染
+        if (!thumbUrl.isNullOrBlank()) {
             AsyncImage(
-                model = url,
+                model = thumbUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -121,7 +114,6 @@ fun FeedCard(
                     .clip(RoundedCornerShape(10.dp)),
             )
         }
-
         Row(verticalAlignment = Alignment.CenterVertically) {
             thread.replies?.let {
                 Text(

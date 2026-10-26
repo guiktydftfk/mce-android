@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.ui
+package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,11 +57,12 @@ private sealed interface PState<out T> {
 private fun topPadding(): androidx.compose.ui.unit.Dp =
     WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-/** 我的主题：与首页一致的卡片流 */
+/** 我的主题：草稿与已发布主题分组展示（v0.3.7） */
 @Composable
 fun MyThreadsScreen(
     onMenu: () -> Unit,
     onOpenDraftBox: () -> Unit = {},
+    onOpenDraft: (Long) -> Unit = {},
     onOpenThread: (Int, String) -> Unit,
 ) {
     Box(Modifier.fillMaxSize()) {
@@ -74,18 +75,37 @@ fun MyThreadsScreen(
             loader = { page -> PersonalClient.loadMyThreads(page) },
             onOpenThread = { thread -> onOpenThread(thread.id, thread.title) },
             header = {
-                // 草稿只存在本地，不会出现在这里；给一个入口避免"存了草稿找不到"
+                // v0.3.7：草稿与已发布分区展示，草稿始终有独立分组标题（空草稿也显示 0）
                 val drafts = cn.mce.starlight.core.DraftStore.drafts
-                if (drafts.isNotEmpty()) {
-                    androidx.compose.foundation.layout.Row(
+                SectionHeader(
+                    title = "草稿",
+                    count = drafts.size,
+                    hint = if (drafts.isEmpty()) "未发布 · 仅存本机" else "未发布 · 仅存本机",
+                )
+                if (drafts.isEmpty()) {
+                    Text(
+                        "还没有草稿。在发帖页点「存草稿」会保存到本机。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                } else {
+                    drafts.take(3).forEach { draft ->
+                        DraftListItem(
+                            draft = draft,
+                            onOpen = { onOpenDraft(draft.id) },
+                            compact = true,
+                        )
+                    }
+                    Row(
                         Modifier
                             .fillMaxWidth()
                             .clickable { onOpenDraftBox() }
-                            .padding(horizontal = 18.dp, vertical = 10.dp),
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            "草稿箱（${drafts.size} 份草稿，未发布）",
+                            if (drafts.size > 3) "查看全部 ${drafts.size} 份草稿" else "打开草稿箱",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -93,6 +113,8 @@ fun MyThreadsScreen(
                         Text("›", color = MaterialTheme.colorScheme.primary)
                     }
                 }
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                SectionHeader(title = "已发布主题", hint = "来自论坛")
             },
         )
         ImmersiveTopBar(title = "我的主题", modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
@@ -201,6 +223,9 @@ fun FavoritesScreen(
     }
 }
 
+/// 消息页上次打开的页签（进程内保持，v0.3.7）
+private var noticeTabIndex = 0
+
 /** 消息中心（v0.3.4）：提醒 + 私信两个页签；进入即标记已读（清顶部提示） */
 @Composable
 fun NoticesScreen(
@@ -211,7 +236,8 @@ fun NoticesScreen(
     onOpenUser: (Int, String) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
-    var tab by remember { mutableStateOf(0) } // 0 = 提醒，1 = 私信
+    // v0.3.7：记住上次页签 —— 从私信会话返回时不再跳回「提醒」
+    var tab by remember { mutableStateOf(noticeTabIndex) } // 0 = 提醒，1 = 私信
     var noticeState by remember { mutableStateOf<PState<PersonalClient.NoticeItem>>(PState.Loading) }
     var pmState by remember { mutableStateOf<PState<PersonalClient.PmItem>>(PState.Loading) }
 
@@ -225,8 +251,18 @@ fun NoticesScreen(
 
     suspend fun loadPm() {
         runCatching { PersonalClient.loadPm(1) }
-            .onSuccess { pmState = PState.Content(it) }
+            .onSuccess {
+                pmState = PState.Content(it)
+                // v0.3.7：列表就是未读真源 —— 拉到什么就写回 MessageCenter，
+                // 页签角标与列表行不再出现「列表读完了、角标还挂着 (2)」的错位
+                MessageCenter.applyPmItems(it)
+            }
             .onFailure { pmState = PState.Error(it.message ?: "加载失败") }
+    }
+
+    // 进入消息页 / 切到私信页签：只清顶部提示（私信角标交给列表真值，避免出现「角标 0 但列表还有红点」）
+    LaunchedEffect(tab) {
+        if (tab == 1) MessageCenter.dismissBanner()
     }
 
     LaunchedEffect(Unit) {
@@ -258,7 +294,7 @@ fun NoticesScreen(
                                 if (tab == value) MaterialTheme.colorScheme.primaryContainer
                                 else MaterialTheme.colorScheme.surfaceVariant,
                             )
-                            .clickable { tab = value }
+                            .clickable { tab = value; noticeTabIndex = value }
                             .padding(horizontal = 14.dp, vertical = 6.dp),
                     )
                 }
@@ -310,6 +346,12 @@ fun NoticesScreen(
                                 text = item.preview,
                                 unread = item.unread > 0,
                             ) {
+                                // v0.3.7：论坛侧读完私信仍返回未读 → 客户端自己记录「这个会话我已看过」，
+                                // 返回列表后重拉时该会话红点/角标清零；对方再来新消息签名变化会重新标未读
+                                cn.mce.starlight.core.PmReadStore.markRead(
+                                    item.touid,
+                                    cn.mce.starlight.core.PmReadStore.signature(item),
+                                )
                                 onOpenPm(item.touid, item.title.ifBlank { "私信" })
                             }
                             HorizontalDivider(Modifier.padding(start = 68.dp))
@@ -342,25 +384,29 @@ private fun NoticeRow(
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        Box(
-            Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            avatar?.let {
-                AsyncImage(
-                    model = it,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
+        // v0.3.7：未读红点原来画在「已 clip(CircleShape) 的头像 Box」内部，会被圆形裁剪吃掉，
+        // 表现为「页签角标有未读、列表却像全已读」。改成外层 Box 承载头像 + 红点，红点不再被裁。
+        Box(Modifier.size(40.dp)) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                avatar?.let {
+                    AsyncImage(
+                        model = it,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
             if (unread) {
                 Box(
                     Modifier
                         .align(Alignment.TopEnd)
-                        .size(9.dp)
+                        .size(10.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.error),
                 )

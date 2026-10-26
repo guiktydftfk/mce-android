@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.core
+package cn.mce.starlight.core
 
 import android.content.Context
 import android.os.Build
@@ -49,7 +49,7 @@ object Diagnostics {
         sb.appendLine("Cookie 项：${cookieNames.size} 个" + if (cookieNames.isEmpty()) "" else "（${cookieNames.joinToString(",")}）")
 
         // 设置
-        sb.appendLine("深色模式：" + if (SettingsStore.darkMode) "开" else "关")
+        sb.appendLine("明暗模式：" + SettingsStore.darkModeSetting.label)
         sb.appendLine("自定义背景：" + if (SettingsStore.backgroundPath != null) "有" else "无")
         sb.appendLine("板块数量：${Boards.all.size}")
 

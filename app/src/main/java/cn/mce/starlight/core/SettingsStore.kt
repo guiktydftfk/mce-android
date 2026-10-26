@@ -14,9 +14,24 @@ import androidx.compose.runtime.setValue
  *   - 自定义背景图片（本地路径）/ 透明度 / 模糊度
  *   - 自动更新：暂停到期时间、最近检查时间、已下载 APK 路径
  */
+/**
+ * 明暗模式（v0.3.7）：浅色 / 深色 / 跟随系统。
+ * 旧版本只有一个布尔值（dark_mode），init 时会自动迁移。
+ */
+enum class DarkMode(val label: String, val key: String) {
+    LIGHT("浅色", "LIGHT"),
+    DARK("深色", "DARK"),
+    SYSTEM("跟随系统", "SYSTEM");
+
+    companion object {
+        fun fromKey(key: String?): DarkMode? = entries.firstOrNull { it.key == key }
+    }
+}
+
 object SettingsStore {
     private const val PREFS = "mce_settings"
     private const val KEY_DARK = "dark_mode"
+    private const val KEY_DARK_MODE = "dark_mode_setting"
     private const val KEY_ACCENT = "accent_theme"
     private const val KEY_BG = "background_path"
     private const val KEY_BG_ALPHA = "background_alpha"
@@ -31,7 +46,7 @@ object SettingsStore {
 
     private var appContext: Context? = null
 
-    var darkMode by mutableStateOf(false)
+    var darkModeSetting by mutableStateOf(DarkMode.LIGHT)
         private set
 
     /** 主题色（AccentTheme 枚举名，默认 MONET = 原有莫奈蓝） */
@@ -67,7 +82,20 @@ object SettingsStore {
     fun init(context: Context) {
         appContext = context.applicationContext
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        darkMode = prefs.getBoolean(KEY_DARK, false)
+        // 明暗模式：优先读新键；旧版只有布尔 dark_mode（用户点过开关才会写），
+        // 从没设置过的老用户 / 新安装用户默认「跟随系统」。
+        darkModeSetting = DarkMode.fromKey(prefs.getString(KEY_DARK_MODE, null))
+            ?: when {
+                !prefs.contains(KEY_DARK) -> DarkMode.SYSTEM
+                prefs.getBoolean(KEY_DARK, false) -> DarkMode.DARK
+                else -> DarkMode.LIGHT
+            }
+        if (prefs.contains(KEY_DARK) || !prefs.contains(KEY_DARK_MODE)) {
+            prefs.edit()
+                .putString(KEY_DARK_MODE, darkModeSetting.key)
+                .remove(KEY_DARK)
+                ?.apply()
+        }
         accentTheme = prefs.getString(KEY_ACCENT, "MONET") ?: "MONET"
         backgroundPath = prefs.getString(KEY_BG, null)
         backgroundAlpha = prefs.getFloat(KEY_BG_ALPHA, 0.85f)
@@ -82,9 +110,9 @@ object SettingsStore {
         signinReminderHour = prefs.getInt(KEY_SIGNIN_REMIND_HOUR, 20)
     }
 
-    fun updateDarkMode(enabled: Boolean) {
-        darkMode = enabled
-        prefs()?.edit()?.putBoolean(KEY_DARK, enabled)?.apply()
+    fun updateDarkModeSetting(mode: DarkMode) {
+        darkModeSetting = mode
+        prefs()?.edit()?.putString(KEY_DARK_MODE, mode.key)?.apply()
     }
 
     fun updateAccentTheme(name: String) {

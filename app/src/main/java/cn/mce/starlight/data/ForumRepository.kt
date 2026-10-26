@@ -50,6 +50,10 @@ data class PollOption(
     val id: String,
     val label: String,
     val votes: Int,
+    /** 服务端给的百分比（poll_bar>poll_ct 的 width），缺失时由 UI 用票数比例计算 */
+    val percent: Float? = null,
+    /** 我在该选项上投过票（已投票页面 input[checked]） */
+    val chosen: Boolean = false,
 )
 
 /** 帖子内投票（v0.3.3：支持直接参与投票） */
@@ -64,6 +68,12 @@ data class PollData(
     val voted: Boolean,
     /** 查看投票参与人入口 */
     val viewVoteUrl: String?,
+    /** 投票已结束/已关闭（与「已投票」区分，避免误显示"您已投过票"） */
+    val closed: Boolean = false,
+    /** 参与人数（div.ss_data「N 投票人数」） */
+    val totalVoters: Int? = null,
+    /** 累计票数（div.ss_data「N 累计投票数」） */
+    val totalVotes: Int? = null,
 )
 
 /** 帖子详情 */
