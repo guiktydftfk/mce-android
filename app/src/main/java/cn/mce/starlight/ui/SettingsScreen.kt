@@ -49,6 +49,7 @@ fun SettingsScreen(
     onLogin: () -> Unit,
     onLogout: () -> Unit,
     onOpenImageDiag: () -> Unit = {},
+    onCheckUpdate: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var message by remember { mutableStateOf<String?>(null) }
@@ -163,6 +164,61 @@ fun SettingsScreen(
             message?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+
+            SectionTitle("更新")
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "检查更新",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onCheckUpdate() }
+                    .padding(vertical = 12.dp),
+            )
+            Text(
+                "当前版本 ${cn.mce.starlight.data.UpdateClient.currentVersionName(context)}" +
+                    "（${cn.mce.starlight.data.UpdateClient.currentVersionCode(context)}）",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (SettingsStore.isUpdateSnoozed())
+                    "已暂停自动检查更新，剩 ${SettingsStore.snoozeRemainingDays()} 天"
+                else "启动时会自动检查更新",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "暂停 7 天",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clickable { SettingsStore.snoozeUpdates(7); message = "已暂停自动更新 7 天" }
+                        .padding(horizontal = 6.dp, vertical = 10.dp),
+                )
+                Text(
+                    "暂停 15 天",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clickable { SettingsStore.snoozeUpdates(15); message = "已暂停自动更新 15 天" }
+                        .padding(horizontal = 6.dp, vertical = 10.dp),
+                )
+                if (SettingsStore.isUpdateSnoozed()) {
+                    Text(
+                        "取消暂停",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .clickable { SettingsStore.clearSnooze(); message = "已恢复自动检查更新" }
+                            .padding(horizontal = 6.dp, vertical = 10.dp),
+                    )
+                }
             }
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))

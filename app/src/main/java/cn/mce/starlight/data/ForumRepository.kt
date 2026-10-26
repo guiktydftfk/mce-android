@@ -65,5 +65,5 @@ interface ForumRepository {
     suspend fun loadBoards(): List<ForumBoard>
     suspend fun loadThreads(fid: Int, page: Int, filter: String? = null): ForumPage
     suspend fun loadGuide(view: String = "newthread", page: Int = 1): ForumPage
-    suspend fun loadThreadDetail(tid: Int, page: Int): ThreadDetail
+    suspend fun loadThreadDetail(tid: Int, page: Int, noCache: Boolean = false): ThreadDetail
 }

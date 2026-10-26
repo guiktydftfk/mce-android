@@ -1,0 +1,6 @@
+{
+  "versionName": "0.2.3",
+  "versionCode": 26,
+  "notes": "0.2.3\n- 修复回帖后“没有解析到楼层内容”：回帖的 POST 响应是提示页，改为重新 GET 帖子页（带时间戳）再渲染，失败会提示手动刷新\n- 修复刷新语义：刷新前先回到最顶部\n- 修复列表缩略图时机问题：失败不再永久缓存，且改用完整解析器（含相册/附件图）\n- 修复发帖页表单加载时机：登录态变化/失败可重试\n- 修复加载更多与刷新并发导致重复/错乱\n- 新增自动更新：启动检查 GitHub 仓库，弹窗显示更新内容，点击后静默下载并拉起安装；设置内可检查更新与暂停 7/15 天",
+  "apk": "https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/MCE-latest.apk"
+}

@@ -49,6 +49,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import cn.mce.starlight.core.SessionStore
 import cn.mce.starlight.data.Boards
 import cn.mce.starlight.data.PostActions
 import coil.compose.AsyncImage
@@ -81,6 +82,7 @@ fun NewThreadScreen(
     var categories by remember { mutableStateOf(emptyList<PostActions.Category>()) }
     var selectedCategory by remember { mutableStateOf<PostActions.Category?>(null) }
     var loadingForm by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
     var formError by remember { mutableStateOf<String?>(null) }
 
     var subject by remember { mutableStateOf("") }
@@ -105,7 +107,7 @@ fun NewThreadScreen(
 
     val fid = boards[boardIndex].fid
 
-    LaunchedEffect(boardIndex) {
+    LaunchedEffect(boardIndex, SessionStore.isLoggedIn, reloadTick) {
         loadingForm = true
         formError = null
         categories = emptyList()
@@ -368,7 +370,10 @@ fun NewThreadScreen(
         }
 
         (formError ?: error)?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { reloadTick += 1 }) { Text("重试") }
+            }
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

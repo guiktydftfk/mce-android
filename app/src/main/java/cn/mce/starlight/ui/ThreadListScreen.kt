@@ -101,7 +101,7 @@ fun ThreadListScreen(
     }
 
     suspend fun loadMore() {
-        if (!hasNext || loadingMore) return
+        if (!hasNext || loadingMore || refreshing) return
         val current = (state as? ListState.Content)?.threads ?: return
         loadingMore = true
         runCatching { loader(page + 1, filter) }
@@ -121,12 +121,11 @@ fun ThreadListScreen(
     // 刷新时保持当前滚动位置（不回顶）
     fun refreshKeepPosition() {
         if (refreshing) return
-        val index = listState.firstVisibleItemIndex
-        val offset = listState.firstVisibleItemScrollOffset
         refreshing = true
         scope.launch {
+            // 先回到最顶部，再刷新
+            runCatching { listState.scrollToItem(0) }
             loadFirst()
-            runCatching { listState.scrollToItem(index, offset) }
             refreshing = false
         }
     }

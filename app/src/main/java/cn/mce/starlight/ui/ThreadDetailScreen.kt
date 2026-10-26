@@ -225,7 +225,21 @@ fun ThreadDetailScreen(
                             if (r.ok) {
                                 replyText = ""
                                 replyTo = null
-                                load()
+                                // 回帖的 POST 响应是提示/跳转页，不能直接当帖子页解析，
+                                // 必须重新 GET（带时间戳绕过缓存）再渲染。
+                                val fresh = runCatching { repo.loadThreadDetail(tid, page, noCache = true) }.getOrNull()
+                                if (fresh != null && fresh.posts.isNotEmpty()) {
+                                    state = DetailState.Content(fresh)
+                                } else {
+                                    // 兜底：稍等再试一次，仍失败则提示手动刷新
+                                    kotlinx.coroutines.delay(1200)
+                                    val retry = runCatching { repo.loadThreadDetail(tid, page, noCache = true) }.getOrNull()
+                                    if (retry != null && retry.posts.isNotEmpty()) {
+                                        state = DetailState.Content(retry)
+                                    } else {
+                                        toast = "回复成功，但页面刷新受限，请下拉/点刷新重试"
+                                    }
+                                }
                             }
                         }
                     },

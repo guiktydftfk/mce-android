@@ -31,9 +31,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.core.SessionStore
+import cn.mce.starlight.core.SettingsStore
 import cn.mce.starlight.data.AuthClient
 import cn.mce.starlight.data.Boards
 import cn.mce.starlight.data.HttpForumRepository
+import cn.mce.starlight.data.UpdateClient
 import kotlinx.coroutines.launch
 
 private const val BASE = "https://mce.msi.cn"
@@ -82,11 +84,26 @@ fun MceApp() {
 
     val context = LocalContext.current
     var lastBackAt by remember { mutableLongStateOf(0L) }
+    var updateRelease by remember { mutableStateOf<UpdateClient.Release?>(null) }
+    var updateDownloading by remember { mutableStateOf(false) }
+    var updateProgress by remember { mutableIntStateOf(0) }
+    var updateError by remember { mutableStateOf<String?>(null) }
 
     fun openDrawer() { scope.launch { drawerState.open() } }
     fun closeDrawer() { scope.launch { drawerState.close() } }
     fun push(route: Route) { stack = stack + route }
     fun pop() { stack = stack.dropLast(1) }
+
+    fun checkUpdate(silent: Boolean) {
+        scope.launch {
+            val release = UpdateClient.check(context)
+            SettingsStore.markUpdateChecked()
+            when {
+                release != null -> updateRelease = release
+                !silent -> Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     fun refreshSession() {
         scope.launch {
@@ -96,8 +113,11 @@ fun MceApp() {
     }
 
     LaunchedEffect(Unit) {
-        SessionStore.probeLoginState()
-        if (!SessionStore.isLoggedIn) showLogin = true
+        // 只有「确定未登录」才弹登录框；网络异常(null)保持静默，避免误判踢人
+        val probe = SessionStore.probeLoginState()
+        if (probe == false) showLogin = true
+        // 启动后自动检查更新（暂停更新期间跳过）
+        if (!SettingsStore.isUpdateSnoozed()) checkUpdate(silent = true)
     }
 
     ModalNavigationDrawer(
@@ -354,6 +374,7 @@ fun MceApp() {
                 Dest.Settings -> SettingsScreen(
                     onMenu = ::openDrawer,
                     onOpenImageDiag = { push(Route.ImageDiag) },
+                    onCheckUpdate = { checkUpdate(silent = false) },
                     onLogin = { showLogin = true },
                     onLogout = {
                         scope.launch {
@@ -374,6 +395,43 @@ fun MceApp() {
                 showLogin = false
                 refreshSession()
             },
+        )
+    }
+
+    updateRelease?.let { release ->
+        UpdateDialog(
+            release = release,
+            downloading = updateDownloading,
+            progress = updateProgress,
+            downloadError = updateError,
+            onUpdate = {
+                val url = release.apkUrl
+                if (url.isNullOrBlank()) {
+                    updateError = "缺少更新下载地址"
+                } else {
+                    updateDownloading = true
+                    updateError = null
+                    updateProgress = 0
+                    scope.launch {
+                        val file = UpdateClient.download(context, url) { p -> updateProgress = p }
+                        updateDownloading = false
+                        if (file != null) {
+                            updateRelease = null
+                            val started = UpdateClient.install(context, file)
+                            if (!started) {
+                                Toast.makeText(context, "无法启动安装器，请在系统设置中允许安装未知应用", Toast.LENGTH_LONG).show()
+                            }
+                        } else {
+                            updateError = "下载失败，请检查网络后重试"
+                        }
+                    }
+                }
+            },
+            onSnooze = {
+                SettingsStore.snoozeUpdates(7)
+                updateRelease = null
+            },
+            onDismiss = { updateRelease = null },
         )
     }
 }

@@ -98,7 +98,7 @@ fun HomeFeedScreen(
     }
 
     suspend fun loadMore() {
-        if (!hasNext || loadingMore) return
+        if (!hasNext || loadingMore || refreshing) return
         val current = (state as? FeedState.Content)?.threads ?: return
         loadingMore = true
         runCatching { repo.loadGuide(view, page + 1) }
@@ -117,12 +117,11 @@ fun HomeFeedScreen(
 
     fun refresh() {
         if (refreshing) return
-        val index = listState.firstVisibleItemIndex
-        val offset = listState.firstVisibleItemScrollOffset
         refreshing = true
         scope.launch {
+            // 先回到最顶部，再刷新（用户要求的刷新语义）
+            runCatching { listState.scrollToItem(0) }
             loadFirst()
-            runCatching { listState.scrollToItem(index, offset) }
             refreshing = false
         }
     }

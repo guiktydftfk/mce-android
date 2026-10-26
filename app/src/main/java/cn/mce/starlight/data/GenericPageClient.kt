@@ -150,46 +150,70 @@ object GenericPageClient {
         else -> "https://mce.msi.cn/$href"
     }
 
-    fun get(url: String, cookieOverride: String? = null): String {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15_000
-            readTimeout = 20_000
-            instanceFollowRedirects = true
-            setRequestProperty("User-Agent", MOBILE_UA)
-            (cookieOverride ?: WebCookies.cookieHeader(url))?.let {
-                setRequestProperty("Cookie", it)
+    fun get(url: String, cookieOverride: String? = null): String =
+        follow(url, "GET", cookieOverride ?: WebCookies.cookieHeader(url), null)
+
+    /**
+     * 手动跟随 3xx：每跳都保存 Set-Cookie。
+     * Discuz 登录/回帖的关键 Cookie 往往在 302 响应里，用自动跟随会全部丢失，
+     * 表现为"登录了却一直是游客"（历史疑难 bug）。
+     */
+    private fun follow(
+        startUrl: String,
+        method: String,
+        cookie: String?,
+        body: String?,
+    ): String {
+        var currentUrl = startUrl
+        var currentCookie = cookie
+        var currentMethod = method
+        var currentBody = body
+        var hops = 0
+
+        while (true) {
+            val conn = (URL(currentUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 15_000
+                readTimeout = 25_000
+                instanceFollowRedirects = false
+                requestMethod = currentMethod
+                setRequestProperty("User-Agent", MOBILE_UA)
+                currentCookie?.let { setRequestProperty("Cookie", it) }
+                if (currentMethod == "POST") {
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                }
+            }
+            try {
+                if (currentMethod == "POST" && currentBody != null) {
+                    conn.outputStream.use { it.write(currentBody.toByteArray(Charsets.UTF_8)) }
+                }
+                val code = conn.responseCode
+
+                // 逐跳保存 Cookie（这是关键）
+                storeCookies(currentUrl, conn)
+
+                if (code in 300..399 && hops < 6) {
+                    val location = conn.getHeaderField("Location") ?: break
+                    conn.disconnect()
+                    currentUrl = URL(URL(currentUrl), location).toString()
+                    currentCookie = WebCookies.cookieHeader(currentUrl) ?: currentCookie
+                    currentMethod = "GET"
+                    currentBody = null
+                    hops++
+                    continue
+                }
+
+                if (code !in 200..299) throw IOException("HTTP $code")
+                return conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            } finally {
+                runCatching { conn.disconnect() }
             }
         }
-        try {
-            val code = conn.responseCode
-            if (code !in 200..299) throw IOException("HTTP $code")
-            storeCookies(url, conn)
-            return conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-        } finally {
-            conn.disconnect()
-        }
+        throw IOException("too many redirects")
     }
 
-    fun httpPost(url: String, body: String, cookie: String?): String {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15_000
-            readTimeout = 20_000
-            requestMethod = "POST"
-            doOutput = true
-            instanceFollowRedirects = true
-            setRequestProperty("User-Agent", MOBILE_UA)
-            setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-            cookie?.let { setRequestProperty("Cookie", it) }
-        }
-        try {
-            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            storeCookies(url, conn)
-            val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
-            return stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-        } finally {
-            conn.disconnect()
-        }
-    }
+    fun httpPost(url: String, body: String, cookie: String?): String =
+        follow(url, "POST", cookie ?: WebCookies.cookieHeader(url), body)
 
     /** 保存响应 Cookie：写入自建 CookieJar（不依赖 WebView），并尽力兼容 CookieManager */
     private fun storeCookies(url: String, conn: HttpURLConnection) {

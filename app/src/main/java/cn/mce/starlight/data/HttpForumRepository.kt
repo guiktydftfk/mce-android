@@ -44,9 +44,10 @@ class HttpForumRepository(
             MobileForumParser.parse(fetch(url), url, page)
         }
 
-    override suspend fun loadThreadDetail(tid: Int, page: Int): ThreadDetail =
+    override suspend fun loadThreadDetail(tid: Int, page: Int, noCache: Boolean): ThreadDetail =
         withContext(Dispatchers.IO) {
-            val url = "$baseHost/forum.php?mod=viewthread&tid=$tid&page=$page"
+            val cacheBust = if (noCache) "&t=${System.currentTimeMillis()}&mobile=2" else ""
+            val url = "$baseHost/forum.php?mod=viewthread&tid=$tid&page=$page$cacheBust"
             ThreadDetailParser.parse(fetch(url), url, tid, page)
         }
 
