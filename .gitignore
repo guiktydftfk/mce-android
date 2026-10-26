@@ -9,6 +9,7 @@ captures/
 # 构建与运行产物
 build.log
 test.log
+push.log
 .kotlin/
 dist/
 *.apk
