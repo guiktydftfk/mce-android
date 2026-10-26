@@ -1,4 +1,4 @@
-package cn.mce.starlight.ui
+﻿package cn.mce.starlight.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -20,7 +20,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -36,7 +40,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import cn.mce.starlight.core.Diagnostics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import cn.mce.starlight.ui.theme.AccentTheme
 import cn.mce.starlight.core.SessionStore
 import cn.mce.starlight.core.SettingsStore
 import coil.compose.AsyncImage
@@ -49,12 +55,13 @@ fun SettingsScreen(
     onMenu: () -> Unit,
     onLogin: () -> Unit,
     onLogout: () -> Unit,
-    onOpenImageDiag: () -> Unit = {},
     onCheckUpdate: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var message by remember { mutableStateOf<String?>(null) }
+    var diagTid by remember { mutableStateOf("") }
+    var diagBusy by remember { mutableStateOf(false) }
 
     val pickBackground = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
@@ -101,6 +108,53 @@ fun SettingsScreen(
                     checked = SettingsStore.darkMode,
                     onCheckedChange = { SettingsStore.updateDarkMode(it) },
                 )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // 主题色（保留原有「莫奈蓝」为默认，新增 Edge 风格配色）
+            Text("主题色", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "默认沿用原有莫奈蓝配色；切换后立即生效",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val current = AccentTheme.fromName(SettingsStore.accentTheme)
+                AccentTheme.entries.forEach { theme ->
+                    val active = theme == current
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { SettingsStore.updateAccentTheme(theme.name) }
+                            .padding(4.dp),
+                    ) {
+                        Box(
+                            Modifier
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(15.dp))
+                                .background(theme.lightPrimary)
+                                .then(
+                                    if (active) {
+                                        Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, RoundedCornerShape(15.dp))
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
+                        )
+                        Text(
+                            theme.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (active) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(12.dp))
@@ -248,37 +302,38 @@ fun SettingsScreen(
             SectionTitle("诊断")
             Spacer(Modifier.height(8.dp))
             Text(
-                "自检报告（点击复制到剪贴板）",
+                "自检报告（含图片自检，一键复制）",
                 style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        val report = Diagnostics.build(context)
-                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        cm.setPrimaryClip(ClipData.newPlainText("MCE 自检报告", report))
-                        message = "自检报告已复制到剪贴板"
-                    }
-                    .padding(vertical = 12.dp),
             )
-            Text(
-                "图片自检（帖子图片看不到时用）",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpenImageDiag() }
-                    .padding(vertical = 12.dp),
-            )
-            Text(
-                "输入帖子 ID，逐个探测正文图片请求，输出失败原因",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
             Text(
                 "包含版本、设备、登录态（不含 Cookie 值）、设置与最近抓取页面，可直接粘贴反馈",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = diagTid,
+                onValueChange = { diagTid = it.filter { ch -> ch.isDigit() }.take(8) },
+                label = { Text("帖子 ID（可选）") },
+                placeholder = { Text("填了会顺带检查该帖图片是否可加载") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                enabled = !diagBusy,
+                onClick = {
+                    diagBusy = true
+                    scope.launch {
+                        val report = Diagnostics.build(context, diagTid.toIntOrNull())
+                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("MCE 自检报告", report))
+                        diagBusy = false
+                        message = if (diagTid.isBlank()) "自检报告已复制到剪贴板"
+                        else "自检报告（含图片自检）已复制到剪贴板"
+                    }
+                },
+            ) { Text(if (diagBusy) "生成中…" else "生成并复制自检报告") }
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
 
@@ -315,9 +370,38 @@ fun SettingsScreen(
 
             SectionTitle("关于")
             Spacer(Modifier.height(8.dp))
-            Text("MCE星光班 Android 客户端", style = MaterialTheme.typography.bodyMedium)
+            Text("aMCE · MCE星光班 Android 客户端", style = MaterialTheme.typography.bodyMedium)
             Text(
                 "github.com/guiktydftfk/mce-android",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(12.dp))
+            Text("开源协议", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "本应用（含代码与文档）采用 CC BY-NC 4.0 国际许可协议" +
+                    "（Creative Commons Attribution-NonCommercial 4.0 International，" +
+                    "署名—非商业性使用 4.0 国际）。",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "您可以自由地共享（复制、发行）和改编本作品，但必须：① 署名（注明原作者与本项目出处并附协议链接）；" +
+                    "② 非商业性使用（不得用于商业目的）。协议全文：https://creativecommons.org/licenses/by-nc/4.0/legalcode.zh-hans",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(12.dp))
+            Text("免责声明", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "1. 本应用为第三方非官方客户端，与 MCE星光班、微星科技（MSI）及论坛管理团队无隶属或授权关系，" +
+                    "名称与图标仅用于标识所访问的论坛社区。\n" +
+                    "2. 应用内展示的帖子、图片、评论等内容版权归原作者及论坛所有，本应用仅做展示与转发，不对内容真实性、合法性负责。\n" +
+                    "3. 本应用按「现状」提供，不附带任何明示或暗示的担保；因使用本应用造成的任何直接或间接损失，" +
+                    "开发者不承担责任，使用风险由使用者自行承担。\n" +
+                    "4. 本应用仅供学习交流与非商业用途，禁止用于任何商业目的；请遵守论坛规则及当地法律法规。\n" +
+                    "5. 如权利人认为内容侵权，请联系开发者删除。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

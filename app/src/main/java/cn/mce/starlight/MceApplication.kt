@@ -25,6 +25,7 @@ class MceApplication : Application(), ImageLoaderFactory {
         // 兜底：清掉"强制电脑版模板"残留的 mobile Cookie（否则所有页面会按电脑版渲染、移动版解析全空）
         CookieJar.removeMobileCookies()
         cn.mce.starlight.data.ThumbCache.init(this)
+        cn.mce.starlight.core.DraftStore.init(this)
         DebugDump.init(this)
     }
 

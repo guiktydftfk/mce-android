@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -63,6 +63,58 @@ object ThreadDetailParser {
             fid = fid,
             formhash = Net.formhashOf(html),
             rewardCount = rewardCount,
+            poll = parsePoll(doc),
+        )
+    }
+
+    // v0.3.3：帖子内投票解析
+    private val pollVoteCountRegex = Regex("""(\d+)\s*票""")
+    private val pollOptionIndexRegex = Regex("""^\d+[.、]\s*""")
+    private val pollMaxObjRegex = Regex("""max_obj\s*=\s*(\d+)""")
+
+    /**
+     * Discuz touch 模板投票：
+     *  - `form#poll` 的 action/formhash + `input[name=pollanswers[]]`（radio/checkbox，value=选项 id）
+     *  - 选项文本在 `.poll_text > .poll_op_name`："8票 1. 基于安卓的系统"
+     *  - 多选上限来自页面脚本 `var max_obj = N`
+     *  - 已投票时没有 input、选项带 `.poll_done`，并有 `div.poll_note4`「您已经投过票」
+     */
+    private fun parsePoll(doc: Document): PollData? {
+        val form = doc.selectFirst("form#poll") ?: doc.selectFirst("form[name=poll]")
+        val list = doc.selectFirst("div.poll_list")
+        if (form == null && list == null) return null
+
+        val scope: Element = form ?: doc
+        val options = scope.select("div.poll_text").mapNotNull { el ->
+            val nameEl = el.selectFirst(".poll_op_name") ?: return@mapNotNull null
+            val raw = nameEl.text().trim()
+            if (raw.isBlank()) return@mapNotNull null
+            val id = el.selectFirst("input[name^=pollanswers]")?.attr("value")?.trim().orEmpty()
+            val votes = pollVoteCountRegex.find(raw)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val label = pollOptionIndexRegex.replace(raw.replace(pollVoteCountRegex, "").trim(), "").trim()
+            if (label.isBlank()) return@mapNotNull null
+            PollOption(id = id.ifBlank { "voted_${el.siblingIndex()}" }, label = label, votes = votes)
+        }.distinctBy { it.label }
+        if (options.isEmpty()) return null
+
+        val firstInput = form?.selectFirst("input[name^=pollanswers]")
+        val multi = firstInput?.attr("type").equals("checkbox", ignoreCase = true)
+        val maxObj = doc.select("script").joinToString("\n") { it.data() }
+            .let { pollMaxObjRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() } ?: 1
+        val voted = form == null || list == null ||
+            (form != null && firstInput == null) ||
+            doc.selectFirst(".poll_done") != null ||
+            doc.selectFirst("div.poll_note4") != null
+
+        return PollData(
+            action = form?.attr("action")?.replace("&amp;", "&").orEmpty(),
+            formhash = form?.selectFirst("input[name=formhash]")?.attr("value").orEmpty(),
+            multi = multi,
+            maxChoices = if (multi) maxOf(1, maxObj) else 1,
+            options = options,
+            voted = voted,
+            viewVoteUrl = doc.selectFirst("a[href*=action=viewvote]")
+                ?.attr("href")?.replace("&amp;", "&")?.let(Net::absolutize),
         )
     }
 
@@ -166,6 +218,8 @@ object ThreadDetailParser {
             when (node) {
                 is TextNode -> sb.append(node.text())
                 is Element -> {
+                    // 投票块由 PollCard 单独渲染，不要混进正文文字里
+                    if (node.id() == "poll" || node.classNames().any { it.startsWith("poll_") }) return
                     when (node.tagName().lowercase()) {
                         "br" -> sb.append('\n')
                         "img" -> {

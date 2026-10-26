@@ -1,4 +1,4 @@
-package cn.mce.starlight.ui
+﻿package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -80,6 +80,8 @@ fun PagedThreadList(
     emptyText: String = "暂无内容，下拉刷新试试",
     showDivider: Boolean = false,
     showRefreshFab: Boolean = true,
+    /** 列表顶部固定内容（如「草稿箱」入口），空列表时也显示 */
+    header: (@Composable () -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val st = remember(resetKey) { PagedState() }
@@ -190,6 +192,7 @@ fun PagedThreadList(
                         end = horizontalPadding,
                     ),
                 ) {
+                    header?.let { head -> item { head() } }
                     if (st.items.isEmpty()) {
                         item { EmptyHint(emptyText) }
                     }

@@ -1,4 +1,4 @@
-.gradle/
+﻿.gradle/
 build/
 local.properties
 *.iml
@@ -9,7 +9,7 @@ captures/
 # 构建与运行产物
 build.log
 test.log
-push.log
+*.log
 .kotlin/
 dist/
 *.apk

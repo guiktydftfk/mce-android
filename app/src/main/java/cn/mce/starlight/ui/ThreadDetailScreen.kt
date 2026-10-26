@@ -24,6 +24,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import cn.mce.starlight.data.HttpForumRepository
 import cn.mce.starlight.data.Post
 import cn.mce.starlight.data.ContentBlock
+import cn.mce.starlight.data.PollData
 import cn.mce.starlight.data.PostActions
 import cn.mce.starlight.data.RateClient
 import cn.mce.starlight.data.ThreadDetail
@@ -67,6 +71,7 @@ fun ThreadDetailScreen(
     onMenu: () -> Unit,
     reloadKey: Int = 0,
     onOpenUser: (Int, String) -> Unit = { _, _ -> },
+    onOpenPage: (String, String) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
     val repo = remember { HttpForumRepository() }
@@ -78,6 +83,7 @@ fun ThreadDetailScreen(
     var rateForm by remember { mutableStateOf<RateClient.Form?>(null) }
     var ratePid by remember { mutableStateOf<Int?>(null) }
     var page by remember { mutableStateOf(1) }
+    var pollSubmitting by remember { mutableStateOf(false) }
 
     // 切换帖子必须重置状态，避免上一个帖子的错误/内容串到新帖子
     LaunchedEffect(tid) {
@@ -183,6 +189,37 @@ fun ThreadDetailScreen(
                         }
                     }
                     HorizontalDivider(Modifier.padding(top = 8.dp))
+                }
+                // 投票贴：直接在帖子内参与投票（v0.3.3）
+                s.detail.poll?.let { poll ->
+                    item {
+                        PollCard(
+                            poll = poll,
+                            submitting = pollSubmitting,
+                            onSubmit = { ids ->
+                                pollSubmitting = true
+                                scope.launch {
+                                    val r = PostActions.votePoll(
+                                        action = poll.action,
+                                        formhash = poll.formhash.ifBlank { s.detail.formhash.orEmpty() },
+                                        optionIds = ids,
+                                    )
+                                    pollSubmitting = false
+                                    toast = r.message
+                                    if (r.ok) {
+                                        val fresh = runCatching {
+                                            repo.loadThreadDetail(tid, page, noCache = true)
+                                        }.getOrNull()
+                                        if (fresh != null) state = DetailState.Content(fresh)
+                                    }
+                                }
+                            },
+                            onOpenVoters = {
+                                poll.viewVoteUrl?.let { onOpenPage(it, "投票参与人") }
+                            },
+                        )
+                        HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                    }
                 }
                 items(s.detail.posts, key = { it.pid }) { post ->
                     PostItem(
@@ -290,6 +327,109 @@ fun ThreadDetailScreen(
                 }
             },
         )
+    }
+}
+
+/** 帖子内投票卡片（v0.3.3）：单选 / 多选 + 提交 + 已投票只读结果 */
+@Composable
+private fun PollCard(
+    poll: PollData,
+    submitting: Boolean,
+    onSubmit: (List<String>) -> Unit,
+    onOpenVoters: () -> Unit,
+) {
+    var selected by remember(poll.action, poll.voted) { mutableStateOf(setOf<String>()) }
+
+    fun toggle(id: String) {
+        if (poll.voted || submitting) return
+        selected = when {
+            !poll.multi -> setOf(id)
+            id in selected -> selected - id
+            selected.size < poll.maxChoices -> selected + id
+            else -> selected
+        }
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Text("投票", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        if (poll.multi) {
+            Text(
+                "多选，最多可选 ${poll.maxChoices} 项",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+
+        poll.options.forEachIndexed { index, option ->
+            val checked = option.id in selected
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !poll.voted && !submitting) { toggle(option.id) }
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (poll.multi) {
+                    Checkbox(
+                        checked = checked,
+                        enabled = !poll.voted && !submitting,
+                        onCheckedChange = { toggle(option.id) },
+                    )
+                } else {
+                    RadioButton(
+                        selected = checked,
+                        enabled = !poll.voted && !submitting,
+                        onClick = { toggle(option.id) },
+                    )
+                }
+                Column(Modifier.padding(start = 4.dp)) {
+                    Text(
+                        "${index + 1}. ${option.label}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (poll.voted) {
+                        Text(
+                            "${option.votes} 票",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
+        if (poll.voted) {
+            Text(
+                "您已经投过票，谢谢您的参与",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        } else {
+            Spacer(Modifier.height(8.dp))
+            Button(
+                enabled = selected.isNotEmpty() && !submitting,
+                onClick = { onSubmit(selected.toList()) },
+            ) {
+                Text(if (submitting) "提交中…" else "提交投票")
+            }
+        }
+
+        if (poll.viewVoteUrl != null) {
+            Text(
+                "查看投票参与人",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable { onOpenVoters() }
+                    .padding(vertical = 6.dp),
+            )
+        }
     }
 }
 

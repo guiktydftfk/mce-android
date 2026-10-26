@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -134,6 +134,40 @@ object PostActions {
                     ?: aidQueryRegex.find(resp)?.groupValues?.get(1)
             }.getOrNull()
         }
+
+    /**
+     * 参与投票（v0.3.3）。
+     * 提交地址取自帖内 `form#poll` 的 action；选项用 Discuz 的数组参数 `pollanswers[]`。
+     * 成功判定：响应里出现已投标记（`poll_done` / 「您已经投过票」）——
+     * 注意模板 JS 里本身就有 `oksmg = '投票成功'` 字样，不能只靠这个字符串判定。
+     */
+    suspend fun votePoll(
+        action: String,
+        formhash: String,
+        optionIds: List<String>,
+    ): Result = withContext(Dispatchers.IO) {
+        if (optionIds.isEmpty()) return@withContext Result(false, "\u8bf7\u5148\u9009\u62e9\u6295\u7968\u9009\u9879")
+        runCatching {
+            val url = if (action.startsWith("http")) action else "$BASE/$action"
+            val body = buildString {
+                append("formhash=").append(URLEncoder.encode(formhash, "UTF-8"))
+                append("&pollsubmit=").append(URLEncoder.encode("\u63d0\u4ea4", "UTF-8"))
+                optionIds.forEach { id ->
+                    append("&pollanswers%5B%5D=").append(URLEncoder.encode(id, "UTF-8"))
+                }
+            }
+            val resp = GenericPageClient.httpPost(url, body, null)
+            when {
+                resp.contains("poll_done") || resp.contains("\u60a8\u5df2\u7ecf\u6295\u8fc7\u7968") ->
+                    Result(true, "\u6295\u7968\u6210\u529f")
+                else -> {
+                    val failure = DiscuzResponse.failureMessage(resp)
+                    if (failure != null) Result(false, failure)
+                    else Result(false, "\u6295\u7968\u7ed3\u679c\u672a\u786e\u8ba4\uff0c\u8bf7\u5237\u65b0\u67e5\u770b")
+                }
+            }
+        }.getOrElse { Result(false, "\u6295\u7968\u5931\u8d25\uff1a" + (it.message ?: "\u7f51\u7edc\u9519\u8bef")) }
+    }
 
     suspend fun newThread(
         fid: Int,

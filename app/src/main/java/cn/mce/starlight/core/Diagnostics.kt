@@ -1,4 +1,4 @@
-package cn.mce.starlight.core
+﻿package cn.mce.starlight.core
 
 import android.content.Context
 import android.os.Build
@@ -10,7 +10,11 @@ import java.util.Locale
 /** 自检报告：把运行环境 / 登录态 / 设置 / 最近错误汇总成可粘贴的文本 */
 object Diagnostics {
 
-    fun build(context: Context): String {
+    /**
+     * 生成自检报告。
+     * @param tid 可选：填了帖子 ID 就顺带做一次图片自检（原「图片自检」页面已并入这里）
+     */
+    suspend fun build(context: Context, tid: Int? = null): String {
         val sb = StringBuilder()
         sb.appendLine("===== MCE 星光班 自检报告 =====")
         sb.appendLine("时间：" + SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA).format(Date()))
@@ -58,6 +62,30 @@ object Diagnostics {
                 .orEmpty()
         }.getOrDefault(emptyList())
         sb.appendLine("最近抓取页面：${if (files.isEmpty()) "无" else files.joinToString("，")}")
+
+        if (tid != null && tid > 0) {
+            sb.appendLine()
+            sb.appendLine("===== 图片自检（tid=$tid） =====")
+            val report = runCatching { cn.mce.starlight.data.ImageDiagClient.run(tid) }.getOrNull()
+            if (report == null) {
+                sb.appendLine("图片自检失败（网络异常或帖子不可见）")
+            } else {
+                sb.appendLine("页面：${report.threadUrl}")
+                sb.appendLine("HTML ${report.htmlLength}B，img 标签 ${report.imgTags} 个，正文解析出 ${report.parsedCount} 张图")
+                if (report.probes.isEmpty()) sb.appendLine("没有可探测的图片")
+                report.probes.forEachIndexed { index, p ->
+                    sb.appendLine(
+                        "[$index] HTTP ${p.code} type=${p.contentType ?: "?"} len=${p.length} " +
+                            "looksHtml=${p.looksHtml}",
+                    )
+                    sb.appendLine("    url=${p.url}")
+                    if (p.looksHtml || p.code !in 200..299) {
+                        sb.appendLine("    head=${p.preview}")
+                    }
+                }
+                report.notes.take(12).forEach { sb.appendLine("note: $it") }
+            }
+        }
 
         sb.appendLine("===== 报告结束 =====")
         return sb.toString()

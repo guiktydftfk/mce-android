@@ -1,4 +1,4 @@
-package cn.mce.starlight.ui
+﻿package cn.mce.starlight.ui
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -53,6 +53,8 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import cn.mce.starlight.core.Draft
+import cn.mce.starlight.core.DraftStore
 import cn.mce.starlight.core.SessionStore
 import cn.mce.starlight.data.Boards
 import cn.mce.starlight.data.PostActions
@@ -74,6 +76,8 @@ import kotlinx.coroutines.launch
 fun NewThreadScreen(
     onMenu: () -> Unit,
     initialFid: Int? = null,
+    initialDraft: Draft? = null,
+    onDraftSaved: () -> Unit = {},
     onPosted: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -117,6 +121,9 @@ fun NewThreadScreen(
     var creditTimes by remember { mutableStateOf("") }
     var creditValue by remember { mutableStateOf("") }
     var showOptions by remember { mutableStateOf(false) }
+    // 草稿 id：从草稿箱进入时带上，发布成功或重新保存时复用
+    var draftId by remember { mutableStateOf(initialDraft?.id) }
+    var draftTip by remember { mutableStateOf<String?>(null) }
 
     // uploaded attachments (local uri + remote aid)
     val uploaded = remember { mutableStateListOf<Pair<Uri, String>>() }
@@ -131,6 +138,20 @@ fun NewThreadScreen(
     var smileySetIndex by remember { mutableIntStateOf(0) }
     LaunchedEffect(showSmiley) {
         if (showSmiley && smileySets.isEmpty()) smileySets = SmileyClient.load(fid)
+    }
+
+    // 从草稿箱恢复内容（只在首次组合时执行；之后用户可自由编辑）
+    LaunchedEffect(initialDraft?.id) {
+        val d = initialDraft ?: return@LaunchedEffect
+        selectedFid = d.fid
+        subject = d.title
+        contentField = TextFieldValue(d.content)
+        pollMode = d.pollMode
+        pollOptions = d.pollOptions
+        maxChoices = d.maxChoices
+        expireDays = d.expireDays
+        resultVisible = d.resultVisible
+        publicVoters = d.publicVoters
     }
 
     LaunchedEffect(selectedFid, SessionStore.isLoggedIn, reloadTick, pollMode) {
@@ -185,6 +206,35 @@ fun NewThreadScreen(
         contentField = TextFieldValue(newText, TextRange(start + text.length))
     }
 
+    /** 存草稿：只存本地（Discuz 手机模板没有草稿箱），不会发布 */
+    fun saveDraft() {
+        if (subject.isBlank() && contentField.text.isBlank()) {
+            error = "标题和内容不能都为空"
+            return
+        }
+        val id = draftId ?: System.currentTimeMillis()
+        DraftStore.save(
+            Draft(
+                id = id,
+                fid = fid,
+                fidName = Boards.byFid(fid)?.name.orEmpty(),
+                title = subject.trim(),
+                content = contentField.text,
+                pollMode = pollMode,
+                pollOptions = pollOptions,
+                maxChoices = maxChoices,
+                expireDays = expireDays,
+                resultVisible = resultVisible,
+                publicVoters = publicVoters,
+                savedAt = System.currentTimeMillis(),
+            ),
+        )
+        draftId = id
+        error = null
+        draftTip = "已保存到草稿箱（抽屉 → 草稿箱 可找到）"
+        onDraftSaved()
+    }
+
     suspend fun submit(draft: Boolean) {
         sending = true
         error = null
@@ -219,7 +269,10 @@ fun NewThreadScreen(
             poll = poll,
         )
         sending = false
-        if (r.ok) onPosted() else error = r.message ?: "发布失败"
+        if (r.ok) {
+            draftId?.let { DraftStore.delete(it) }
+            onPosted()
+        } else error = r.message ?: "发布失败"
     }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -517,12 +570,14 @@ fun NewThreadScreen(
                 )
             }
 
-            if (!pollMode) {
-                TextButton(
-                    enabled = !sending && contentField.text.isNotBlank(),
-                    onClick = { scope.launch { submit(true) } },
-                ) { Text("存草稿") }
-            }
+            TextButton(
+                enabled = !sending && (subject.isNotBlank() || contentField.text.isNotBlank()),
+                onClick = { saveDraft() },
+            ) { Text(if (draftId != null) "更新草稿" else "存草稿") }
+        }
+
+        draftTip?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         }
 
         Spacer(Modifier.height(8.dp))

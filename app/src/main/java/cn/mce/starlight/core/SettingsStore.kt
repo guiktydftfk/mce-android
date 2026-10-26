@@ -1,4 +1,4 @@
-package cn.mce.starlight.core
+﻿package cn.mce.starlight.core
 
 import android.content.Context
 import androidx.compose.runtime.getValue
@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 object SettingsStore {
     private const val PREFS = "mce_settings"
     private const val KEY_DARK = "dark_mode"
+    private const val KEY_ACCENT = "accent_theme"
     private const val KEY_BG = "background_path"
     private const val KEY_BG_ALPHA = "background_alpha"
     private const val KEY_BG_BLUR = "background_blur"
@@ -29,6 +30,10 @@ object SettingsStore {
     private var appContext: Context? = null
 
     var darkMode by mutableStateOf(false)
+        private set
+
+    /** 主题色（AccentTheme 枚举名，默认 MONET = 原有莫奈蓝） */
+    var accentTheme by mutableStateOf("MONET")
         private set
 
     var backgroundPath by mutableStateOf<String?>(null)
@@ -59,6 +64,7 @@ object SettingsStore {
         appContext = context.applicationContext
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         darkMode = prefs.getBoolean(KEY_DARK, false)
+        accentTheme = prefs.getString(KEY_ACCENT, "MONET") ?: "MONET"
         backgroundPath = prefs.getString(KEY_BG, null)
         backgroundAlpha = prefs.getFloat(KEY_BG_ALPHA, 0.85f)
         backgroundBlur = prefs.getFloat(KEY_BG_BLUR, 0f)
@@ -72,6 +78,11 @@ object SettingsStore {
     fun updateDarkMode(enabled: Boolean) {
         darkMode = enabled
         prefs()?.edit()?.putBoolean(KEY_DARK, enabled)?.apply()
+    }
+
+    fun updateAccentTheme(name: String) {
+        accentTheme = name
+        prefs()?.edit()?.putString(KEY_ACCENT, name)?.apply()
     }
 
     fun updateBackground(path: String?) {

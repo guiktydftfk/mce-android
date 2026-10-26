@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 // ---------------- 模型 ----------------
 
@@ -45,6 +45,27 @@ data class Post(
     val isOp: Boolean,
 )
 
+/** 投票选项 */
+data class PollOption(
+    val id: String,
+    val label: String,
+    val votes: Int,
+)
+
+/** 帖子内投票（v0.3.3：支持直接参与投票） */
+data class PollData(
+    /** 提交表单 action（相对地址，如 forum.php?mod=misc&action=votepoll&fid=2&tid=38058...） */
+    val action: String,
+    val formhash: String,
+    val multi: Boolean,
+    val maxChoices: Int,
+    val options: List<PollOption>,
+    /** 已投过票：只读展示结果，不再显示提交按钮 */
+    val voted: Boolean,
+    /** 查看投票参与人入口 */
+    val viewVoteUrl: String?,
+)
+
 /** 帖子详情 */
 data class ThreadDetail(
     val tid: Int,
@@ -56,6 +77,7 @@ data class ThreadDetail(
     val fid: Int? = null,
     val formhash: String? = null,
     val rewardCount: Int? = null,
+    val poll: PollData? = null,
 )
 
 // ---------------- 协议 ----------------

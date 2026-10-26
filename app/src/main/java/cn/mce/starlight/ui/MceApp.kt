@@ -1,4 +1,4 @@
-package cn.mce.starlight.ui
+﻿package cn.mce.starlight.ui
 
 import android.app.Activity
 import android.widget.Toast
@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 sealed interface Route {
     data class Thread(val tid: Int, val title: String) : Route
     data class Page(val url: String, val title: String) : Route
-    data class Compose(val fid: Int?) : Route
+    data class Compose(val fid: Int?, val draftId: Long? = null) : Route
     data class Board(val fid: Int, val name: String) : Route
     data object MyThreads : Route
     data object MyReplies : Route
@@ -53,7 +53,7 @@ sealed interface Route {
     data object Medals : Route
     data object Friends : Route
     data class User(val uid: Int?, val name: String) : Route
-    data object ImageDiag : Route
+    data object DraftBox : Route
     data class GenericList(val title: String, val path: String) : Route
 }
 
@@ -207,6 +207,11 @@ fun MceApp() {
                     stack = listOf(Route.Compose(null))
                     closeDrawer()
                 }
+                DrawerItem("草稿箱" + if (cn.mce.starlight.core.DraftStore.drafts.isEmpty()) "" else "（${cn.mce.starlight.core.DraftStore.drafts.size}）", false) {
+                    dest = Dest.Feed
+                    stack = listOf(Route.DraftBox)
+                    closeDrawer()
+                }
                 DrawerItem("签到", dest == Dest.SignIn) {
                     dest = Dest.SignIn; stack = emptyList(); closeDrawer()
                 }
@@ -251,6 +256,7 @@ fun MceApp() {
                 onMenu = ::openDrawer,
                 reloadKey = dataVersion,
                 onOpenUser = { uid, name -> push(Route.User(if (uid > 0) uid else null, name)) },
+                onOpenPage = { url, title -> push(Route.Page(url, title)) },
             )
 
             is Route.Page -> NativePageScreen(
@@ -263,6 +269,7 @@ fun MceApp() {
             is Route.Compose -> NewThreadScreen(
                 onMenu = ::openDrawer,
                 initialFid = current.fid,
+                initialDraft = current.draftId?.let { cn.mce.starlight.core.DraftStore.get(it) },
                 onPosted = {
                     // 发帖成功：回到主页并刷新列表
                     stack = emptyList()
@@ -273,6 +280,7 @@ fun MceApp() {
 
             is Route.MyThreads -> MyThreadsScreen(
                 onMenu = ::openDrawer,
+                onOpenDraftBox = { push(Route.DraftBox) },
                 onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
             )
 
@@ -291,7 +299,11 @@ fun MceApp() {
                 onSaved = { dataVersion += 1; pop() },
             )
 
-            is Route.ImageDiag -> ImageDiagScreen(onMenu = ::openDrawer)
+            is Route.DraftBox -> DraftBoxScreen(
+                onMenu = ::openDrawer,
+                onOpenDraft = { id -> push(Route.Compose(null, id)) },
+                onComposeNew = { push(Route.Compose(null)) },
+            )
 
             is Route.User -> UserProfileScreen(
                 uid = current.uid,
@@ -391,7 +403,6 @@ fun MceApp() {
 
                 Dest.Settings -> SettingsScreen(
                     onMenu = ::openDrawer,
-                    onOpenImageDiag = { push(Route.ImageDiag) },
                     onCheckUpdate = { checkUpdate(silent = false) },
                     onLogin = { showLogin = true },
                     onLogout = {

@@ -60,6 +60,7 @@ private fun topPadding(): androidx.compose.ui.unit.Dp =
 @Composable
 fun MyThreadsScreen(
     onMenu: () -> Unit,
+    onOpenDraftBox: () -> Unit = {},
     onOpenThread: (Int, String) -> Unit,
 ) {
     Box(Modifier.fillMaxSize()) {
@@ -71,6 +72,27 @@ fun MyThreadsScreen(
             emptyText = "还没有发过主题",
             loader = { page -> PersonalClient.loadMyThreads(page) },
             onOpenThread = { thread -> onOpenThread(thread.id, thread.title) },
+            header = {
+                // 草稿只存在本地，不会出现在这里；给一个入口避免"存了草稿找不到"
+                val drafts = cn.mce.starlight.core.DraftStore.drafts
+                if (drafts.isNotEmpty()) {
+                    androidx.compose.foundation.layout.Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenDraftBox() }
+                            .padding(horizontal = 18.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "草稿箱（${drafts.size} 份草稿，未发布）",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text("›", color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            },
         )
         ImmersiveTopBar(title = "我的主题", modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
     }
