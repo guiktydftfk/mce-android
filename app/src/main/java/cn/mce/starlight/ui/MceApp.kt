@@ -3,7 +3,10 @@
 import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
@@ -19,6 +22,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -54,6 +59,9 @@ sealed interface Route {
     data object Friends : Route
     data class User(val uid: Int?, val name: String) : Route
     data object DraftBox : Route
+    data object FriendQr : Route
+    data class Pm(val touid: Int, val name: String) : Route
+    data object Scan : Route
     data class GenericList(val title: String, val path: String) : Route
 }
 
@@ -138,9 +146,26 @@ fun MceApp() {
             launch {
                 if (!SettingsStore.isUpdateSnoozed()) checkUpdate(silent = true)
             }
+            // 新消息检查（私信 + 提醒），有未读会在顶部弹提示
+            launch {
+                runCatching { cn.mce.starlight.core.MessageCenter.refresh() }
+            }
         }
     }
 
+    // 回到前台时检查一次新消息
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                scope.launch { runCatching { cn.mce.starlight.core.MessageCenter.refresh() } }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -299,6 +324,22 @@ fun MceApp() {
                 onSaved = { dataVersion += 1; pop() },
             )
 
+            is Route.Pm -> PmChatScreen(
+                touid = current.touid,
+                name = current.name,
+                onMenu = ::openDrawer,
+            )
+
+            is Route.FriendQr -> FriendQrScreen(
+                onMenu = ::openDrawer,
+                onOpenScan = { push(Route.Scan) },
+            )
+
+            is Route.Scan -> ScanScreen(
+                onMenu = ::openDrawer,
+                onScanned = { uid, name -> stack = emptyList(); push(Route.User(uid, name)) },
+            )
+
             is Route.DraftBox -> DraftBoxScreen(
                 onMenu = ::openDrawer,
                 onOpenDraft = { id -> push(Route.Compose(null, id)) },
@@ -354,6 +395,8 @@ fun MceApp() {
                 Dest.Profile -> ProfileScreen(
                     onMenu = ::openDrawer,
                     reloadKey = dataVersion,
+                    onOpenFriendQr = { push(Route.FriendQr) },
+                    onOpenScan = { push(Route.Scan) },
                     onLogin = { showLogin = true },
                     onLogout = {
                         scope.launch {
@@ -399,6 +442,8 @@ fun MceApp() {
                 Dest.Notice -> NoticesScreen(
                     onMenu = ::openDrawer,
                     onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+                    onOpenPm = { uid, title -> push(Route.Pm(uid, title)) },
+                    onOpenPage = { url, title -> push(Route.Page(url, title)) },
                 )
 
                 Dest.Settings -> SettingsScreen(
@@ -414,6 +459,22 @@ fun MceApp() {
                     },
                 )
             }
+        }
+    }
+
+        cn.mce.starlight.core.MessageCenter.banner?.let { banner ->
+            cn.mce.starlight.ui.NewMessageBanner(
+                banner = banner,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding(),
+                onClick = {
+                    cn.mce.starlight.core.MessageCenter.dismissBanner()
+                    dest = Dest.Notice
+                    stack = emptyList()
+                },
+                onDismiss = { cn.mce.starlight.core.MessageCenter.dismissBanner() },
+            )
         }
     }
 

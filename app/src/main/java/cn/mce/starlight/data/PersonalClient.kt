@@ -21,6 +21,19 @@ object PersonalClient {
 
     data class ReplyItem(val tid: Int, val title: String, val content: String, val time: String?)
     data class FavoriteItem(val tid: Int, val title: String, val forumName: String?)
+    /** 私信会话条目（v0.3.4） */
+    data class PmItem(
+        val touid: Int,
+        val avatar: String?,
+        /** "我对 X 说" / "X 对我说" */
+        val title: String,
+        val time: String?,
+        val preview: String?,
+        /** 未读数（span.num；0 表示已读） */
+        val unread: Int,
+        val url: String,
+    )
+
     data class NoticeItem(
         val avatar: String?,
         val author: String?,
@@ -66,6 +79,42 @@ object PersonalClient {
         }.distinctBy { it.tid }
     }
 
+    /**
+     * 私信列表（v0.3.4）：`ul#alist.pmbox li > a.pmtxt`
+     * 结构：头像 + span.num（未读）+ div.pm_authi（span.name / span.time）+ div.pmmes（正文摘要）
+     */
+    suspend fun loadPm(page: Int): List<PmItem> = withContext(Dispatchers.IO) {
+        val url = "$BASE/home.php?mod=space&do=pm&page=$page"
+        val doc = Jsoup.parse(GenericPageClient.get(url), url)
+        val items = doc.select("ul#alist li > a[href*=do=pm], ul.pmbox li a[href*=subop=view]").mapNotNull { a ->
+            val href = a.attr("href").replace("&amp;", "&")
+            val touid = Regex("""touid=(\d+)""").find(href)?.groupValues?.get(1)?.toIntOrNull()
+                ?: return@mapNotNull null
+            val avatar = a.selectFirst("img[src*=avatar.php]")?.attr("src")
+                ?.takeIf { it.isNotBlank() }?.let(::absolutize)
+            val name = a.selectFirst("div.pm_authi span.name")?.text()?.trim().orEmpty()
+            if (name.isBlank()) return@mapNotNull null
+            val time = a.selectFirst("div.pm_authi span.time")?.text()?.trim()
+            val preview = a.selectFirst("div.pmmes")?.text()?.trim()
+            val unread = a.selectFirst("span.num")?.text()?.trim()?.toIntOrNull() ?: 0
+            PmItem(
+                touid = touid,
+                avatar = avatar,
+                title = name,
+                time = time,
+                preview = preview,
+                unread = unread,
+                url = Net.absolutize(href),
+            )
+        }
+        // 同一个好友可能有多条往来消息：按 touid 合并（保留最新一条，未读数取该会话最大值），
+        // 否则"我对他说"和"他对我说"会被 distinctBy 丢掉未读那条 → 新私信弹窗不触发。
+        items.groupBy { it.touid }.values.map { group ->
+            val first = group.first()
+            first.copy(unread = group.maxOf { it.unread })
+        }
+    }
+
     /** 消息提醒：li.notice_item */
     suspend fun loadNotices(page: Int): List<NoticeItem> = withContext(Dispatchers.IO) {
         val url = "$BASE/home.php?mod=space&do=notice&page=$page"
@@ -78,13 +127,53 @@ object PersonalClient {
             val noteBlock = li.selectFirst("div.notice_note")
             val note = noteBlock?.text()?.trim()
             // 旧实现为了拿 fallback 链接会做一次整块 li.html()（每条的 DOM 序列化）
-            val linkEl = noteBlock?.selectFirst("a[href]") ?: li.selectFirst("a[href*=ptid], a[href*=tid]")
+            val linkEl = noteBlock?.selectFirst("a[href*=ptid], a[href*=pid=]") ?: noteBlock?.selectFirst("a[href*=findpost]") ?: li.selectFirst("a[href*=ptid], a[href*=tid]")
             val tid = linkEl?.attr("href")?.let { href ->
                 tidRegex.find(href)?.groupValues?.get(1)?.toIntOrNull()
             }
             val author = noteBlock?.selectFirst("a[href*=space]")?.text()?.trim()
             NoticeItem(avatar, author, time, note, tid)
         }
+    }
+
+    /** 私信聊天条目：incoming=true 表示对方发来 */
+    data class PmMessage(
+        val incoming: Boolean,
+        val avatar: String?,
+        val time: String?,
+        val text: String,
+    )
+
+    /** 私信会话页（home.php?mod=space&do=pm&subop=view&touid=X） */
+    data class PmChat(
+        val touid: Int,
+        val messages: List<PmMessage>,
+        /** 发送表单 action（含 pmid/formhash 等参数） */
+        val action: String,
+        val formhash: String,
+    )
+
+    suspend fun loadPmChat(touid: Int, name: String? = null): PmChat = withContext(Dispatchers.IO) {
+        val url = "$BASE/home.php?mod=space&do=pm&subop=view&touid=$touid"
+        val doc = Jsoup.parse(GenericPageClient.get(url), url)
+        val messages = doc.select("div.friend_msg, div.self_msg").mapNotNull { el ->
+            val incoming = el.hasClass("friend_msg")
+            val text = el.selectFirst("div.dialog_white, div.dialog_green")?.text()?.trim()
+                ?: return@mapNotNull null
+            val avatar = el.selectFirst("img[src*=avatar.php]")?.attr("src")
+                ?.takeIf { it.isNotBlank() }?.let(::absolutize)
+            val time = el.selectFirst("div.date")?.text()?.trim()
+            PmMessage(incoming, avatar, time, text)
+        }
+        val form = doc.selectFirst("form#pmform")
+        PmChat(
+            touid = touid,
+            messages = messages,
+            action = form?.attr("action")?.replace("&amp;", "&")
+                ?: "home.php?mod=spacecp&ac=pm&op=send&touid=$touid&pmsubmit=yes&mobile=2",
+            formhash = form?.selectFirst("input[name=formhash]")?.attr("value")
+                ?: Net.formhashOf(doc.outerHtml()).orEmpty(),
+        )
     }
 
     private fun absolutize(src: String): String = Net.absolutize(src)

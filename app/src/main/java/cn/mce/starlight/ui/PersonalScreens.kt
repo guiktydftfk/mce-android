@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import cn.mce.starlight.core.MessageCenter
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.data.PersonalClient
@@ -200,76 +201,188 @@ fun FavoritesScreen(
     }
 }
 
-/** 消息提醒（重做：头像 + 作者 + 时间 + 内容） */
+/** 消息中心（v0.3.4）：提醒 + 私信两个页签；进入即标记已读（清顶部提示） */
 @Composable
 fun NoticesScreen(
     onMenu: () -> Unit,
     onOpenThread: (Int, String) -> Unit,
+    onOpenPage: (String, String) -> Unit = { _, _ -> },
+    onOpenPm: (Int, String) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
-    var state by remember { mutableStateOf<PState<PersonalClient.NoticeItem>>(PState.Loading) }
+    var tab by remember { mutableStateOf(0) } // 0 = 提醒，1 = 私信
+    var noticeState by remember { mutableStateOf<PState<PersonalClient.NoticeItem>>(PState.Loading) }
+    var pmState by remember { mutableStateOf<PState<PersonalClient.PmItem>>(PState.Loading) }
 
-    suspend fun load() {
+    suspend fun loadNotices() {
         runCatching { PersonalClient.loadNotices(1) }
-            .onSuccess { state = PState.Content(it) }
-            .onFailure { state = PState.Error(it.message ?: "加载失败") }
+            .onSuccess {
+                noticeState = PState.Content(it)
+            }
+            .onFailure { noticeState = PState.Error(it.message ?: "加载失败") }
     }
-    LaunchedEffect(Unit) { load() }
+
+    suspend fun loadPm() {
+        runCatching { PersonalClient.loadPm(1) }
+            .onSuccess { pmState = PState.Content(it) }
+            .onFailure { pmState = PState.Error(it.message ?: "加载失败") }
+    }
+
+    LaunchedEffect(Unit) {
+        loadNotices()
+        loadPm()
+        MessageCenter.markAllSeen()
+    }
 
     Box(Modifier.fillMaxSize()) {
-        when (val s = state) {
-            is PState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-            is PState.Error -> ErrorBlock(s.message) { scope.launch { state = PState.Loading; load() } }
-            is PState.Content -> LazyColumn(
-                contentPadding = PaddingValues(top = topPadding() + 64.dp, bottom = 100.dp),
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = topPadding() + 56.dp, start = 14.dp, end = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                if (s.items.isEmpty()) { item { EmptyHint("暂无消息") } }
-                items(s.items.size, key = { i -> "${s.items[i].tid ?: -1}-$i" }) { i ->
-                    val item = s.items[i]
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
+                listOf(
+                    0 to ("提醒" + if (MessageCenter.unreadNotices > 0) " (${MessageCenter.unreadNotices})" else ""),
+                    1 to ("私信" + if (MessageCenter.unreadPm > 0) " (${MessageCenter.unreadPm})" else ""),
+                ).forEach { (value, label) ->
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (tab == value) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (tab == value) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            .clickable { tab = value }
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                    )
+                }
+            }
+
+            if (tab == 0) {
+                when (val s = noticeState) {
+                    is PState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+                    is PState.Error -> ErrorBlock(s.message) { scope.launch { noticeState = PState.Loading; loadNotices() } }
+                    is PState.Content -> LazyColumn(
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp),
+                    ) {
+                        if (s.items.isEmpty()) { item { EmptyHint("暂无提醒") } }
+                        items(s.items.size, key = { i -> "n-${s.items[i].tid ?: -1}-$i" }) { i ->
+                            val item = s.items[i]
+                            NoticeRow(
+                                avatar = item.avatar,
+                                title = item.author ?: "通知",
+                                time = item.time,
+                                text = item.note,
+                                unread = false,
+                            ) {
                                 item.tid?.let { onOpenThread(it, item.note?.take(20) ?: "消息") }
                             }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                    ) {
-                        Box(
-                            Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                        ) {
-                            item.avatar?.let {
-                                AsyncImage(model = it, contentDescription = null,
-                                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            }
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(item.author ?: "通知", style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium)
-                                Spacer(Modifier.width(8.dp))
-                                item.time?.let {
-                                    Text(it, style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            item.note?.let {
-                                Spacer(Modifier.height(4.dp))
-                                Text(it, style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 3, overflow = TextOverflow.Ellipsis)
-                            }
+                            HorizontalDivider(Modifier.padding(start = 68.dp))
                         }
                     }
-                    HorizontalDivider(Modifier.padding(start = 68.dp))
+                }
+            } else {
+                when (val s = pmState) {
+                    is PState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+                    is PState.Error -> ErrorBlock(s.message) { scope.launch { pmState = PState.Loading; loadPm() } }
+                    is PState.Content -> LazyColumn(
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp),
+                    ) {
+                        if (s.items.isEmpty()) { item { EmptyHint("暂无私信") } }
+                        items(s.items.size, key = { i -> "p-${s.items[i].touid}" }) { i ->
+                            val item = s.items[i]
+                            NoticeRow(
+                                avatar = item.avatar,
+                                title = item.title,
+                                time = item.time,
+                                text = item.preview,
+                                unread = item.unread > 0,
+                            ) {
+                                onOpenPm(item.touid, item.title.ifBlank { "私信" })
+                            }
+                            HorizontalDivider(Modifier.padding(start = 68.dp))
+                        }
+                    }
                 }
             }
         }
-        ImmersiveTopBar(title = "消息提醒", modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
+
+        ImmersiveTopBar(
+            title = "消息提醒",
+            modifier = Modifier.align(Alignment.TopStart),
+            onMenu = onMenu,
+        )
     }
 }
 
-
+@Composable
+private fun NoticeRow(
+    avatar: String?,
+    title: String,
+    time: String?,
+    text: String?,
+    unread: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            avatar?.let {
+                AsyncImage(
+                    model = it,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            if (unread) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .size(9.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.error),
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (unread) FontWeight.Bold else FontWeight.Medium,
+                )
+                Spacer(Modifier.width(8.dp))
+                time?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            text?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}

@@ -61,6 +61,8 @@ fun ProfileScreen(
     onLogin: () -> Unit,
     onLogout: () -> Unit,
     onOpenPage: (String, String) -> Unit,
+    onOpenFriendQr: () -> Unit = {},
+    onOpenScan: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<ProfileState>(ProfileState.Loading) }
@@ -219,6 +221,23 @@ fun ProfileScreen(
                                         .padding(horizontal = 14.dp, vertical = 12.dp),
                                 )
                             }
+                            // v0.3.4：好友码 / 扫一扫（放在入口列表末尾，不改变原有跳转逻辑）
+                            Text(
+                                "我的好友码",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenFriendQr() }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                            )
+                            Text(
+                                "扫一扫（加好友）",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenScan() }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                            )
                         }
                     }
 

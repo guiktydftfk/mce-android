@@ -1,4 +1,4 @@
-package cn.mce.starlight.data
+﻿package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -167,6 +167,35 @@ object PostActions {
                 }
             }
         }.getOrElse { Result(false, "\u6295\u7968\u5931\u8d25\uff1a" + (it.message ?: "\u7f51\u7edc\u9519\u8bef")) }
+    }
+
+    /** 发送私信（v0.3.4）：POST 到会话页表单 action */
+    suspend fun sendPm(
+        action: String,
+        formhash: String,
+        touid: Int,
+        message: String,
+    ): Result = withContext(Dispatchers.IO) {
+        if (message.isBlank()) return@withContext Result(false, "\u6d88\u606f\u4e0d\u80fd\u4e3a\u7a7a")
+        runCatching {
+            val url = if (action.startsWith("http")) action else "$BASE/$action"
+            val body = buildString {
+                append("formhash=").append(URLEncoder.encode(formhash, "UTF-8"))
+                append("&touid=").append(touid)
+                append("&message=").append(URLEncoder.encode(message, "UTF-8"))
+                append("&pmsubmit=").append(URLEncoder.encode("\u56de\u590d", "UTF-8"))
+            }
+            val resp = GenericPageClient.httpPost(url, body, null)
+            when {
+                resp.contains("\u53d1\u9001\u6210\u529f") || resp.contains("show_success") ->
+                    Result(true, "\u5df2\u53d1\u9001")
+                else -> {
+                    val failure = DiscuzResponse.failureMessage(resp)
+                    if (failure != null) Result(false, failure)
+                    else Result(true, "\u5df2\u53d1\u9001")
+                }
+            }
+        }.getOrElse { Result(false, "\u53d1\u9001\u5931\u8d25\uff1a" + (it.message ?: "\u7f51\u7edc\u9519\u8bef")) }
     }
 
     suspend fun newThread(
