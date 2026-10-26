@@ -156,8 +156,8 @@ object PostActions {
             }
             val url = "$BASE/forum.php?mod=post&action=newthread&fid=$fid&topicsubmit=yes&mobile=2"
             val resp = GenericPageClient.httpPost(url, body, null)
-            val ok = !resp.contains("\u767b\u5f55\u540e") && !resp.contains("\u6807\u9898\u4e0d\u80fd\u4e3a\u7a7a")
-            Result(ok, if (ok) "\u53d1\u5e03\u6210\u529f" else extractMessage(resp))
+            val ok = resp.contains("\u53d1\u5e03\u6210\u529f") || resp.contains("\u611f\u8c22\u60a8\u7684\u53c2\u4e0e")
+            Result(ok, if (ok) "\u53d1\u5e03\u6210\u529f" else (extractMessage(resp) ?: "\u53d1\u5e03\u5931\u8d25\uff08\u8bf7\u770b\u8fd4\u56de\u63d0\u793a\uff09: " + resp.take(120)))
         }.getOrElse { Result(false, it.message) }
     }
 

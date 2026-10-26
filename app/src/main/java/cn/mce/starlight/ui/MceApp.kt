@@ -88,6 +88,7 @@ fun MceApp() {
     var updateDownloading by remember { mutableStateOf(false) }
     var updateProgress by remember { mutableIntStateOf(0) }
     var updateError by remember { mutableStateOf<String?>(null) }
+    var showSigninReminder by remember { mutableStateOf(false) }
 
     fun openDrawer() { scope.launch { drawerState.open() } }
     fun closeDrawer() { scope.launch { drawerState.close() } }
@@ -116,6 +117,14 @@ fun MceApp() {
         // 只有「确定未登录」才弹登录框；网络异常(null)保持静默，避免误判踢人
         val probe = SessionStore.probeLoginState()
         if (probe == false) showLogin = true
+        // 签到提醒：已过提醒时间且今日未签到 → 启动时提示
+        if (SettingsStore.signinReminderEnabled &&
+            java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) >= SettingsStore.signinReminderHour
+        ) {
+            runCatching { cn.mce.starlight.data.SigninClient.load() }.getOrNull()?.let { s ->
+                if (!s.alreadySigned) showSigninReminder = true
+            }
+        }
         // 启动后自动检查更新（暂停更新期间跳过）
         if (!SettingsStore.isUpdateSnoozed()) checkUpdate(silent = true)
     }
@@ -397,6 +406,17 @@ fun MceApp() {
                 showLogin = false
                 refreshSession()
             },
+        )
+    }
+
+    if (showSigninReminder) {
+        SigninReminderDialog(
+            onGoSignin = {
+                showSigninReminder = false
+                dest = Dest.SignIn
+                stack = emptyList()
+            },
+            onDismiss = { showSigninReminder = false },
         )
     }
 

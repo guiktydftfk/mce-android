@@ -223,6 +223,10 @@ fun SettingsScreen(
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
 
+            SigninReminderSection()
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+
             SectionTitle("诊断")
             Spacer(Modifier.height(8.dp))
             Text(

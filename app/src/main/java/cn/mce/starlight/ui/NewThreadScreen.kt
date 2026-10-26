@@ -428,13 +428,22 @@ fun NewThreadScreen(
             title = { Text("\u8868\u60c5") },
             text = {
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (smileys.isEmpty()) {
+                        Text("\u6b63\u5728\u52a0\u8f7d\u8868\u60c5\u2026", style = MaterialTheme.typography.bodySmall)
+                    }
                     smileys.chunked(8).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             row.forEach { s ->
-                                if (s.url != null) coil.compose.AsyncImage(s.url, null,
-                                    modifier = Modifier.size(32.dp).clickable { insertText("[img]${s.url}[/img]"); showSmiley = false })
-                                else Text(s.emoji ?: "", style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.clickable { insertText(s.emoji ?: ""); showSmiley = false }.padding(2.dp))
+                                coil.compose.AsyncImage(
+                                    model = s.url,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clickable {
+                                            insertText("[img]${s.url}[/img]")
+                                            showSmiley = false
+                                        },
+                                )
                             }
                         }
                     }
@@ -443,7 +452,6 @@ fun NewThreadScreen(
             confirmButton = { TextButton(onClick = { showSmiley = false }) { Text("\u5173\u95ed") } },
         )
     }
-
     ImmersiveTopBar(title = "发帖", onMenu = onMenu)
 }
 
