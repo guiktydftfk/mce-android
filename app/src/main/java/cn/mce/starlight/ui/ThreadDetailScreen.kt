@@ -79,6 +79,18 @@ fun ThreadDetailScreen(
     var ratePid by remember { mutableStateOf<Int?>(null) }
     var page by remember { mutableStateOf(1) }
 
+    // 切换帖子必须重置状态，避免上一个帖子的错误/内容串到新帖子
+    LaunchedEffect(tid) {
+        state = DetailState.Loading
+        page = 1
+        runCatching { repo.loadThreadDetail(tid, 1) }
+            .onSuccess { detail ->
+                state = if (detail.posts.isEmpty()) DetailState.Error("没有解析到楼层内容")
+                else DetailState.Content(detail)
+            }
+            .onFailure { state = DetailState.Error(it.message ?: "加载失败") }
+    }
+
     suspend fun load(targetPage: Int = page) {
         runCatching { repo.loadThreadDetail(tid, targetPage) }
             .onSuccess {
@@ -237,7 +249,8 @@ fun ThreadDetailScreen(
                                     if (retry != null && retry.posts.isNotEmpty()) {
                                         state = DetailState.Content(retry)
                                     } else {
-                                        toast = "回复成功，但页面刷新受限，请下拉/点刷新重试"
+                                        // 保留当前页面内容，仅提示（不要清空导致"没有解析到楼层"）
+                                        toast = "回复成功，列表暂未刷新，可下拉重试"
                                     }
                                 }
                             }

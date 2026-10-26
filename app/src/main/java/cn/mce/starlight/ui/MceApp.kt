@@ -243,7 +243,9 @@ fun MceApp() {
                 onMenu = ::openDrawer,
                 initialFid = current.fid,
                 onPosted = {
-                    pop()
+                    // 发帖成功：回到主页并刷新列表
+                    stack = emptyList()
+                    dest = Dest.Feed
                     dataVersion += 1
                 },
             )

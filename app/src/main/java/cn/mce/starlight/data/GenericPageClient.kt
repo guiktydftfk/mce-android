@@ -225,5 +225,15 @@ object GenericPageClient {
         }
     }
 
+    /** 是否被重定向到登录页（会话失效） */
+    fun isLoginPage(html: String): Boolean =
+        html.contains("id=\"loginform\"") || html.contains("name=\"loginsubmit\"") ||
+            (html.contains("name=\"password\"") && html.contains("member.php?mod=logging"))
+
+    /** 是否被论坛频率/安全策略拦截 */
+    fun isBlockedPage(html: String): Boolean =
+        html.contains("\u9891\u7e41") || html.contains("\u8bf7\u7a0d\u540e") ||
+            html.contains("seccodeverify") || html.contains("\u8bbf\u95ee\u88ab\u62d2\u7edd")
+
     fun document(url: String): Document = Jsoup.parse(get(url), url)
 }

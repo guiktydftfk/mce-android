@@ -43,10 +43,14 @@ fun FeedCard(
     thread: ThreadSummary,
     modifier: Modifier = Modifier,
     showBoard: Boolean = true,
+    allowThumbnail: Boolean = true,
     onClick: () -> Unit,
 ) {
     var image by remember(thread.id) { mutableStateOf<String?>(null) }
-    LaunchedEffect(thread.id) { image = ThreadImageCache.firstImage(thread.id) }
+    // 只有前几张卡片才去拉缩略图：一屏十几张卡片各拉一次整页会触发论坛频率限制
+    LaunchedEffect(thread.id, allowThumbnail) {
+        if (allowThumbnail) image = ThreadImageCache.firstImage(thread.id)
+    }
 
     Column(
         modifier

@@ -64,7 +64,14 @@ class HttpForumRepository(
         try {
             val code = conn.responseCode
             if (code !in 200..299) throw IOException("HTTP $code")
-            return conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val html = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            if (GenericPageClient.isBlockedPage(html)) {
+                throw java.io.IOException("\u8bbf\u95ee\u8fc7\u4e8e\u9891\u7e41\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5")
+            }
+            if (GenericPageClient.isLoginPage(html)) {
+                throw java.io.IOException("\u767b\u5f55\u5df2\u5931\u6548\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55")
+            }
+            return html
         } finally {
             conn.disconnect()
         }

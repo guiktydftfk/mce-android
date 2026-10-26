@@ -1,39 +1,81 @@
 package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /**
  * 帖子首图（列表卡片缩略图）。
  *
- * 注意两个历史坑（都与「解析时机/解析范围」有关）：
- *  1. 只扫 div.message → 相册图/附件图在 .attach_list 里，永远取不到；
- *  2. 失败结果也缓存 → 一次网络抖动后该帖永久没有缩略图。
- * 现在：直接用完整解析器（含附件容器），且只缓存成功结果。
+ * 经验教训（都踩过）：
+ *  1. 只扫 div.message → 相册/附件图在 .attach_list 里，取不到；
+ *  2. 失败结果永久缓存 → 一次抖动后该帖永远没缩略图；
+ *  3. 失败不缓存 + 每张卡片整页拉取 → **请求风暴**，触发论坛频率限制，
+ *     帖子页返回拦截页，表现为"所有帖子都解析不到楼层"。
+ *
+ * 现在：并发限制(2) + 失败负缓存(10 分钟) + 成功正缓存 + 同 tid 去重。
  */
 object ThreadImageCache {
-    private val cache = mutableMapOf<Int, String>()
+    private val positive = mutableMapOf<Int, String>()
+    private val negative = mutableMapOf<Int, Long>()
+
+    private const val NEGATIVE_TTL_MS = 10 * 60 * 1000L
+    private val semaphore = Semaphore(2)
+    private val inflight = mutableSetOf<Int>()
 
     suspend fun firstImage(tid: Int): String? = withContext(Dispatchers.IO) {
-        cache[tid]?.let { return@withContext it }
+        synchronized(positive) { positive[tid] }?.let { return@withContext it }
 
-        val url = runCatching {
-            val html = GenericPageClient.get("https://mce.msi.cn/forum.php?mod=viewthread&tid=$tid")
-            val detail = ThreadDetailParser.parse(
-                html,
-                "https://mce.msi.cn/forum.php?mod=viewthread&tid=$tid",
-                tid,
-                1,
-            )
-            detail.posts.asSequence()
-                .flatMap { it.images.asSequence() }
-                .firstOrNull()
-        }.getOrNull()
+        val failedAt = synchronized(negative) { negative[tid] }
+        if (failedAt != null && System.currentTimeMillis() - failedAt < NEGATIVE_TTL_MS) {
+            return@withContext null
+        }
 
-        // 只有成功才缓存，避免失败结果长期污染
-        if (!url.isNullOrBlank()) cache[tid] = url
-        url
+        // 同一 tid 只发一次请求
+        val started = synchronized(inflight) {
+            if (inflight.contains(tid)) false else { inflight.add(tid); true }
+        }
+        if (!started) return@withContext synchronized(positive) { positive[tid] }
+
+        try {
+            semaphore.withPermit {
+                val url = runCatching {
+                    val html = GenericPageClient.get("https://mce.msi.cn/forum.php?mod=viewthread&tid=$tid")
+                    if (looksBlocked(html)) return@runCatching null
+                    val detail = ThreadDetailParser.parse(
+                        html,
+                        "https://mce.msi.cn/forum.php?mod=viewthread&tid=$tid",
+                        tid,
+                        1,
+                    )
+                    detail.posts.asSequence()
+                        .flatMap { it.images.asSequence() }
+                        .firstOrNull()
+                }.getOrNull()
+
+                if (url.isNullOrBlank()) {
+                    synchronized(negative) { negative[tid] = System.currentTimeMillis() }
+                    null
+                } else {
+                    synchronized(positive) { positive[tid] = url }
+                    url
+                }
+            }
+        } finally {
+            synchronized(inflight) { inflight.remove(tid) }
+        }
     }
 
-    fun clear() = cache.clear()
+    /** 论坛频率限制/拦截页识别 */
+    fun looksBlocked(html: String): Boolean =
+        html.contains("\u9891\u7e41") ||
+            html.contains("\u8bf7\u7a0d\u540e") ||
+            html.contains("seccodeverify") ||
+            html.contains("\u8bbf\u95ee\u88ab\u62d2\u7edd")
+
+    fun clear() {
+        positive.clear()
+        negative.clear()
+    }
 }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -176,8 +177,8 @@ fun HomeFeedScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    items(s.threads, key = { it.id }) { thread ->
-                        FeedCard(thread) { onOpenThread(thread) }
+                    itemsIndexed(s.threads, key = { _, t -> t.id }) { index, thread ->
+                        FeedCard(thread, allowThumbnail = index < 6) { onOpenThread(thread) }
                     }
                     if (loadingMore) {
                         item {
