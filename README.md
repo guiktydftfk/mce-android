@@ -1,5 +1,13 @@
-# MCE星光班 · Android 客户端
+# MCE 星光班 · Android 客户端
 
+## 📦 下载即安装（推荐）
+
+1. 在 GitHub 页面点 **Code → Download ZIP**
+2. 解压后，仓库**根目录**里的 `MCE-starlight.apk` 就是可直接安装的安装包
+3. 传到手机点击安装即可（首次需允许“安装未知应用”）
+
+> 备用位置：`release/MCE-latest.apk`（自动更新下载用的同一文件）
+> 当前版本：**0.3.0（versionCode 33）**
 mce.msi.cn（Discuz! X3.5 论坛）的原生 Android 客户端：Kotlin + Jetpack Compose 外壳，
 内容页逐步从 WebView 替换为原生实现（绞杀者模式）。
 
