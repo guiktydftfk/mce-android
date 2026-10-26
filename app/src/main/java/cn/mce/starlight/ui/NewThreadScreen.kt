@@ -243,7 +243,7 @@ fun NewThreadScreen(
                 onExpandedChange = { categoryExpanded = !categoryExpanded },
             ) {
                 OutlinedTextField(
-                    value = selectedCategory?.name ?: "选择主题分类（可留空）",
+                    value = selectedCategory?.name ?: "选择主题分类（必选）",
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("主题分类") },
