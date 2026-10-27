@@ -180,7 +180,7 @@ fun NewThreadScreen(
                     val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                         ?: return@runCatching
                     val name = "image_${System.currentTimeMillis()}.jpg"
-                    val aid = PostActions.uploadImage(fid, bytes, name)
+                    val aid = PostActions.uploadImage(fid, null, bytes, name)
                     if (aid != null) uploaded.add(uri to aid)
                 }
             }

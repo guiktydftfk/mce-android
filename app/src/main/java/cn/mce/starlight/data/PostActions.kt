@@ -104,14 +104,47 @@ object PostActions {
     /** 最近一次上传失败时服务端返回的原文（用于排查/提示） */
     var lastUploadError: String? = null
 
-    /** Upload one image, returns attachment id (aid) or null */
-    suspend fun uploadImage(fid: Int, bytes: ByteArray, filename: String): String? =
+    /** 上传令牌缓存：key = tid（回帖）或 -fid（发帖） */
+    private val uploadAuthCache = mutableMapOf<Int, Pair<String, String>>()
+    private val uploadHashRegex = Regex("""hash\s*:\s*"([a-fA-F0-9]{32})"""")
+    private val uploadUidRegex = Regex("""uid\s*=\s*'(\d+)'""")
+    private val discuzUploadSplit = "|"
+
+    /**
+     * 取上传鉴权（uid + hash）。
+     * v0.3.8：抓包确认手机模板的上传是 html5upload 流程，需要在发帖/回帖页里拿 `uid:'N'` 与 `hash:'32位hex'`，
+     * 然后 POST 到 `misc.php?mod=swfupload&operation=upload&type=image&inajax=yes&infloat=yes&simple=2`。
+     */
+    private suspend fun fetchUploadAuth(fid: Int, tid: Int?): Pair<String, String>? = withContext(Dispatchers.IO) {
+        val cacheKey = tid ?: -fid
+        uploadAuthCache[cacheKey]?.let { return@withContext it }
+        val pageUrl = if (tid != null) {
+            "$BASE/forum.php?mod=post&action=reply&fid=$fid&tid=$tid&mobile=2"
+        } else {
+            "$BASE/forum.php?mod=post&action=newthread&fid=$fid&mobile=2"
+        }
+        val page = runCatching { GenericPageClient.get(pageUrl) }.getOrNull() ?: return@withContext null
+        val hash = uploadHashRegex.find(page)?.groupValues?.get(1) ?: return@withContext null
+        val uid = uploadUidRegex.find(page)?.groupValues?.get(1)
+            ?: cn.mce.starlight.core.SessionStore.uid?.toString()
+            ?: return@withContext null
+        (uid to hash).also { uploadAuthCache[cacheKey] = it }
+    }
+
+    /**
+     * 上传一张图片，返回附件 id（aid）或 null。
+     * @param tid 回帖上传时传帖子 id（用于取该帖回帖页的上传令牌）；发新帖传 null
+     */
+    suspend fun uploadImage(fid: Int, tid: Int? = null, bytes: ByteArray, filename: String): String? =
         withContext(Dispatchers.IO) {
             runCatching {
-                // v0.3.8：补 formhash / mobile（手机模板 swfupload 会校验表单令牌与来路）
-                val uploadHash = FormhashStore.get()
-                val url = "$BASE/misc.php?mod=swfupload&action=swfupload&operation=upload" +
-                    "&simple=1&type=image&fid=$fid&mobile=2&formhash=$uploadHash"
+                val auth = fetchUploadAuth(fid, tid)
+                if (auth == null) {
+                    lastUploadError = "无法获取上传令牌（uid/hash）"
+                    return@runCatching null
+                }
+                val (uid, hash) = auth
+                val url = "$BASE/misc.php?mod=swfupload&operation=upload&type=image&inajax=yes&infloat=yes&simple=2"
                 val boundary = "----MCEBoundary${System.currentTimeMillis()}"
                 val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
@@ -121,7 +154,11 @@ object PostActions {
                     setRequestProperty("User-Agent", HttpForumRepository.MOBILE_UA)
                     setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
                     setRequestProperty("X-Requested-With", "XMLHttpRequest")
-                    setRequestProperty("Referer", "$BASE/forum.php?mod=post&action=reply&fid=$fid")
+                    setRequestProperty(
+                        "Referer",
+                        if (tid != null) "$BASE/forum.php?mod=post&action=reply&fid=$fid&tid=$tid&mobile=2"
+                        else "$BASE/forum.php?mod=post&action=newthread&fid=$fid&mobile=2",
+                    )
                     cn.mce.starlight.core.WebCookies.cookieHeader()?.let {
                         setRequestProperty("Cookie", it)
                     }
@@ -133,8 +170,8 @@ object PostActions {
                         write("Content-Disposition: form-data; name=\"$name\"\r\n\r\n")
                         write("$value\r\n")
                     }
-                    if (uploadHash.isNotEmpty()) field("formhash", uploadHash)
-                    cn.mce.starlight.core.SessionStore.uid?.let { field("uid", it.toString()) }
+                    field("uid", uid)
+                    field("hash", hash)
                     write("--$boundary\r\n")
                     write("Content-Disposition: form-data; name=\"Filedata\"; filename=\"$filename\"\r\n")
                     write("Content-Type: image/jpeg\r\n\r\n")
@@ -148,9 +185,19 @@ object PostActions {
                     stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
                 }.getOrElse { "" }
                 conn.disconnect()
-                val aid = aidJsonRegex.find(resp)?.groupValues?.get(1)
-                    ?: aidQueryRegex.find(resp)?.groupValues?.get(1)
-                if (aid == null) lastUploadError = "HTTP $code " + resp.take(180)
+                // 成功回包：DISCUZUPLOAD|1|0|<aid>|...（aid 在第 4 个字段）
+                val aid = if (resp.startsWith("DISCUZUPLOAD")) {
+                    val parts = resp.trim().split(discuzUploadSplit)
+                    if (parts.getOrNull(1) == "1") parts.getOrNull(3)?.takeIf { it.isNotBlank() } else null
+                } else {
+                    aidJsonRegex.find(resp)?.groupValues?.get(1)
+                        ?: aidQueryRegex.find(resp)?.groupValues?.get(1)
+                }
+                if (aid == null) {
+                    lastUploadError = "HTTP $code " + resp.take(180)
+                    // 令牌可能过期：清缓存，下次重取
+                    uploadAuthCache.remove(tid ?: -fid)
+                }
                 aid
             }.getOrNull()
         }

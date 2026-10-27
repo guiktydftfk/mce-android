@@ -167,7 +167,7 @@ fun ThreadDetailScreen(
                     val bytes = pickContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                         ?: return@runCatching
                     val name = "reply_${System.currentTimeMillis()}.jpg"
-                    val aid = PostActions.uploadImage(uploadFid, bytes, name)
+                    val aid = PostActions.uploadImage(uploadFid, tid, bytes, name)
                     if (aid != null) replyImages.add(uri to aid)
                 }
             }

@@ -169,8 +169,9 @@ powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -Bump -ToDesktop
 - 新增：**首页帖子过滤** —— 设置 → 内容：按字数隐藏首页帖子（每 10 字一档，0 = 关闭），过滤后仍能正常翻页
 - 修复：液态玻璃抽屉的高亮流光改为**每次打开只扫过一遍**（900ms 缓出），不再无限循环
 - 新增：**回帖附图** —— 回帖工具条新增「图片」：选图后上传并随回复提交（`attachnew[aid]` + 正文 `[attach]aid[/attach]` 内嵌），
-  上传中/预览/删除都有状态提示。**已知限制**：站点 `misc.php?mod=swfupload` 上传接口本机实测返回 HTTP 200 空响应，
-  图片可能上传不成功（发帖页的图片上传用同一接口，历史行为相同），失败时会显示服务端返回摘要，便于进一步抓包定位
+  上传中/预览/删除都有状态提示；实测可正常发图并渲染。上传改用站点 html5upload 接口
+  （`misc.php?mod=swfupload&operation=upload&type=image&inajax=yes&infloat=yes&simple=2`，先在回帖/发帖页取 `uid`+`hash`，
+  回包 `DISCUZUPLOAD|1|0|<aid>|...` 解析 aid）；发帖页的「添加图片」共用同一修复
 - 测试：新增彩色文字解析 9 例、签到顺序回归 2 例，单测 **56 个全绿**
 - 版本：0.3.8 / versionCode 42
 
