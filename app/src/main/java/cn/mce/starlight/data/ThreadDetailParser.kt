@@ -51,7 +51,7 @@ object ThreadDetailParser {
             .firstOrNull { it.isNotEmpty() }
             ?: emptyList()
 
-        val posts = blocks.mapNotNull { block -> parsePost(block, blocks.indexOf(block)) }
+        val posts = blocks.mapNotNull { block -> parsePost(block, blocks.indexOf(block), page) }
 
         val fid = fidRegex.find(html)
             ?.groupValues?.get(1)?.toIntOrNull()
@@ -192,7 +192,7 @@ object ThreadDetailParser {
         return null
     }
 
-    private fun parsePost(el: Element, index: Int): Post? {
+    private fun parsePost(el: Element, index: Int, page: Int = 1): Post? {
         val pid = pidRegex.find(el.id())?.groupValues?.get(1)?.toIntOrNull() ?: (index + 1)
 
         val authi = el.selectFirst("div.view_authi")
@@ -239,7 +239,11 @@ object ThreadDetailParser {
             contentText = plainText,
             images = blocks.filterIsInstance<ContentBlock.Image>().map { it.url },
             blocks = blocks,
-            floorLabel = if (index == 0) "\u697c\u4e3b" else "${index + 1}\u697c",
+            // v0.3.8：楼层号要按总序号（每页 10 楼）；只有第一页第一条才是楼主
+            floorLabel = when {
+                page <= 1 && index == 0 -> "\u697c\u4e3b"
+                else -> "${(page - 1) * 10 + index + 1}\u697c"
+            },
             dateText = date,
             isOp = index == 0,
         )

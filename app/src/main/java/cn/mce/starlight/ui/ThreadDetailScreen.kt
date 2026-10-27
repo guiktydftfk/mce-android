@@ -83,6 +83,10 @@ private sealed interface DetailState {
     data class Content(val detail: ThreadDetail) : DetailState
 }
 
+/// 每个帖子最后浏览的页码（v0.3.8）：回帖会跳到最后一页，退出再进沿用同一页，
+/// 避免「刚发的图片/回复在最后一页，重新点进来又回到第 1 页找不到」。
+private val lastPageByTid = mutableMapOf<Int, Int>()
+
 /** 帖子详情：楼层 + 图片 + 楼层回复 + 评分 */
 @Composable
 fun ThreadDetailScreen(
@@ -127,8 +131,10 @@ fun ThreadDetailScreen(
     // 进帖子必然连发 2 次整页 GET，加载态被置两次，既慢又闪）
     LaunchedEffect(tid, reloadKey) {
         state = DetailState.Loading
-        page = 1
-        load(1)
+        // v0.3.8：恢复上次浏览页（默认第 1 页）——回帖会跳到最后一页，退出再进仍停在那一页，
+        // 避免「自己刚发的图/回复在最后一页，重新进来又回第 1 页以为没发出去」
+        page = (lastPageByTid[tid] ?: 1).coerceAtLeast(1)
+        load(page)
     }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -242,6 +248,7 @@ fun ThreadDetailScreen(
                         if (s.detail.hasNextPage) {
                             TextButton(onClick = {
                                 page += 1
+                                lastPageByTid[tid] = page
                                 scope.launch { load(page) }
                             }) { Text("下一页") }
                         } else {
@@ -373,6 +380,8 @@ fun ThreadDetailScreen(
                                     }
                                     if (lastLoaded != null) {
                                         page = lastLoadedPage
+                                        // 记住最后一页：退出再进仍能看到自己刚发的回复
+                                        lastPageByTid[tid] = lastLoadedPage
                                         state = DetailState.Content(lastLoaded)
                                     } else {
                                         // 兜底：稍等再试一次当前页
