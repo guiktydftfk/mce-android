@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -83,11 +84,7 @@ private sealed interface DetailState {
     data class Content(val detail: ThreadDetail) : DetailState
 }
 
-/// 每个帖子最后浏览的页码（v0.3.8）：回帖会跳到最后一页，退出再进沿用同一页，
-/// 避免「刚发的图片/回复在最后一页，重新点进来又回到第 1 页找不到」。
-private val lastPageByTid = mutableMapOf<Int, Int>()
-
-/** 帖子详情：楼层 + 图片 + 楼层回复 + 评分 */
+/** 帖子详情：楼层 + 图片 + 楼层回复 + 评分（v0.3.8 起为流水式阅读：后续页自动追加，不翻页） */
 @Composable
 fun ThreadDetailScreen(
     tid: Int,
@@ -99,6 +96,8 @@ fun ThreadDetailScreen(
     onOpenPage: (String, String) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
+    // v0.3.8 流水式阅读：整帖一个列表，用于回帖后滚到最新楼层
+    val detailListState = rememberLazyListState()
     val repo = remember { HttpForumRepository() }
     var state by remember { mutableStateOf<DetailState>(DetailState.Loading) }
     var replyText by remember { mutableStateOf(TextFieldValue("")) }
@@ -117,14 +116,50 @@ fun ThreadDetailScreen(
     var showMention by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
 
+    /**
+     * v0.3.8 流水式阅读：第 2 页起把楼层追加到已有列表（不再翻页），
+     * 页内楼层号由解析层按 `page` 计算，所以追加后序号连续。
+     */
     suspend fun load(targetPage: Int = page) {
         runCatching { repo.loadThreadDetail(tid, targetPage) }
-            .onSuccess {
-                cn.mce.starlight.data.FormhashStore.seed(it.formhash)
-                state = if (it.posts.isEmpty()) DetailState.Error("没有解析到楼层内容")
-                else DetailState.Content(it)
+            .onSuccess { d ->
+                cn.mce.starlight.data.FormhashStore.seed(d.formhash)
+                val existing = (state as? DetailState.Content)?.detail
+                val merged = if (existing != null && targetPage > 1) {
+                    d.copy(posts = existing.posts + d.posts)
+                } else {
+                    d
+                }
+                state = if (merged.posts.isEmpty()) DetailState.Error("没有解析到楼层内容")
+                else DetailState.Content(merged)
             }
             .onFailure { state = DetailState.Error(it.message ?: "加载失败") }
+    }
+
+    /** 依次把后续页全部拉下来追加（流水式阅读）；failed 时保留已有内容 */
+    suspend fun loadRemainingPages() {
+        var guard = 0
+        while (guard < 40) {
+            guard++
+            val cur = (state as? DetailState.Content)?.detail ?: return
+            if (!cur.hasNextPage) return
+            val nextPage = page + 1
+            val before = cur.posts.size
+            runCatching { repo.loadThreadDetail(tid, nextPage) }
+                .onSuccess { d ->
+                    if (d.posts.isNotEmpty()) {
+                        page = nextPage
+                        state = DetailState.Content(d.copy(posts = cur.posts + d.posts))
+                    } else {
+                        // 没有更多楼层：把当前页标记为最后一页即可
+                        state = DetailState.Content(cur.copy(hasNextPage = false))
+                        return
+                    }
+                }
+                .onFailure { return }
+            val after = (state as? DetailState.Content)?.detail?.posts?.size ?: return
+            if (after <= before) return
+        }
     }
 
     // v0.3.7：首屏只发一次请求（旧实现 LaunchedEffect(tid) 与 LaunchedEffect(tid, reloadKey) 同时跑，
@@ -133,8 +168,10 @@ fun ThreadDetailScreen(
         state = DetailState.Loading
         // v0.3.8：恢复上次浏览页（默认第 1 页）——回帖会跳到最后一页，退出再进仍停在那一页，
         // 避免「自己刚发的图/回复在最后一页，重新进来又回第 1 页以为没发出去」
-        page = (lastPageByTid[tid] ?: 1).coerceAtLeast(1)
-        load(page)
+        page = 1
+        load(1)
+        // 流水式阅读：进来后自动把后续页追加到同一列表
+        loadRemainingPages()
     }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -202,6 +239,7 @@ fun ThreadDetailScreen(
 
             is DetailState.Content -> LazyColumn(
                 Modifier.fillMaxSize(),
+                state = detailListState,
                 contentPadding = PaddingValues(top = topInset + 56.dp, bottom = 148.dp),
             ) {
                 item {
@@ -245,19 +283,11 @@ fun ThreadDetailScreen(
                             }
                         }) { Text("收藏") }
 
-                        if (s.detail.hasNextPage) {
-                            TextButton(onClick = {
-                                page += 1
-                                lastPageByTid[tid] = page
-                                scope.launch { load(page) }
-                            }) { Text("下一页") }
-                        } else {
-                            Text(
-                                "已是最后一页",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Text(
+                            "共 ${s.detail.posts.size} 楼 · 流水阅读",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     HorizontalDivider(Modifier.padding(top = 8.dp))
                 }
@@ -361,39 +391,17 @@ fun ThreadDetailScreen(
                                     replyText = TextFieldValue("")
                                     replyTo = null
                                     replyImages.clear()
-                                    // v0.3.8：回帖成功后新楼层在「最后一页」，旧实现只刷新当前页 →
-                                    // 用户会以为没发出去。这里往后探测直到「不满一页」再渲染。
-                                    var targetPage = 1
-                                    var lastLoaded: ThreadDetail? = null
-                                    var lastLoadedPage = 1
-                                    var guard = 0
-                                    while (guard < 30) {
-                                        guard++
-                                        val p = runCatching {
-                                            repo.loadThreadDetail(tid, targetPage, noCache = true)
-                                        }.getOrNull() ?: break
-                                        if (p.posts.isEmpty()) break
-                                        lastLoaded = p
-                                        lastLoadedPage = targetPage
-                                        if (p.posts.size < 10) break
-                                        targetPage += 1
-                                    }
-                                    if (lastLoaded != null) {
-                                        page = lastLoadedPage
-                                        // 记住最后一页：退出再进仍能看到自己刚发的回复
-                                        lastPageByTid[tid] = lastLoadedPage
-                                        state = DetailState.Content(lastLoaded)
-                                    } else {
-                                        // 兜底：稍等再试一次当前页
-                                        kotlinx.coroutines.delay(1200)
-                                        val retry = runCatching {
-                                            repo.loadThreadDetail(tid, page, noCache = true)
-                                        }.getOrNull()
-                                        if (retry != null && retry.posts.isNotEmpty()) {
-                                            state = DetailState.Content(retry)
-                                        } else {
-                                            toast = "回复成功，列表暂未刷新，可下拉重试"
-                                        }
+                                    // v0.3.8 流水式阅读：回帖成功后从第 1 页重新聚合所有楼层，
+                                    // 新回复会自动出现在列表末尾，并滚到底部。
+                                    page = 1
+                                    load(1)
+                                    loadRemainingPages()
+                                    kotlinx.coroutines.delay(150)
+                                    val total = (state as? DetailState.Content)?.detail?.posts?.size ?: 0
+                                    if (total > 0) {
+                                        detailListState.requestScrollToItem(
+                                            index = (total - 1).coerceAtLeast(0),
+                                        )
                                     }
                                 }
                             }
