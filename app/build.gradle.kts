@@ -24,6 +24,15 @@ android {
     }
 
     /**
+     * v0.3.8：图标底层「协会 logo」是整层 alpha=0 的彩蛋图层（正常显示不可见，只有解包才能看到）。
+     * aapt 默认的 PNG crunch 会把全透明像素的 RGB 也抹掉（235KB → 444B），彩蛋层就没了，
+     * 所以这里关闭 PNG 压缩，保留原始字节。
+     */
+    androidResources {
+        noCompress += "png"
+    }
+
+    /**
      * v0.3.3 批 6：release 包用 debug keystore 签名（仓库内 keystore/debug.keystore），
      * 保证与历史 debug 包**同签名、可覆盖升级**；同时避免依赖用户目录下 ~/.android 的 keystore
      * （CI/沙箱环境对该路径无写权限，release 签名校验会失败）。

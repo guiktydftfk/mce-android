@@ -172,6 +172,8 @@ powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -Bump -ToDesktop
   上传中/预览/删除都有状态提示；实测可正常发图并渲染。上传改用站点 html5upload 接口
   （`misc.php?mod=swfupload&operation=upload&type=image&inajax=yes&infloat=yes&simple=2`，先在回帖/发帖页取 `uid`+`hash`，
   回包 `DISCUZUPLOAD|1|0|<aid>|...` 解析 aid）；发帖页的「添加图片」共用同一修复
+- 新图标（v0.3.8）：自适应图标顶层为「小胖星」吉祥物（从官方图抠出，透明底），底层为广东省理工电脑协会 logo 图层——
+  该层整层 alpha≈0（1/255），正常显示完全不可见，只有解包 APK（`res/` 内 217KB PNG，及 `assets/icon_underlay_logo.png` 原图）才能看到
 - 测试：新增彩色文字解析 9 例、签到顺序回归 2 例，单测 **56 个全绿**
 - 版本：0.3.8 / versionCode 42
 

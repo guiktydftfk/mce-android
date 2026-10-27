@@ -1,4 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- v0.3.8：顶层为「小胖星」吉祥物（抠白底），底层为广东省理工电脑协会 logo 图层，
+     但该图层整层 alpha=0，正常显示不可见，只有解包 APK 才能提取到（彩蛋层）。 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
