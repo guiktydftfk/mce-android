@@ -113,6 +113,8 @@ fun ThreadDetailScreen(
     }
     var rateForm by remember { mutableStateOf<RateClient.Form?>(null) }
     var ratePid by remember { mutableStateOf<Int?>(null) }
+    /** 当前弹窗是「赞赏楼主」(true) 还是「评分某楼」(false)，只用于成功提示文案 */
+    var rateIsReward by remember { mutableStateOf(false) }
     var page by remember { mutableStateOf(1) }
     var pollSubmitting by remember { mutableStateOf(false) }
 
@@ -126,8 +128,11 @@ fun ThreadDetailScreen(
     /**
      * v0.3.8 流水式阅读：第 2 页起把楼层追加到已有列表（不再翻页），
      * 页内楼层号由解析层按 `page` 计算，所以追加后序号连续。
+     *
+     * v0.3.9 弱网：[keepOnError] = true 时（当前已有内容）失败不清空界面，
+     * 只刷新失败的提示，避免弱网「刷新一次整帖变空白」。
      */
-    suspend fun load(targetPage: Int = page) {
+    suspend fun load(targetPage: Int = page, keepOnError: Boolean = false) {
         runCatching { repo.loadThreadDetail(tid, targetPage) }
             .onSuccess { d ->
                 cn.mce.starlight.data.FormhashStore.seed(d.formhash)
@@ -140,7 +145,14 @@ fun ThreadDetailScreen(
                 state = if (merged.posts.isEmpty()) DetailState.Error("没有解析到楼层内容")
                 else DetailState.Content(merged)
             }
-            .onFailure { state = DetailState.Error(it.message ?: "加载失败") }
+            .onFailure {
+                val existing = (state as? DetailState.Content)?.detail
+                if (keepOnError && existing != null) {
+                    toast = (it.message ?: "刷新失败") + "（已保留上次内容）"
+                } else {
+                    state = DetailState.Error(it.message ?: "加载失败")
+                }
+            }
     }
 
     /** 依次把后续页全部拉下来追加（流水式阅读）；failed 时保留已有内容 */
@@ -172,11 +184,13 @@ fun ThreadDetailScreen(
     // v0.3.7：首屏只发一次请求（旧实现 LaunchedEffect(tid) 与 LaunchedEffect(tid, reloadKey) 同时跑，
     // 进帖子必然连发 2 次整页 GET，加载态被置两次，既慢又闪）
     LaunchedEffect(tid, reloadKey) {
-        state = DetailState.Loading
+        // v0.3.9 弱网：已有内容时重新进入/刷新不再先切成整屏转圈，失败也能保留旧内容
+        val hadContent = state is DetailState.Content
+        if (!hadContent) state = DetailState.Loading
         // v0.3.8：恢复上次浏览页（默认第 1 页）——回帖会跳到最后一页，退出再进仍停在那一页，
         // 避免「自己刚发的图/回复在最后一页，重新进来又回第 1 页以为没发出去」
         page = 1
-        load(1)
+        load(1, keepOnError = hadContent)
         // 流水式阅读：进来后自动把后续页追加到同一列表
         loadRemainingPages()
     }
@@ -277,8 +291,15 @@ fun ThreadDetailScreen(
                             val opPid = s.detail.posts.firstOrNull()?.pid
                             if (opPid != null) {
                                 scope.launch {
-                                    val f = RateClient.loadForm(tid, opPid)
-                                    if (f == null) toast = "赞赏表单加载失败（可能未登录）" else rateForm = f
+                                    val r = RateClient.loadForm(tid, opPid)
+                                    val f = r.form
+                                    if (f == null) {
+                                        toast = r.message ?: "赞赏表单加载失败（可能未登录）"
+                                    } else {
+                                        rateIsReward = true
+                                        ratePid = opPid
+                                        rateForm = f
+                                    }
                                 }
                             }
                         }) { Text("赞赏") }
@@ -339,8 +360,15 @@ fun ThreadDetailScreen(
                         onOpenUser = { onOpenUser(post.uid ?: 0, post.author ?: "") },
                         onRate = {
                             scope.launch {
-                                val f = RateClient.loadForm(tid, post.pid)
-                                if (f == null) toast = "评分表单加载失败（可能未登录）" else rateForm = f
+                                val r = RateClient.loadForm(tid, post.pid)
+                                val f = r.form
+                                if (f == null) {
+                                    toast = r.message ?: "评分表单加载失败（可能未登录）"
+                                } else {
+                                    rateIsReward = false
+                                    ratePid = post.pid
+                                    rateForm = f
+                                }
                             }
                         },
                     )
@@ -554,7 +582,7 @@ fun ThreadDetailScreen(
         )
     }
 
-    // 评分弹窗
+    // 评分 / 赞赏弹窗
     val form = rateForm
     if (form != null) {
         RateDialog(
@@ -563,9 +591,25 @@ fun ThreadDetailScreen(
             onSubmit = { score, reason ->
                 rateForm = null
                 scope.launch {
-                    val (ok, msg) = RateClient.submit(form, score, reason)
+                    // v0.3.9：赞赏/评分的「赞赏人数」在提交前后用来兜底确认是否真的成功
+                    // （Discuz 的 AJAX 回包不一定带「评分成功」标记，旧实现只弹一句 toast，
+                    //  界面不刷新，用户根本不知道有没有生效）
+                    val beforeReward = (state as? DetailState.Content)?.detail?.rewardCount ?: 0
+                    val (ok, msg) = RateClient.submit(
+                        form,
+                        score,
+                        reason,
+                        successText = if (rateIsReward) "赞赏成功" else "评分成功",
+                    )
                     toast = msg
-                    if (ok) load()
+                    // 不管回包判定结果如何，都重新聚合整帖：楼层里的赞赏状态 / 赞赏人数由服务端页面决定
+                    page = 1
+                    load(1, keepOnError = true)
+                    loadRemainingPages()
+                    if (!ok) {
+                        val afterReward = (state as? DetailState.Content)?.detail?.rewardCount ?: 0
+                        if (afterReward > beforeReward) toast = "赞赏成功（已刷新赞赏状态）"
+                    }
                 }
             },
         )

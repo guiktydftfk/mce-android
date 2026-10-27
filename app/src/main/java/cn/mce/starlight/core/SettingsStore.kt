@@ -44,6 +44,7 @@ object SettingsStore {
     private const val KEY_SIGNIN_REMIND = "signin_reminder_enabled"
     private const val KEY_SIGNIN_REMIND_HOUR = "signin_reminder_hour"
     private const val KEY_FEED_MIN_CHARS = "feed_min_chars"
+    private const val KEY_LOW_DATA = "low_data_mode"
     private const val KEY_URGENT_CODE = "urgent_handled_code"
 
     private var appContext: Context? = null
@@ -88,6 +89,13 @@ object SettingsStore {
     var feedMinChars by mutableIntStateOf(0)
         private set
 
+    /**
+     * 低数据流量模式（v0.3.9）：开启后列表卡片不加载帖子配图（缩略图），
+     * 列表层也不再为缩略图整页抓取 viewthread 页面；进入详情页后正文图仍可正常查看。
+     */
+    var lowDataMode by mutableStateOf(false)
+        private set
+
     /** 已自动处理过的紧急更新版本号（同一版本只自动下载/拉起安装一次） */
     var urgentHandledCode by mutableIntStateOf(0)
         private set
@@ -125,6 +133,7 @@ object SettingsStore {
         signinReminderEnabled = prefs.getBoolean(KEY_SIGNIN_REMIND, false)
         signinReminderHour = prefs.getInt(KEY_SIGNIN_REMIND_HOUR, 20)
         feedMinChars = prefs.getInt(KEY_FEED_MIN_CHARS, 0).coerceIn(0, 200)
+        lowDataMode = prefs.getBoolean(KEY_LOW_DATA, false)
         urgentHandledCode = prefs.getInt(KEY_URGENT_CODE, 0)
     }
 
@@ -209,6 +218,12 @@ object SettingsStore {
     fun updateFeedMinChars(value: Int, persist: Boolean = true) {
         feedMinChars = value.coerceIn(0, 200)
         if (persist) prefs()?.edit()?.putInt(KEY_FEED_MIN_CHARS, feedMinChars)?.apply()
+    }
+
+    /** 低数据流量模式：首页/列表不加载帖子配图（详情页正文图不受影响） */
+    fun updateLowDataMode(enabled: Boolean) {
+        lowDataMode = enabled
+        prefs()?.edit()?.putBoolean(KEY_LOW_DATA, enabled)?.apply()
     }
 
     fun updateDownloadedApk(path: String?) {

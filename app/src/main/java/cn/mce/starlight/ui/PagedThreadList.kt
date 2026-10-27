@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import cn.mce.starlight.core.SettingsStore
 import cn.mce.starlight.data.ForumPage
 import cn.mce.starlight.data.ThreadImageCache
 import cn.mce.starlight.data.ThreadSummary
@@ -99,7 +100,12 @@ fun PagedThreadList(
     // item 滚出再滚回也不会重新请求/重新跳动。
     val thumbs = remember(resetKey) { mutableStateMapOf<Int, String>() }
 
+    // v0.3.9 低数据流量模式：开启后不抓缩略图（每张缩略图 = 一次完整 viewthread 整页 GET）。
+    // 读一次 state 让开关切换时列表重组、下面两个 effect 以它作为 key 重新决定是否抓取。
+    val lowData = SettingsStore.lowDataMode
+
     suspend fun fetchThumbWindow() {
+        if (SettingsStore.lowDataMode) return
         val info = listState.layoutInfo.visibleItemsInfo
         if (info.isEmpty()) return
         val headerOffset = if (header != null) 1 else 0
@@ -111,7 +117,12 @@ fun PagedThreadList(
         }
     }
 
-    LaunchedEffect(listState, resetKey, header) {
+    LaunchedEffect(listState, resetKey, header, lowData) {
+        if (lowData) {
+            // 关掉开关立刻停止后续抓取，并释放已抓到的缩略图
+            thumbs.clear()
+            return@LaunchedEffect
+        }
         snapshotFlow { listState.isScrollInProgress }
             .collectLatest { scrolling ->
                 if (scrolling) return@collectLatest
@@ -121,8 +132,8 @@ fun PagedThreadList(
 
     // 首屏：snapshotFlow 的初值可能在列表完成布局前就发出（那时 visibleItemsInfo 为空），
     // 所以数据到达后再补一次延迟抓取，保证不滚动也能看到首屏缩略图
-    LaunchedEffect(st.items, resetKey) {
-        if (st.items.isEmpty()) return@LaunchedEffect
+    LaunchedEffect(st.items, resetKey, lowData) {
+        if (lowData || st.items.isEmpty()) return@LaunchedEffect
         delay(350)
         if (!listState.isScrollInProgress) fetchThumbWindow()
     }
@@ -143,7 +154,16 @@ fun PagedThreadList(
                 st.hasNext = page.threads.isNotEmpty()
                 st.error = null
             }
-            .onFailure { if (gen == st.generation) st.error = it.message ?: "加载失败" }
+            // v0.3.9 弱网：首屏失败时若已有内容（如重试过程中），保留旧列表只提示，不整屏变错误页
+            .onFailure {
+                if (gen == st.generation) {
+                    if (st.items.isEmpty()) {
+                        st.error = it.message ?: "加载失败"
+                    } else {
+                        st.message = "网络较弱，已保留原有内容（${it.message ?: "加载失败"}）"
+                    }
+                }
+            }
         if (gen == st.generation) st.loading = false
     }
 

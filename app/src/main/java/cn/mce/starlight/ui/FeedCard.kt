@@ -24,6 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import cn.mce.starlight.core.SettingsStore
 import cn.mce.starlight.data.ThreadSummary
 import coil.compose.AsyncImage
 
@@ -102,8 +103,9 @@ fun FeedCard(
             )
         }
 
-        // 缩略图：URL 由列表层在滚动停止后统一抓取（见 PagedThreadList），这里只负责渲染
-        if (!thumbUrl.isNullOrBlank()) {
+        // 缩略图：URL 由列表层在滚动停止后统一抓取（见 PagedThreadList），这里只负责渲染。
+        // v0.3.9 低数据流量模式：开启后整卡不渲染配图（列表层同时不再抓取缩略图）。
+        if (!SettingsStore.lowDataMode && !thumbUrl.isNullOrBlank()) {
             AsyncImage(
                 model = thumbUrl,
                 contentDescription = null,

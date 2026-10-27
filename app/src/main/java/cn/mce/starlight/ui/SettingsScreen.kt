@@ -306,6 +306,30 @@ fun SettingsScreen(
                 steps = 19,
             )
 
+            // v0.3.9：低数据流量模式（首页/列表不加载帖子配图，详情页正文图不受影响）
+            Spacer(Modifier.height(18.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "低数据流量模式",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        "首页/板块列表不加载帖子配图（省流量）；点进帖子仍可正常看图",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.size(12.dp))
+                Switch(
+                    checked = SettingsStore.lowDataMode,
+                    onCheckedChange = { SettingsStore.updateLowDataMode(it) },
+                )
+            }
+
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
 
             SectionTitle("更新")

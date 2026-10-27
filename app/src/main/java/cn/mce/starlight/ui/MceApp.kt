@@ -2,7 +2,6 @@ package cn.mce.starlight.ui
 
 import android.app.Activity
 import android.os.Build
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -11,15 +10,19 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
@@ -51,8 +54,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import cn.mce.starlight.R
 import cn.mce.starlight.core.SessionStore
 import cn.mce.starlight.core.SettingsStore
 import cn.mce.starlight.data.AuthClient
@@ -143,6 +148,15 @@ fun MceApp() {
     var updateProgress by remember { mutableIntStateOf(0) }
     var updateError by remember { mutableStateOf<String?>(null) }
     var showSigninReminder by remember { mutableStateOf(false) }
+    // v0.3.9：应用内提示条（替代系统 Toast —— MuMu/部分 ROM 上系统 Toast 会带安卓机器人图标，
+    // 与应用无关且样式不可控）。所有「更新相关 / 退出确认」提示统一走这里。
+    var appToast by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(appToast) {
+        if (appToast != null) {
+            kotlinx.coroutines.delay(2600)
+            appToast = null
+        }
+    }
 
     fun openDrawer() { scope.launch { drawerState.open() } }
     fun closeDrawer() { scope.launch { drawerState.close() } }
@@ -173,11 +187,7 @@ fun MceApp() {
                 updateRelease = null
                 val started = UpdateClient.install(context, file)
                 if (!started) {
-                    Toast.makeText(
-                        context,
-                        "无法启动安装器，请在系统设置中允许安装未知应用",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    appToast = "无法启动安装器，请在系统设置中允许安装未知应用"
                 }
             } else {
                 updateError = "下载失败，请检查网络后重试"
@@ -199,11 +209,7 @@ fun MceApp() {
                     if (release.emergency && SettingsStore.urgentHandledCode != release.versionCode) {
                         SettingsStore.markUrgentHandled(release.versionCode)
                         SettingsStore.clearSnooze()
-                        Toast.makeText(
-                            context,
-                            "紧急更新 ${release.versionName}：正在自动下载…",
-                            Toast.LENGTH_LONG,
-                        ).show()
+                        appToast = "紧急更新 ${release.versionName}：正在自动下载…"
                         startUpdate(release)
                     } else if (release.emergency) {
                         // 该紧急版本已自动处理过：不再重复下载 / 弹安装器
@@ -214,9 +220,9 @@ fun MceApp() {
                     }
                 }
                 is UpdateClient.CheckResult.Latest ->
-                    if (!silent) Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
+                    if (!silent) appToast = "已是最新版本"
                 is UpdateClient.CheckResult.Failed ->
-                    Toast.makeText(context, result.reason, Toast.LENGTH_LONG).show()
+                    appToast = result.reason
             }
         }
     }
@@ -440,7 +446,7 @@ fun MceApp() {
                 (context as? Activity)?.finish()
             } else {
                 lastBackAt = now
-                Toast.makeText(context, "\u518d\u6309\u4e00\u6b21\u9000\u51fa", Toast.LENGTH_SHORT).show()
+                appToast = "再按一次退出"
             }
         }
 
@@ -659,6 +665,39 @@ fun MceApp() {
                         stack = emptyList()
                     },
                     onDismiss = { cn.mce.starlight.core.MessageCenter.dismissBanner() },
+                )
+            }
+        }
+
+        // v0.3.9：应用内提示条（替代系统 Toast）——左侧放应用图标「小胖星」，右侧文案，
+        // 圆角 Surface 与主题一致；2.6s 后由 appToast 的 LaunchedEffect 自动清空。
+        appToast?.let { msg ->
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 96.dp)
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.97f),
+                        RoundedCornerShape(20.dp),
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.16f),
+                        shape = RoundedCornerShape(20.dp),
+                    )
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_brand_star),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    msg,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }

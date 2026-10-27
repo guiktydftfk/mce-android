@@ -140,7 +140,10 @@ object GenericPageClient {
                     .joinToString("&") {
                         URLEncoder.encode(it.first, "UTF-8") + "=" + URLEncoder.encode(it.second, "UTF-8")
                     }
-                get(if (form.action.contains("?")) "${form.action}&$query" else "${form.action}?$query")
+                get(
+                    if (form.action.contains("?")) "${form.action}&$query" else "${form.action}?$query",
+                    retryOnFailure = false,
+                )
             }
         }.getOrNull()
     }
@@ -156,14 +159,33 @@ object GenericPageClient {
         userAgent: String? = null,
         /** 不把本次响应的 Set-Cookie 写入 CookieJar（用于"强制电脑版模板"这类一次性探路请求） */
         isolateCookies: Boolean = false,
-    ): String = follow(
-        url,
-        "GET",
-        cookieOverride ?: WebCookies.cookieHeader(url),
-        null,
-        userAgent,
-        isolateCookies,
-    )
+        /**
+         * v0.3.9 弱网：GET 失败（IO/超时）是否自动重试 1 次。
+         * 默认 true（读页面是幂等的）；表单经 GET 提交（submit）要传 false，避免重复提交。
+         */
+        retryOnFailure: Boolean = true,
+    ): String {
+        fun once() = follow(
+            url,
+            "GET",
+            cookieOverride ?: WebCookies.cookieHeader(url),
+            null,
+            userAgent,
+            isolateCookies,
+        )
+        if (!retryOnFailure) return once()
+        return try {
+            once()
+        } catch (e: IOException) {
+            // 指数退避 600ms 后重试一次；仍失败则抛「网络较弱」友好文案（保留原始 cause 便于诊断）
+            runCatching { Thread.sleep(Net.RETRY_BACKOFF_MS) }
+            try {
+                once()
+            } catch (e2: IOException) {
+                throw IOException(Net.WEAK_NETWORK_MESSAGE, e2)
+            }
+        }
+    }
 
     /**
      * 手动跟随 3xx：每跳都保存 Set-Cookie。
@@ -187,8 +209,8 @@ object GenericPageClient {
 
         while (true) {
             val conn = (URL(currentUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 15_000
-                readTimeout = 25_000
+                connectTimeout = Net.CONNECT_TIMEOUT_MS
+                readTimeout = Net.READ_TIMEOUT_MS
                 instanceFollowRedirects = false
                 requestMethod = currentMethod
                 setRequestProperty("User-Agent", ua)

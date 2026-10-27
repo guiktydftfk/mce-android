@@ -19,6 +19,19 @@ object Net {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
 
+    /**
+     * 弱网超时分级（v0.3.9）：旧实现 连接 15s / 读取 25s，弱网时用户要干等 40 秒才知道失败。
+     * 现在连接快速失败（8s），读取给足 20s（大楼层页面/图片接口），再配合一次自动重试。
+     */
+    const val CONNECT_TIMEOUT_MS = 8_000
+    const val READ_TIMEOUT_MS = 20_000
+
+    /** 弱网自动重试的退避时间（指数退避第一次 600ms） */
+    const val RETRY_BACKOFF_MS = 600L
+
+    /** 弱网最终失败时给用户看的统一文案（不再抛 Java 异常原文） */
+    const val WEAK_NETWORK_MESSAGE = "网络较弱，请稍后重试"
+
     private val formhashInputRegex = Regex("""name="formhash"\s+value="([a-z0-9]+)"""")
     private val formhashQueryRegex = Regex("""formhash=([a-z0-9]+)""")
 
