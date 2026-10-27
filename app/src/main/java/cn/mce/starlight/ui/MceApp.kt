@@ -260,9 +260,10 @@ fun MceApp() {
                 // v0.3.8：暂停更新不再挡住「检查」本身（否则紧急推送永远送不到），普通更新在 checkUpdate 内按暂停态过滤
                 checkUpdate(silent = true)
             }
-            // 新消息检查（私信 + 提醒），有未读会在顶部弹提示
+            // v0.3.9：打开应用时的消息检查 —— 只弹一次（本次启动内 launchBannerShown 保证不重复）；
+            // 之后的回前台/新消息检查走下面 DisposableEffect 的 refresh()，只有真正的新消息才弹
             launch {
-                runCatching { cn.mce.starlight.core.MessageCenter.refresh() }
+                runCatching { cn.mce.starlight.core.MessageCenter.refresh(fromLaunch = true) }
             }
         }
     }
@@ -653,6 +654,12 @@ fun MceApp() {
         // v0.3.7：已经在消息页时不再盖一条「有新消息」提示
         if (dest != Dest.Notice) {
             cn.mce.starlight.core.MessageCenter.banner?.let { banner ->
+                // v0.3.9：提示条是「弹一次」的瞬时提醒，8 秒后自动收起（也可以点 × 立刻关掉），
+                // 不再像旧版那样一直挂到用户手动点掉/进消息页
+                LaunchedEffect(banner) {
+                    kotlinx.coroutines.delay(8000)
+                    cn.mce.starlight.core.MessageCenter.dismissBanner()
+                }
                 cn.mce.starlight.ui.NewMessageBanner(
                     banner = banner,
                     modifier = Modifier
