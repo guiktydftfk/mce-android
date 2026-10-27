@@ -24,6 +24,7 @@ object ThreadDetailParser {
     // v0.3.3 批 3：每帖/每楼都会用到的正则提升为常量
     private val fidRegex = Regex("""action=reply&(?:amp;)?fid=(\d+)""")
     private val uidRegex = Regex("""uid=(\d+)""")
+    private val pageNumRegex = Regex("""[?&]page=(\d+)""")
     private val trailingSpaceNewlineRegex = Regex("""[ \t]+\n""")
     private val multiNewlineRegex = Regex("""\n{3,}""")
 
@@ -64,7 +65,16 @@ object ThreadDetailParser {
             replies = null,
             posts = posts,
             page = page,
-            hasNextPage = doc.select("a").any { it.text().contains("\u4e0b\u4e00\u9875") },
+            // v0.3.8：手机模板没有「下一页」链接也没有 page=N 分页（是 ajax「加载更多」），
+            // 旧判定恒为 false → 多页帖被当成最后一页，回帖后看不到新楼。
+            // 这里用「本页是否满 10 楼」推断还有下一页（手机模板每页 10 楼），
+            // 并保留原有页码链接/文字判定作为兜底。
+            hasNextPage = posts.size >= 10 ||
+                doc.select("a[href*=page=]").any { a ->
+                    val p = pageNumRegex.find(a.attr("href"))?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                    p > page
+                } ||
+                doc.select("a").any { it.text().contains("\u4e0b\u4e00\u9875") },
             fid = fid,
             formhash = Net.formhashOf(html),
             rewardCount = rewardCount,

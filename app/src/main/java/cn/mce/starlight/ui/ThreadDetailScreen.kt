@@ -354,19 +354,35 @@ fun ThreadDetailScreen(
                                     replyText = TextFieldValue("")
                                     replyTo = null
                                     replyImages.clear()
-                                    // 回帖的 POST 响应是提示/跳转页，不能直接当帖子页解析，
-                                    // 必须重新 GET（带时间戳绕过缓存）再渲染。
-                                    val fresh = runCatching { repo.loadThreadDetail(tid, page, noCache = true) }.getOrNull()
-                                    if (fresh != null && fresh.posts.isNotEmpty()) {
-                                        state = DetailState.Content(fresh)
+                                    // v0.3.8：回帖成功后新楼层在「最后一页」，旧实现只刷新当前页 →
+                                    // 用户会以为没发出去。这里往后探测直到「不满一页」再渲染。
+                                    var targetPage = 1
+                                    var lastLoaded: ThreadDetail? = null
+                                    var lastLoadedPage = 1
+                                    var guard = 0
+                                    while (guard < 30) {
+                                        guard++
+                                        val p = runCatching {
+                                            repo.loadThreadDetail(tid, targetPage, noCache = true)
+                                        }.getOrNull() ?: break
+                                        if (p.posts.isEmpty()) break
+                                        lastLoaded = p
+                                        lastLoadedPage = targetPage
+                                        if (p.posts.size < 10) break
+                                        targetPage += 1
+                                    }
+                                    if (lastLoaded != null) {
+                                        page = lastLoadedPage
+                                        state = DetailState.Content(lastLoaded)
                                     } else {
-                                        // 兜底：稍等再试一次，仍失败则提示手动刷新
+                                        // 兜底：稍等再试一次当前页
                                         kotlinx.coroutines.delay(1200)
-                                        val retry = runCatching { repo.loadThreadDetail(tid, page, noCache = true) }.getOrNull()
+                                        val retry = runCatching {
+                                            repo.loadThreadDetail(tid, page, noCache = true)
+                                        }.getOrNull()
                                         if (retry != null && retry.posts.isNotEmpty()) {
                                             state = DetailState.Content(retry)
                                         } else {
-                                            // 保留当前页面内容，仅提示（不要清空导致"没有解析到楼层"）
                                             toast = "回复成功，列表暂未刷新，可下拉重试"
                                         }
                                     }
