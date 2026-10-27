@@ -35,6 +35,16 @@
 | 设置 | 上述外观项、签到提醒、检查更新与暂停更新、自检报告（可选填帖子 ID 做图片自检） |
 | 自动更新 | 启动检查 → 弹窗展示更新内容 → 后台静默下载 → 拉起安装（下次启动即为新版） |
 
+## 🛡 安装与长期可用
+
+- **覆盖安装**：包名固定 `cn.mce.starlight`、签名证书固定（仓库内 `keystore/debug.keystore`），
+  已安装任意历史版本都可直接覆盖升级，无需卸载，登录态 / 设置 / 草稿会保留
+- **版本只增不减**：`versionCode` 单调递增，旧版也可通过应用内更新升到最新
+- **稳定版归档**：`release/MCE-starlight-v0.3.8-stable.apk`（与 `MCE-latest.apk` 同内容，文件名固定便于长期保存）
+- **完整性校验**：`release/SHA256SUMS.txt` 记录版本 / 包名 / 签名指纹 / SHA256，可用
+  `Get-FileHash .\MCE-starlight-v0.3.8-stable.apk -Algorithm SHA256` 核对
+- **离线可用**：原生客户端，断网时仍可浏览已加载内容与本地草稿，联网后自动恢复
+- **更新来源**：`version.json` 的 `apk` 指向 `release/MCE-latest.apk`（镜像自动回退）；紧急版本可免确认自动下载
 ## 📷 好友码与扫码加好友
 
 - **我的好友码**：「我的」→「我的好友码」。本地生成包含你个人主页链接（`home.php?mod=space&uid=<你的 UID>`）的**标准二维码**，
