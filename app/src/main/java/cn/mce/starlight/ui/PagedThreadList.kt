@@ -58,13 +58,13 @@ import kotlinx.coroutines.launch
  * 现在统一到这里：请求代际号（generation）作废旧请求、刷新/加载更多互斥、
  * 换 [resetKey] 重建状态与滚动位置、空态中性提示 + 下拉刷新、单一刷新指示器。
  */
-private class PagedState {
-    var items by mutableStateOf<List<ThreadSummary>>(emptyList())
-    var loading by mutableStateOf(true)
+private class PagedState(initial: List<ThreadSummary> = emptyList(), initialHasNext: Boolean = false) {
+    var items by mutableStateOf(initial)
+    var loading by mutableStateOf(initial.isEmpty())
     var error by mutableStateOf<String?>(null)
     var refreshing by mutableStateOf(false)
     var loadingMore by mutableStateOf(false)
-    var hasNext by mutableStateOf(false)
+    var hasNext by mutableStateOf(initialHasNext)
     var message by mutableStateOf<String?>(null)
     var page = 1
     var generation = 0
@@ -88,9 +88,22 @@ fun PagedThreadList(
     header: (@Composable () -> Unit)? = null,
     /** 帖子过滤（v0.3.8）：返回 false 的帖子不展示；分页仍按服务端原始页判断「还有没有下一页」 */
     filter: ((ThreadSummary) -> Boolean)? = null,
+    /**
+     * v0.3.10：首屏缓存（见 [cn.mce.starlight.core.FeedCache]）。
+     * 有缓存时先渲染旧列表、loading=false，网络请求在后台静默补齐 —— 冷启动/从帖子返回不再看骨架屏。
+     */
+    initialItems: List<ThreadSummary> = emptyList(),
+    initialHasNext: Boolean = true,
+    /** 第 1 页加载成功时回调（用于写缓存） */
+    onFirstPage: ((ForumPage) -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
-    val st = remember(resetKey) { PagedState() }
+    val st = remember(resetKey) {
+        PagedState(
+            initial = if (filter == null) initialItems else initialItems.filter(filter),
+            initialHasNext = initialHasNext,
+        )
+    }
     val listState = remember(resetKey) { LazyListState() }
 
     // v0.3.7：缩略图改为「列表级 + 滚动停止后再抓」。
@@ -153,6 +166,7 @@ fun PagedThreadList(
                 // 用服务端原始页判断是否还有下一页（过滤后可能本页全被隐藏）
                 st.hasNext = page.threads.isNotEmpty()
                 st.error = null
+                onFirstPage?.invoke(page)
             }
             // v0.3.9 弱网：首屏失败时若已有内容（如重试过程中），保留旧列表只提示，不整屏变错误页
             .onFailure {
@@ -212,6 +226,7 @@ fun PagedThreadList(
                     st.hasNext = page.threads.isNotEmpty()
                     st.error = null
                     st.message = null
+                    onFirstPage?.invoke(page)
                     runCatching { listState.requestScrollToItem(0) }
                 }
                 .onFailure {

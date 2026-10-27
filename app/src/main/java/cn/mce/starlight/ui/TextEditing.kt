@@ -22,7 +22,12 @@ fun TextFieldValue.insertAtCursor(insert: String): TextFieldValue {
     )
 }
 
-/** 有选区则用 [open]/[close] 包裹选区；无选区插入占位文本，光标放到标签中间 */
+/**
+ * 有选区则用 [open]/[close] 包裹选区；无选区插入占位文本，光标放到标签中间。
+ *
+ * v0.3.10：包裹后**保持选中被包裹的文字**（而不是把光标丢到标签末尾），
+ * 这样「选中 → 加粗 → 再点颜色/斜体/下划线」可以连续叠加，符合网页编辑器的使用习惯。
+ */
 fun TextFieldValue.wrapSelection(
     open: String,
     close: String,
@@ -30,12 +35,18 @@ fun TextFieldValue.wrapSelection(
 ): TextFieldValue {
     val start = selection.min
     val end = selection.max
+    val hasSelection = end > start
     val selected = text.substring(start, end).ifBlank { placeholder }
     val newText = text.replaceRange(start, end, open + selected + close)
-    val cursor = start + open.length + selected.length
+    val innerStart = start + open.length
+    val selectionRange = if (hasSelection) {
+        TextRange(innerStart, innerStart + selected.length)
+    } else {
+        TextRange(innerStart + selected.length)
+    }
     return TextFieldValue(
         text = newText,
-        selection = TextRange(cursor),
+        selection = selectionRange,
         composition = null,
     )
 }

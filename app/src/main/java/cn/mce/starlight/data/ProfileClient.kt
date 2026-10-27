@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -30,6 +30,8 @@ object ProfileClient {
         val stats: Map<String, String>,
         val fields: Map<String, String>,
         val entries: List<Pair<String, String>>,
+        /** v0.3.10：管理员 / 超级版主 / 版主；普通用户为 null（界面不变） */
+        val staff: String? = null,
     )
 
     private val FIELD_LABELS = listOf("UID", "姓名", "年级", "学校", "专业", "生日", "来自", "个人网站", "血型")
@@ -45,6 +47,7 @@ object ProfileClient {
 
             val username = ProfileCommon.username(doc)
             val group = ProfileCommon.group(doc, text)
+            val staff = ProfileCommon.staffTitle(doc, text)
             val stats = ProfileCommon.stats(text, listOf("主题", "回帖", "积分", "好友", "威望"))
             val fields = ProfileCommon.fields(text, FIELD_LABELS)
 
@@ -66,6 +69,7 @@ object ProfileClient {
                 stats = stats,
                 fields = fields,
                 entries = entries,
+                staff = staff,
             )
         }.getOrNull()
     }

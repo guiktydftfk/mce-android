@@ -53,12 +53,23 @@ fun HomeFeedScreen(
     var view by remember { mutableStateOf("newthread") }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
+    // v0.3.10：首页列表缓存 —— 首次打开/从帖子返回时先用缓存秒开，再后台刷新
+    val filterFn: (ThreadSummary) -> Boolean = { thread ->
+        val min = SettingsStore.feedMinChars
+        min <= 0 || threadCharCount(thread) >= min
+    }
+    val cacheKey = "guide_$view"
+    val cached = remember(view, reloadKey) { cn.mce.starlight.core.FeedCache.get(cacheKey) }
+
     Box(Modifier.fillMaxSize()) {
         PagedThreadList(
             // 过滤阈值变化时也重建列表（resetKey 变化 → 重新加载第 1 页）
             resetKey = Triple(view, reloadKey, SettingsStore.feedMinChars),
             topPadding = topInset + 104.dp,
             horizontalPadding = 12.dp,
+            initialItems = cached?.threads.orEmpty(),
+            initialHasNext = cached?.hasNext ?: true,
+            onFirstPage = { page -> cn.mce.starlight.core.FeedCache.put(cacheKey, page) },
             emptyText = if (SettingsStore.feedFilterEnabled) {
                 "当前设置过滤了少于 ${SettingsStore.feedMinChars} 字的帖子\n可在「设置 → 内容」里调整或关闭"
             } else {
@@ -81,10 +92,7 @@ fun HomeFeedScreen(
                 }
             },
             // v0.3.8：按字数过滤（只看首页信息流，不影响板块/搜索）
-            filter = { thread ->
-                val min = SettingsStore.feedMinChars
-                min <= 0 || threadCharCount(thread) >= min
-            },
+            filter = filterFn,
             onOpenThread = onOpenThread,
         )
 

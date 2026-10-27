@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -54,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontStyle
@@ -288,31 +290,18 @@ fun ThreadDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         TextButton(onClick = {
-                            val opPid = s.detail.posts.firstOrNull()?.pid
-                            if (opPid != null) {
-                                scope.launch {
-                                    val r = RateClient.loadForm(tid, opPid)
-                                    val f = r.form
-                                    if (f == null) {
-                                        toast = r.message ?: "赞赏表单加载失败（可能未登录）"
-                                    } else {
-                                        rateIsReward = true
-                                        ratePid = opPid
-                                        rateForm = f
-                                    }
-                                }
-                            }
-                        }) { Text("赞赏") }
-
-                        TextButton(onClick = {
                             scope.launch {
                                 val r = PostActions.favorite(tid)
                                 toast = r.message
                             }
                         }) { Text("收藏") }
 
+                        // v0.3.10：评论数与楼层数分开显示，避免「回复 6」和「共 7 楼」看起来对不上；
+                        // 楼主不计入回复楼层（见 ThreadDetailParser：楼主=楼主，回复从 1楼 起）。
+                        val floorCount = s.detail.posts.size
+                        val replyCount = s.detail.replies ?: (floorCount - 1).coerceAtLeast(0)
                         Text(
-                            "共 ${s.detail.posts.size} 楼 · 流水阅读",
+                            "共 $floorCount 楼 · $replyCount 条回复",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -382,6 +371,41 @@ fun ThreadDetailScreen(
         }
 
         ImmersiveTopBar(title = title, modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
+
+        // v0.3.10：赞赏（打赏楼主）从顶部按钮移到右下角悬浮按钮，拇指更容易点到
+        detail?.let { d ->
+            val opPid = d.posts.firstOrNull()?.pid
+            if (opPid != null) {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            val r = RateClient.loadForm(tid, opPid)
+                            val f = r.form
+                            if (f == null) {
+                                toast = r.message ?: "赞赏表单加载失败（可能未登录）"
+                            } else {
+                                rateIsReward = true
+                                ratePid = opPid
+                                rateForm = f
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 14.dp, bottom = 128.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            RoundedCornerShape(20.dp),
+                        ),
+                ) {
+                    Text(
+                        "赞赏",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
 
         detail?.let { d ->
             Column(
@@ -981,11 +1005,25 @@ private fun PostItem(
  * - 引用块（kind = Quote）用左侧竖条 + 灰色小字区分。
  * `remember(block)` 避免每次重组都重建 AnnotatedString。
  */
+/** 正文里的网址（v0.3.10）：点击直接用系统默认浏览器打开 */
+private val postUrlRegex = Regex("""https?://[^\s<>"'，。；、）】\[\]]+""")
+
 @Composable
 private fun PostTextBlock(block: ContentBlock.Text) {
     val baseColor = MaterialTheme.colorScheme.onSurface
     val quotedColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val annotated = remember(block) {
+    val linkColor = MaterialTheme.colorScheme.primary
+    // v0.3.10：可点击的网址 = 解析层给出的 <a href> 区间 + 正文里裸写的 http(s) 链接
+    val urlRanges = remember(block) {
+        val fromHtml = block.links.map { Triple(it.start, it.end, it.url) }
+        val fromText = postUrlRegex.findAll(block.text)
+            .map { m -> Triple(m.range.first, m.range.last + 1, m.value) }
+            .toList()
+        (fromHtml + fromText)
+            .filter { it.first >= 0 && it.second <= block.text.length && it.second > it.first }
+            .distinctBy { it.first to it.second }
+    }
+    val annotated = remember(block, baseColor, quotedColor, linkColor) {
         buildAnnotatedString {
             append(block.text)
             block.spans.forEach { span ->
@@ -1012,6 +1050,20 @@ private fun PostTextBlock(block: ContentBlock.Text) {
                     end,
                 )
             }
+            // 网址高亮 + 可点击（点击自动拉起系统默认浏览器）
+            urlRanges.forEach { (start, end, _) ->
+                addStyle(
+                    SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline),
+                    start,
+                    end,
+                )
+            }
+        }
+    }
+    val uriHandler = LocalUriHandler.current
+    val onUrlClick: (Int) -> Unit = { offset ->
+        urlRanges.firstOrNull { offset >= it.first && offset < it.second }?.let { (_, _, url) ->
+            runCatching { uriHandler.openUri(url) }
         }
     }
     val textStyle = if (block.kind == TextKind.Quote) {
@@ -1029,14 +1081,18 @@ private fun PostTextBlock(block: ContentBlock.Text) {
                     .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp)),
             )
             Spacer(Modifier.width(8.dp))
-            Text(
+            ClickableText(
                 text = annotated,
-                style = textStyle,
-                color = quotedColor,
+                style = textStyle.copy(color = quotedColor),
+                onClick = onUrlClick,
                 modifier = Modifier.weight(1f),
             )
         }
     } else {
-        Text(text = annotated, style = textStyle, color = baseColor)
+        ClickableText(
+            text = annotated,
+            style = textStyle.copy(color = baseColor),
+            onClick = onUrlClick,
+        )
     }
 }

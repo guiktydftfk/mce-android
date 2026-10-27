@@ -473,6 +473,8 @@ fun MceApp() {
                 onMenu = ::openDrawer,
                 initialFid = current.fid,
                 initialDraft = current.draftId?.let { cn.mce.starlight.core.DraftStore.get(it) },
+                // v0.3.10：退出发帖页（存草稿/放弃）后出栈
+                onExit = { pop() },
                 onPosted = {
                     // 发帖成功：回到主页并刷新列表
                     stack = emptyList()

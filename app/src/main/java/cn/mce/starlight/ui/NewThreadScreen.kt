@@ -22,8 +22,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +49,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
@@ -79,6 +82,8 @@ fun NewThreadScreen(
     initialDraft: Draft? = null,
     onDraftSaved: () -> Unit = {},
     onPosted: () -> Unit,
+    /** v0.3.10：退出编辑页（存草稿 / 放弃修改后由 MceApp 出栈） */
+    onExit: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -128,6 +133,9 @@ fun NewThreadScreen(
     // uploaded attachments (local uri + remote aid)
     val uploaded = remember { mutableStateListOf<Pair<Uri, String>>() }
     var uploading by remember { mutableStateOf(false) }
+    // v0.3.10：颜色选择器 / 退出提醒
+    var showColorPicker by remember { mutableStateOf(false) }
+    var showExitConfirm by remember { mutableStateOf(false) }
 
     val fid = selectedFid
     val pollChoices = pollOptions.split('\n').map { it.trim() }.filter { it.isNotBlank() }.distinct()
@@ -175,17 +183,45 @@ fun NewThreadScreen(
         if (uris.isNullOrEmpty()) return@rememberLauncherForActivityResult
         scope.launch {
             uploading = true
+            var inserted = 0
             uris.forEach { uri ->
                 runCatching {
                     val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                         ?: return@runCatching
                     val name = "image_${System.currentTimeMillis()}.jpg"
                     val aid = PostActions.uploadImage(fid, null, bytes, name)
-                    if (aid != null) uploaded.add(uri to aid)
+                    if (aid != null) {
+                        uploaded.add(uri to aid)
+                        // v0.3.10：类「小黑盒」图文 —— 选完图就在光标处插入，图片跟着文字段落走，
+                        // 不再像旧版那样先攒着、等发布时统一堆到正文末尾
+                        contentField = contentField.insertAtCursor("\n[attach]$aid[/attach]\n")
+                        inserted++
+                    }
                 }
             }
             uploading = false
+            draftTip = if (inserted > 0) {
+                "已插入 $inserted 张图片（光标处）"
+            } else {
+                "图片上传失败：" + (PostActions.lastUploadError?.take(80)?.replace("\n", " ") ?: "未知原因")
+            }
         }
+    }
+
+    /** 删除一张已插入的图片（同时把正文里的 [attach] 标记去掉） */
+    fun removeUploaded(item: Pair<Uri, String>) {
+        uploaded.remove(item)
+        val marker = "[attach]${item.second}[/attach]"
+        contentField = TextFieldValue(
+            text = contentField.text.replace(marker, "").replace(Regex("""\n{3,}"""), "\n\n"),
+        )
+    }
+
+    val hasDraftContent = subject.isNotBlank() || contentField.text.isNotBlank() || uploaded.isNotEmpty()
+
+    // v0.3.10：直接退出编辑页时先提醒存草稿（有内容才拦）
+    androidx.activity.compose.BackHandler(enabled = hasDraftContent && !sending) {
+        showExitConfirm = true
     }
 
     // 在光标处插入 BBCode（实现见 ui/TextEditing.kt，与回帖框共用）
@@ -195,6 +231,12 @@ fun NewThreadScreen(
 
     fun insertText(text: String) {
         contentField = contentField.insertAtCursor(text)
+    }
+
+    /** 选中文字后直接套用预设颜色（与网页编辑器同款色板） */
+    fun applyColor(hex: String) {
+        contentField = contentField.wrapSelection("[color=$hex]", "[/color]", "彩色文字")
+        showColorPicker = false
     }
 
     /** 存草稿：只存本地（Discuz 手机模板没有草稿箱），不会发布 */
@@ -383,9 +425,11 @@ fun NewThreadScreen(
             ToolButton("B") { wrap("[b]", "[/b]", "加粗文字") }
             ToolButton("I") { wrap("[i]", "[/i]", "斜体文字") }
             ToolButton("U") { wrap("[u]", "[/u]", "下划线文字") }
-            ToolButton("颜色") { wrap("[color=#ff0000]", "[/color]", "彩色文字") }
+            // v0.3.10：颜色改为「选中文字 → 点颜色 → 选预设色」，预设色与网页版论坛编辑器一致
+            ToolButton("颜色") { showColorPicker = true }
             ToolButton("链接") { wrap("[url]", "[/url]", "https://") }
-            ToolButton("图片") { wrap("[img]", "[/img]", "图片链接") }
+            ToolButton("图片") { pickImages.launch("image/*") }
+            ToolButton("图链") { wrap("[img]", "[/img]", "图片链接") }
             ToolButton("引用") { wrap("[quote]", "[/quote]", "引用内容") }
             ToolButton("代码") { wrap("[code]", "[/code]", "代码") }
             ToolButton("隐藏") { wrap("[hide]", "[/hide]", "隐藏内容（回复可见）") }
@@ -396,10 +440,13 @@ fun NewThreadScreen(
         OutlinedTextField(
             value = contentField,
             onValueChange = { contentField = it },
-            label = { Text("内容（支持 BBCode）") },
+            label = { Text("内容（支持 BBCode；选中文字后可加粗/颜色/斜体/下划线）") },
             minLines = if (pollMode) 4 else 8,
             modifier = Modifier.fillMaxWidth(),
         )
+
+        // v0.3.10：图文预览（类小黑盒：图片在光标处插入，按段落顺序和文字混排）
+        DraftPreview(text = contentField.text, images = uploaded)
 
         // ---------- 投票设置 ----------
         if (pollMode) {
@@ -450,19 +497,17 @@ fun NewThreadScreen(
             HorizontalDivider()
         }
 
-        // image upload row
+        // v0.3.10：图片改为「选完即插入光标处」，不需要先上传再手动插入
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(
                 enabled = !uploading,
                 onClick = { pickImages.launch("image/*") },
-            ) { Text(if (uploading) "上传中…" else "＋ 添加图片") }
-            if (uploaded.isNotEmpty()) {
-                Text(
-                    "已上传 ${uploaded.size} 张",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+            ) { Text(if (uploading) "插入中…" else "＋ 插入图片") }
+            Text(
+                "选图后自动插到光标处，可和文字混排",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         if (uploaded.isNotEmpty()) {
             Row(
@@ -471,10 +516,10 @@ fun NewThreadScreen(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                uploaded.forEach { (uri, _) ->
+                uploaded.forEach { item ->
                     Box {
                         AsyncImage(
-                            model = uri,
+                            model = item.first,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
@@ -487,7 +532,7 @@ fun NewThreadScreen(
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .clickable { uploaded.remove(uri to uploaded.first { it.first == uri }.second) }
+                                .clickable { removeUploaded(item) }
                                 .padding(horizontal = 4.dp),
                         )
                     }
@@ -588,6 +633,34 @@ fun NewThreadScreen(
             onDismiss = { showSmiley = false },
         )
     }
+    if (showColorPicker) {
+        ColorPickerDialog(onPick = { applyColor(it) }, onDismiss = { showColorPicker = false })
+    }
+
+    if (showExitConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirm = false },
+            title = { Text("要存入草稿箱吗？") },
+            text = { Text("退出后未发布的标题、正文和图片会丢失。可以先存到草稿箱，之后在「抽屉 → 草稿箱」里继续编辑。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitConfirm = false
+                    saveDraft()
+                    onExit()
+                }) { Text("存草稿并退出") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        showExitConfirm = false
+                        onExit()
+                    }) { Text("直接退出", color = MaterialTheme.colorScheme.error) }
+                    TextButton(onClick = { showExitConfirm = false }) { Text("取消") }
+                }
+            },
+        )
+    }
+
     ImmersiveTopBar(title = if (pollMode) "发起投票" else "发帖", onMenu = onMenu)
 }
 
@@ -639,5 +712,82 @@ private fun OptionRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     ) {
         Text(label, style = MaterialTheme.typography.bodySmall)
         Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+/** 网页版论坛编辑器（Discuz）的预设颜色，取自 forum.php?mod=post 编辑页的 data-color 列表 */
+private val SITE_COLORS = listOf("#222222", "#E64346", "#FF9501", "#AAC238", "#1A497D")
+
+private val attachMarkerRegex = Regex("""\[attach\](\d+)\[/attach\]""")
+
+/** 选颜色弹窗：选中文字后点「颜色」→ 直接点色块即可套用 */
+@Composable
+private fun ColorPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("文字颜色") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "与网页版论坛编辑器一致的预设颜色；先选中要变色的文字，再点色块",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SITE_COLORS.forEach { hex ->
+                        Box(
+                            Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex)))
+                                .clickable { onPick(hex) },
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
+}
+
+/**
+ * 图文预览（v0.3.10）：把正文里的 `[attach]aid[/attach]` 还原成本地图片，
+ * 按段落顺序和文字混排展示，方便发布前确认图片位置。
+ */
+@Composable
+private fun DraftPreview(text: String, images: List<Pair<Uri, String>>) {
+    if (text.isBlank()) return
+    val byAid = remember(images.toList()) { images.associateBy({ it.second }, { it.first }) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            "预览",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        text.split('\n').forEach { line ->
+            val marker = attachMarkerRegex.find(line)
+            if (marker != null) {
+                val uri = byAid[marker.groupValues[1]]
+                if (uri != null) {
+                    AsyncImage(
+                        model = uri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                    )
+                }
+            } else if (line.isNotBlank()) {
+                Text(line, style = MaterialTheme.typography.bodySmall)
+            }
+        }
     }
 }

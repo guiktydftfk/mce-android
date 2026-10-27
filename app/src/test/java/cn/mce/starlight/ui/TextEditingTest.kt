@@ -48,7 +48,9 @@ class TextEditingTest {
         val field = TextFieldValue("请加粗这里", TextRange(1, 4))
         val out = field.wrapSelection("[b]", "[/b]", "占位")
         assertEquals("请[b]加粗这[/b]里", out.text)
-        assertEquals(1 + 3 + 3, out.selection.start)
+        // v0.3.10：包裹后保持「被包裹的文字」处于选中态，方便连续叠加颜色/斜体等样式
+        assertEquals(1 + 3, out.selection.min)
+        assertEquals(1 + 3 + 3, out.selection.max)
     }
 
     @Test

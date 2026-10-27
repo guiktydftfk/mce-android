@@ -16,6 +16,7 @@ object PersonalClient {
 
     private val tidRegex = Regex("""(?:ptid|tid)=(\d+)""")
     private val viewTidRegex = Regex("""tid=(\d+)""")
+    private val uidRegex = Regex("""uid=(\d+)""")
     private val dateRegex = Regex("""\d{4}-\d{1,2}-\d{1,2}[^\s<]{0,10}""")
     private val shortTextRegex = Regex("""[^<]{4,30}""")
 
@@ -119,11 +120,12 @@ object PersonalClient {
         cn.mce.starlight.core.PmReadStore.overlay(merged)
     }
 
-    /** 消息提醒：li.notice_item */
+    /** 消息提醒：li.notice_item（v0.3.10：补 uid，翻页由 UI 逐页拉取合并） */
     suspend fun loadNotices(page: Int): List<NoticeItem> = withContext(Dispatchers.IO) {
         val url = "$BASE/home.php?mod=space&do=notice&page=$page"
         val doc = Jsoup.parse(GenericPageClient.get(url), url)
         doc.select("li.notice_item, li[class*=notice_item]").map { li ->
+            val avatarLink = li.selectFirst("a.avatars, a[href*=space][href*=uid=]")
             val avatar = li.selectFirst("img[src*=avatar.php]")?.attr("src")
                 ?.takeIf { it.isNotBlank() }?.let(::absolutize)
             val time = li.selectFirst("p.notice_time")?.text()
@@ -136,7 +138,9 @@ object PersonalClient {
                 tidRegex.find(href)?.groupValues?.get(1)?.toIntOrNull()
             }
             val author = noteBlock?.selectFirst("a[href*=space]")?.text()?.trim()
-            NoticeItem(avatar, author, time, note, tid)
+            val uid = uidRegex.find(avatarLink?.attr("href").orEmpty())
+                ?.groupValues?.get(1)?.toIntOrNull()
+            NoticeItem(avatar, author, time, note, tid, uid)
         }
     }
 

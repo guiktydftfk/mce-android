@@ -8,10 +8,15 @@ sealed interface ContentBlock {
         val spans: List<TextSpan> = emptyList(),
         /** 段落类型：普通段落 / 引用块 */
         val kind: TextKind = TextKind.Paragraph,
+        /** v0.3.10：正文里的超链接（点击用系统默认浏览器打开） */
+        val links: List<TextLink> = emptyList(),
     ) : ContentBlock
 
     data class Image(val url: String) : ContentBlock
 }
+
+/** 正文超链接区间：[start, end) 是链接文字，[url] 是跳转地址（绝对地址） */
+data class TextLink(val start: Int, val end: Int, val url: String)
 
 /** 正文段落类型（v0.3.8） */
 enum class TextKind { Paragraph, Quote }

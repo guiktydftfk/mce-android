@@ -33,6 +33,25 @@ object ProfileCommon {
         groupRegex.find(text)?.groupValues?.get(1)
             ?: doc.selectFirst(".grouptitle, .xw1")?.text()?.trim()
 
+    /**
+     * 管理身份（v0.3.10）：论坛里的「管理员 / 超级版主 / 版主」。
+     *
+     * 只看用户组字段与身份徽标元素（`.grouptitle/.xw1/.userstatus/i.mod` 等），
+     * **不**在整页文本里找关键词 —— 否则帖子里出现「版主」二字就会把人误判成版主。
+     * 普通用户返回 null，界面保持原样。
+     */
+    fun staffTitle(doc: Document, text: String): String? {
+        val group = group(doc, text)
+        val badges = doc.select("i.mod, em.mod, span.mod, .grouptitle, .xw1, .userstatus, .user_group")
+            .map { it.text().trim() }
+            .filter { it.isNotBlank() }
+        val hay = (listOfNotNull(group) + badges).joinToString(" ")
+        // 「超级版主」要在「版主」之前判断，否则会被子串先命中
+        return STAFF_TOKENS.firstOrNull { hay.contains(it) }
+    }
+
+    private val STAFF_TOKENS = listOf("\u7ba1\u7406\u5458", "\u8d85\u7ea7\u7248\u4e3b", "\u7248\u4e3b")
+
     /** 统计数字（主题 / 回帖 / 积分…） */
     fun stats(text: String, labels: List<String>): Map<String, String> {
         val result = mutableMapOf<String, String>()

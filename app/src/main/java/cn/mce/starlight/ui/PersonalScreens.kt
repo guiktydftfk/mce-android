@@ -242,11 +242,27 @@ fun NoticesScreen(
     var pmState by remember { mutableStateOf<PState<PersonalClient.PmItem>>(PState.Loading) }
 
     suspend fun loadNotices() {
-        runCatching { PersonalClient.loadNotices(1) }
-            .onSuccess {
-                noticeState = PState.Content(it)
+        // v0.3.10：消息提醒逐页拉取合并（每次 30 条）—— 旧实现只看第 1 页，
+        // 较早的「打赏/评分」提醒会整批消失（用户反馈"部分打赏不显示"）。
+        val merged = LinkedHashMap<String, PersonalClient.NoticeItem>()
+        for (page in 1..4) {
+            val items = runCatching { PersonalClient.loadNotices(page) }.getOrNull()
+            if (items == null) {
+                if (page == 1) {
+                    noticeState = PState.Error("加载失败")
+                    return
+                }
+                break
             }
-            .onFailure { noticeState = PState.Error(it.message ?: "加载失败") }
+            if (items.isEmpty()) break
+            items.forEach { item ->
+                // 同一提醒的去重键：内容 + 时间（时间在模板里是相对时间，只用于去重）
+                val key = (item.note ?: "") + "|" + (item.time ?: "") + "|" + (item.author ?: "")
+                merged.putIfAbsent(key, item)
+            }
+            if (items.size < 25) break
+        }
+        noticeState = PState.Content(merged.values.toList())
     }
 
     suspend fun loadPm() {

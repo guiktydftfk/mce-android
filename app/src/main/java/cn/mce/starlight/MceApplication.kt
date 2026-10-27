@@ -29,6 +29,7 @@ class MceApplication : Application(), ImageLoaderFactory {
         cn.mce.starlight.core.MessageCenter.init(this)
         cn.mce.starlight.core.PmReadStore.init(this)
         cn.mce.starlight.core.StarlightDailyStore.init(this)
+        cn.mce.starlight.core.FeedCache.init(this)
         DebugDump.init(this)
     }
 

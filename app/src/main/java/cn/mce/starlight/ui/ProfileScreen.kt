@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -67,6 +68,8 @@ fun ProfileScreen(
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<ProfileState>(ProfileState.Loading) }
     var reloadTick by remember { mutableStateOf(0) }
+    // v0.3.10：今日星光=当日新增，改成随资料加载一起刷新（旧实现每次重组现算，还会在组合期写 SharedPreferences）
+    var todayDelta by remember { mutableStateOf(0) }
 
     suspend fun load() {
         if (!SessionStore.isLoggedIn) {
@@ -75,7 +78,17 @@ fun ProfileScreen(
         }
         try {
             val p = ProfileClient.load()
-            state = if (p == null) ProfileState.Error("资料加载失败") else ProfileState.Content(p)
+            if (p == null) {
+                state = ProfileState.Error("资料加载失败")
+                return
+            }
+            state = ProfileState.Content(p)
+            val pointsTotal = p.stats["积分"]?.filter { it.isDigit() }?.toIntOrNull()
+            todayDelta = if (pointsTotal != null) {
+                cn.mce.starlight.core.StarlightDailyStore.deltaFor(pointsTotal)
+            } else {
+                0
+            }
         } catch (e: kotlinx.coroutines.CancellationException) {
             // 组合被重建导致请求取消：保持加载态，交给下一次 LaunchedEffect 重试
             return
@@ -85,6 +98,23 @@ fun ProfileScreen(
     }
 
     LaunchedEffect(reloadKey, SessionStore.isLoggedIn, reloadTick) { load() }
+
+    // v0.3.10：从后台回来时静默刷新一次（积分/星光/分组可能已变），20s 节流避免频繁请求
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        var last = 0L
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                val now = System.currentTimeMillis()
+                if (now - last > 20_000L) {
+                    last = now
+                    reloadTick += 1
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
@@ -146,12 +176,28 @@ fun ProfileScreen(
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                 )
-                                p.group?.let {
-                                    Text(
-                                        it,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    p.group?.let {
+                                        Text(
+                                            it,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                    // v0.3.10：管理员/超级版主/版主按实际用户组显示身份徽标；普通用户不显示
+                                    p.staff?.let { staff ->
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            staff,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(staffColor(staff))
+                                                .padding(horizontal = 6.dp, vertical = 1.dp),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -187,13 +233,12 @@ fun ProfileScreen(
                                         )
                                     }
                                 }
-                                // v0.3.8：本日星光值新增（论坛无此数字，用本地日快照 diff 近似）
+                                // v0.3.10：今日星光 = 当日新增（峰值 − 当天基准），随资料加载一起刷新；
+                                // 花积分不会把今天已获得的抹掉，回到页面/回前台会重新拉取
                                 val pointsTotal = p.stats["积分"]
                                     ?.filter { it.isDigit() }
                                     ?.toIntOrNull()
                                 if (pointsTotal != null) {
-                                    val todayDelta = cn.mce.starlight.core.StarlightDailyStore
-                                        .deltaFor(pointsTotal)
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text(
                                             "+$todayDelta",
@@ -202,7 +247,7 @@ fun ProfileScreen(
                                             color = MaterialTheme.colorScheme.primary,
                                         )
                                         Text(
-                                            "今日星光",
+                                            "今日新增星光",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -328,4 +373,11 @@ fun ProfileScreen(
 
         ImmersiveTopBar(title = "我的", modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
     }
+}
+
+/** 身份徽标底色（v0.3.10）：管理员红 / 超级版主橙 / 版主绿 */
+private fun staffColor(staff: String): androidx.compose.ui.graphics.Color = when {
+    staff.contains("\u7ba1\u7406\u5458") -> androidx.compose.ui.graphics.Color(0xFFC62828)
+    staff.contains("\u8d85\u7ea7\u7248\u4e3b") -> androidx.compose.ui.graphics.Color(0xFFEF6C00)
+    else -> androidx.compose.ui.graphics.Color(0xFF2E7D32)
 }

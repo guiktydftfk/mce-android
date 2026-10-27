@@ -33,14 +33,16 @@ fun ImmersiveTopBar(
     onAction: (() -> Unit)? = null,
 ) {
     val surface = MaterialTheme.colorScheme.surface
+    // v0.3.10：渐变画刷缓存，避免每次重组都新建 Brush（滚动/重组时可省一次分配）
+    val gradient = androidx.compose.runtime.remember(surface) {
+        Brush.verticalGradient(
+            listOf(surface, surface.copy(alpha = 0.94f), Color.Transparent),
+        )
+    }
     Column(
         modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    listOf(surface, surface.copy(alpha = 0.94f), Color.Transparent),
-                ),
-            )
+            .background(gradient)
             .statusBarsPadding(),
     ) {
         Row(

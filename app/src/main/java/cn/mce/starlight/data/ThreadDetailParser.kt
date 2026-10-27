@@ -25,6 +25,7 @@ object ThreadDetailParser {
     private val fidRegex = Regex("""action=reply&(?:amp;)?fid=(\d+)""")
     private val uidRegex = Regex("""uid=(\d+)""")
     private val pageNumRegex = Regex("""[?&]page=(\d+)""")
+    private val replyCountRegex = Regex("""(\d+)\s*(?:\u56de\u590d|\u5e16\u5b50|\u697c)""")
     private val trailingSpaceNewlineRegex = Regex("""[ \t]+\n""")
     private val multiNewlineRegex = Regex("""\n{3,}""")
 
@@ -59,10 +60,13 @@ object ThreadDetailParser {
         val rewardCount = doc.selectFirst("div.view_reward .reward_num span")
             ?.text()?.trim()?.toIntOrNull()
 
+        val replies = doc.selectFirst("div#ap_reply span.z, div.titls span.z")
+            ?.text()?.let { replyCountRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() }
+
         return ThreadDetail(
             tid = tid,
             title = title,
-            replies = null,
+            replies = replies,
             posts = posts,
             page = page,
             // v0.3.8：手机模板没有「下一页」链接也没有 page=N 分页（是 ajax「加载更多」），
@@ -230,6 +234,11 @@ object ThreadDetailParser {
         val date = el.selectFirst("span.datelinetimes")?.text()?.trim()
             ?: authi?.selectFirst("span.datelinetimes")?.text()?.trim()
 
+        // v0.3.10：论坛的楼层语义是「楼主 + 回复楼层（沙发/1楼、2楼…）」。
+        // 旧实现把楼主正文也排成「1楼」，导致「回复数 N」和「共 N+1 楼」对不上（用户反馈"正文被当成一楼"）。
+        // 现在：楼主固定显示「楼主」，回复从 1楼 开始编号，与列表卡片的「回复 N」一致。
+        val globalIndex = (page - 1) * 10 + index
+        val floorLabel = if (globalIndex == 0) "\u697c\u4e3b" else "${globalIndex}\u697c"
         return Post(
             pid = pid,
             uid = authorUid,
@@ -239,10 +248,9 @@ object ThreadDetailParser {
             contentText = plainText,
             images = blocks.filterIsInstance<ContentBlock.Image>().map { it.url },
             blocks = blocks,
-            // v0.3.9：统一显示数字楼层（1楼/2楼…），1 楼不再显示成「楼主」
-            floorLabel = "${(page - 1) * 10 + index + 1}\u697c",
+            floorLabel = floorLabel,
             dateText = date,
-            isOp = index == 0,
+            isOp = globalIndex == 0,
         )
     }
 
@@ -369,12 +377,15 @@ object ThreadDetailParser {
         val blocks = mutableListOf<ContentBlock>()
         val sb = StringBuilder()
         val runs = mutableListOf<Run>()
+        val linkRuns = mutableListOf<Triple<Int, Int, String>>()
         var currentKind = TextKind.Paragraph
 
         fun flush() {
             val raw = sb.toString()
             val pending = runs.toList()
+            val pendingLinks = linkRuns.toList()
             runs.clear()
+            linkRuns.clear()
             sb.setLength(0)
             if (raw.isBlank()) return
             runCatching {
@@ -438,6 +449,11 @@ object ThreadDetailParser {
                         text = text,
                         spans = spans,
                         kind = currentKind,
+                        links = pendingLinks.mapNotNull { (ls, le, url) ->
+                            val s = (map[ls.coerceIn(0, raw.length)] - start).coerceIn(0, text.length)
+                            val e = (map[le.coerceIn(0, raw.length)] - start).coerceIn(0, text.length)
+                            if (e > s) TextLink(s, e, url) else null
+                        }.distinctBy { it.start to it.url },
                     ),
                 )
             }.onFailure {
@@ -496,7 +512,15 @@ object ThreadDetailParser {
                                 flush()
                                 blocks.add(ContentBlock.Image(absolutize(href)))
                             } else {
+                                // v0.3.10：记录正文里的超链接区间（点文字用系统浏览器打开）
+                                val abs = absolutize(href)
+                                val record = abs.startsWith("http://", true) || abs.startsWith("https://", true)
+                                val ls = sb.length
                                 node.childNodes().forEach { walk(it, next) }
+                                val le = sb.length
+                                if (record && le > ls && sb.length >= le) {
+                                    linkRuns.add(Triple(ls, le, abs))
+                                }
                             }
                         }
                         "p", "div", "li", "tr", "h1", "h2", "h3", "h4" -> {

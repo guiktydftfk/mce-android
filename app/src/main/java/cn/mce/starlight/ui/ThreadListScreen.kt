@@ -53,6 +53,9 @@ fun ThreadListScreen(
     var filter by remember { mutableStateOf<String?>(null) }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val loadPage: suspend (Int) -> ForumPage = { page -> loader(page, filter) }
+    // v0.3.10：版块列表也用缓存（返回时秒开）
+    val cacheKey = "board_${title}_${filter ?: "all"}"
+    val cached = remember(cacheKey, reloadKey) { cn.mce.starlight.core.FeedCache.get(cacheKey) }
 
     Box(modifier.fillMaxSize()) {
         PagedThreadList(
@@ -61,6 +64,9 @@ fun ThreadListScreen(
             showDivider = true,
             emptyText = "这个版块还没有帖子，下拉刷新试试",
             loader = loadPage,
+            initialItems = cached?.threads.orEmpty(),
+            initialHasNext = cached?.hasNext ?: true,
+            onFirstPage = { page -> cn.mce.starlight.core.FeedCache.put(cacheKey, page) },
             onOpenThread = onOpenThread,
         )
 
