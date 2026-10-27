@@ -133,10 +133,15 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
 
             // v0.3.6：界面大小与字体大小合并为单一「字体大小」
-            Text("字体大小 ${(SettingsStore.fontScale * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+            // v0.3.9：拖动时只改本地预览值，松手才写回设置并重建字体（旧实现每帧改全局字体 → 整页重排卡顿）
+            var fontScaleLocal by androidx.compose.runtime.remember {
+                androidx.compose.runtime.mutableFloatStateOf(SettingsStore.fontScale)
+            }
+            Text("字体大小 ${(fontScaleLocal * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
             Slider(
-                value = SettingsStore.fontScale,
-                onValueChange = { SettingsStore.updateFontScale(it) },
+                value = fontScaleLocal,
+                onValueChange = { fontScaleLocal = it },
+                onValueChangeFinished = { SettingsStore.updateFontScale(fontScaleLocal) },
                 valueRange = 0.8f..1.4f,
             )
             Text(

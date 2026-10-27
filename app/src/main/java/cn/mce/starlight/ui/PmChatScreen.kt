@@ -64,6 +64,13 @@ fun PmChatScreen(
     var input by remember { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
+    // v0.3.9：屏内提示 2.6s 后自动消失（旧实现 toast 永不清空 → 小弹窗一直挂在界面上）
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            kotlinx.coroutines.delay(2600)
+            toast = null
+        }
+    }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     suspend fun load(scrollToEnd: Boolean = true) {

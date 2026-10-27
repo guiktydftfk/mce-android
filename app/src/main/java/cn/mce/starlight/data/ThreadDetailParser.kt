@@ -239,11 +239,8 @@ object ThreadDetailParser {
             contentText = plainText,
             images = blocks.filterIsInstance<ContentBlock.Image>().map { it.url },
             blocks = blocks,
-            // v0.3.8：楼层号要按总序号（每页 10 楼）；只有第一页第一条才是楼主
-            floorLabel = when {
-                page <= 1 && index == 0 -> "\u697c\u4e3b"
-                else -> "${(page - 1) * 10 + index + 1}\u697c"
-            },
+            // v0.3.9：统一显示数字楼层（1楼/2楼…），1 楼不再显示成「楼主」
+            floorLabel = "${(page - 1) * 10 + index + 1}\u697c",
             dateText = date,
             isOp = index == 0,
         )

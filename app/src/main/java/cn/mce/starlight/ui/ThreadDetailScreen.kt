@@ -104,6 +104,13 @@ fun ThreadDetailScreen(
     var replyTo by remember { mutableStateOf<Post?>(null) }
     var sending by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
+    // v0.3.9：屏内提示 2.6s 后自动消失（旧实现 toast 永不清空 → 小弹窗一直挂在界面上）
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            kotlinx.coroutines.delay(2600)
+            toast = null
+        }
+    }
     var rateForm by remember { mutableStateOf<RateClient.Form?>(null) }
     var ratePid by remember { mutableStateOf<Int?>(null) }
     var page by remember { mutableStateOf(1) }
@@ -852,7 +859,21 @@ private fun PostItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    post.dateText?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    // v0.3.9：楼层号统一右对齐（1楼/2楼…，不再显示「楼主」）
+                    Spacer(Modifier.weight(1f))
                     post.floorLabel?.let { floor ->
                         Text(
                             floor,
@@ -864,16 +885,6 @@ private fun PostItem(
                                     RoundedCornerShape(4.dp),
                                 )
                                 .padding(horizontal = 5.dp, vertical = 1.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                    }
-                    post.dateText?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
