@@ -43,6 +43,8 @@ object SettingsStore {
     private const val KEY_FONT_SCALE = "font_scale"
     private const val KEY_SIGNIN_REMIND = "signin_reminder_enabled"
     private const val KEY_SIGNIN_REMIND_HOUR = "signin_reminder_hour"
+    private const val KEY_FEED_MIN_CHARS = "feed_min_chars"
+    private const val KEY_URGENT_CODE = "urgent_handled_code"
 
     private var appContext: Context? = null
 
@@ -79,6 +81,20 @@ object SettingsStore {
     var signinReminderHour by mutableIntStateOf(20)
         private set
 
+    /**
+     * 首页帖子过滤（v0.3.8）：低于该字数的帖子不在首页信息流显示。
+     * 0 = 关闭过滤；范围 0–200 字。
+     */
+    var feedMinChars by mutableIntStateOf(0)
+        private set
+
+    /** 已自动处理过的紧急更新版本号（同一版本只自动下载/拉起安装一次） */
+    var urgentHandledCode by mutableIntStateOf(0)
+        private set
+
+    /** 首页是否按字数过滤 */
+    val feedFilterEnabled: Boolean get() = feedMinChars > 0
+
     fun init(context: Context) {
         appContext = context.applicationContext
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -108,6 +124,8 @@ object SettingsStore {
         if (prefs.contains(KEY_UI_SCALE)) prefs.edit().remove(KEY_UI_SCALE)?.apply()
         signinReminderEnabled = prefs.getBoolean(KEY_SIGNIN_REMIND, false)
         signinReminderHour = prefs.getInt(KEY_SIGNIN_REMIND_HOUR, 20)
+        feedMinChars = prefs.getInt(KEY_FEED_MIN_CHARS, 0).coerceIn(0, 200)
+        urgentHandledCode = prefs.getInt(KEY_URGENT_CODE, 0)
     }
 
     fun updateDarkModeSetting(mode: DarkMode) {
@@ -179,6 +197,18 @@ object SettingsStore {
     fun updateSigninReminderHour(hour: Int) {
         signinReminderHour = hour.coerceIn(0, 23)
         prefs()?.edit()?.putInt(KEY_SIGNIN_REMIND_HOUR, signinReminderHour)?.apply()
+    }
+
+    /** 标记某个版本号的紧急更新已自动处理过 */
+    fun markUrgentHandled(code: Int) {
+        urgentHandledCode = code
+        prefs()?.edit()?.putInt(KEY_URGENT_CODE, code)?.apply()
+    }
+
+    /** 首页帖子过滤阈值（0 = 关闭；每 10 字一档，0–200） */
+    fun updateFeedMinChars(value: Int, persist: Boolean = true) {
+        feedMinChars = value.coerceIn(0, 200)
+        if (persist) prefs()?.edit()?.putInt(KEY_FEED_MIN_CHARS, feedMinChars)?.apply()
     }
 
     fun updateDownloadedApk(path: String?) {

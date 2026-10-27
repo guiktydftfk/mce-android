@@ -110,6 +110,25 @@ fun MceApp() {
     )
     val drawerOpened = drawerState.isOpen || drawerState.targetValue == DrawerValue.Open
 
+    // v0.3.8 液态玻璃流光：只在每次打开抽屉时**扫过一遍**（旧实现无限循环，用户觉得重复且偏快）。
+    // 用 Animatable + LaunchedEffect(drawerOpened) 触发；值只在抽屉子树里读取，不影响右侧内容重组。
+    val glassSheen = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(drawerOpened) {
+        if (drawerOpened) {
+            glassSheen.snapTo(0f)
+            glassSheen.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = 900,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing,
+                ),
+            )
+        } else {
+            // 关闭后复位，下次打开从头扫一遍
+            glassSheen.snapTo(0f)
+        }
+    }
+
     var dest by remember { mutableStateOf(Dest.Feed) }
     var stack by remember { mutableStateOf(listOf<Route>()) }
     var dataVersion by remember { mutableIntStateOf(0) }
@@ -130,12 +149,70 @@ fun MceApp() {
     fun push(route: Route) { stack = stack + route }
     fun pop() { stack = stack.dropLast(1) }
 
+    /** 下载并拉起安装（普通更新与紧急更新共用；紧急更新只是不需要用户先点「立即更新」） */
+    fun startUpdate(release: UpdateClient.Release) {
+        val url = release.apkUrl
+        if (url.isNullOrBlank()) {
+            updateError = "缺少更新下载地址"
+            updateRelease = release
+            return
+        }
+        if (updateDownloading) return
+        updateDownloading = true
+        updateError = null
+        updateProgress = 0
+        scope.launch {
+            var file = UpdateClient.download(context, url) { p -> updateProgress = p }
+            if (file == null) {
+                // 备用源：直连 raw.githubusercontent（部分网络可用）
+                val backup = url.replace("https://gh-proxy.com/", "")
+                file = UpdateClient.download(context, backup) { p -> updateProgress = p }
+            }
+            updateDownloading = false
+            if (file != null) {
+                updateRelease = null
+                val started = UpdateClient.install(context, file)
+                if (!started) {
+                    Toast.makeText(
+                        context,
+                        "无法启动安装器，请在系统设置中允许安装未知应用",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            } else {
+                updateError = "下载失败，请检查网络后重试"
+                updateRelease = release
+            }
+        }
+    }
+
     fun checkUpdate(silent: Boolean) {
         scope.launch {
             val result = UpdateClient.checkDetailed(context)
             SettingsStore.markUpdateChecked()
             when (result) {
-                is UpdateClient.CheckResult.Available -> updateRelease = result.release
+                is UpdateClient.CheckResult.Available -> {
+                    val release = result.release
+                    // v0.3.8 紧急推送：清单标了 emergency 就跳过「是否更新」确认，直接后台下载，
+                    // 下载完自动拉起系统安装器（Android 仍需要用户点一次「安装」）。
+                    // 同一版本只自动处理一次，避免每次启动反复下载/弹安装器。
+                    if (release.emergency && SettingsStore.urgentHandledCode != release.versionCode) {
+                        SettingsStore.markUrgentHandled(release.versionCode)
+                        SettingsStore.clearSnooze()
+                        Toast.makeText(
+                            context,
+                            "紧急更新 ${release.versionName}：正在自动下载…",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                        startUpdate(release)
+                    } else if (release.emergency) {
+                        // 该紧急版本已自动处理过：不再重复下载 / 弹安装器
+                    } else if (SettingsStore.isUpdateSnoozed()) {
+                        // 用户暂停了更新：普通更新在暂停期内不打扰（紧急推送已在上面优先处理）
+                    } else {
+                        updateRelease = release
+                    }
+                }
                 is UpdateClient.CheckResult.Latest ->
                     if (!silent) Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
                 is UpdateClient.CheckResult.Failed ->
@@ -143,6 +220,7 @@ fun MceApp() {
             }
         }
     }
+
 
     fun refreshSession() {
         scope.launch {
@@ -173,7 +251,8 @@ fun MceApp() {
             }
             // 启动后自动检查更新（暂停更新期间跳过）
             launch {
-                if (!SettingsStore.isUpdateSnoozed()) checkUpdate(silent = true)
+                // v0.3.8：暂停更新不再挡住「检查」本身（否则紧急推送永远送不到），普通更新在 checkUpdate 内按暂停态过滤
+                checkUpdate(silent = true)
             }
             // 新消息检查（私信 + 提醒），有未读会在顶部弹提示
             launch {
@@ -205,21 +284,9 @@ fun MceApp() {
         drawerContent = {
             // 只在抽屉自己的作用域里读动画值：抽屉外观逐帧动画不会导致右侧首页列表重组
             val progress = drawerAnimation.value
-            // 玻璃流光只在抽屉打开时运行，避免常驻无限动画拖慢首页滚动
-            val sheen = if (progress > 0.01f) {
-                val transition = rememberInfiniteTransition(label = "sheen")
-                transition.animateFloat(
-                    initialValue = -0.25f,
-                    targetValue = 1.25f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(durationMillis = 2400, easing = LinearEasing),
-                        repeatMode = RepeatMode.Restart,
-                    ),
-                    label = "sheen",
-                ).value
-            } else {
-                0f
-            }
+            // 玻璃流光：0→1 的一次性扫过（由 MceApp 顶部的 Animatable 驱动，播完即停），
+            // 映射到 -0.35→1.35 让高光从中偏左扫到右侧消失
+            val sheen = -0.35f + glassSheen.value * 1.7f
             // v0.3.7 液态玻璃抽屉：半透明玻璃底板 + 白色高光/主题色底光（随呼出淡入）+ 玻璃边缘
             Box(
                 Modifier
@@ -433,6 +500,8 @@ fun MceApp() {
                 touid = current.touid,
                 name = current.name,
                 onMenu = ::openDrawer,
+                // v0.3.8：点对方头像进入其主页（类微信）
+                onOpenUser = { uid, userName -> push(Route.User(uid, userName)) },
             )
 
             is Route.FriendQr -> FriendQrScreen(
@@ -619,37 +688,11 @@ fun MceApp() {
     updateRelease?.let { release ->
         UpdateDialog(
             release = release,
+            emergency = release.emergency,
             downloading = updateDownloading,
             progress = updateProgress,
             downloadError = updateError,
-            onUpdate = {
-                val url = release.apkUrl
-                if (url.isNullOrBlank()) {
-                    updateError = "缺少更新下载地址"
-                } else {
-                    updateDownloading = true
-                    updateError = null
-                    updateProgress = 0
-                    scope.launch {
-                        var file = UpdateClient.download(context, url) { p -> updateProgress = p }
-                        if (file == null) {
-                            // 备用源：直连 raw.githubusercontent（部分网络可用）
-                            val backup = url.replace("https://gh-proxy.com/", "")
-                            file = UpdateClient.download(context, backup) { p -> updateProgress = p }
-                        }
-                        updateDownloading = false
-                        if (file != null) {
-                            updateRelease = null
-                            val started = UpdateClient.install(context, file)
-                            if (!started) {
-                                Toast.makeText(context, "无法启动安装器，请在系统设置中允许安装未知应用", Toast.LENGTH_LONG).show()
-                            }
-                        } else {
-                            updateError = "下载失败，请检查网络后重试"
-                        }
-                    }
-                }
-            },
+            onUpdate = { startUpdate(release) },
             onSnooze = {
                 SettingsStore.snoozeUpdates(7)
                 updateRelease = null

@@ -187,6 +187,27 @@ fun ProfileScreen(
                                         )
                                     }
                                 }
+                                // v0.3.8：本日星光值新增（论坛无此数字，用本地日快照 diff 近似）
+                                val pointsTotal = p.stats["积分"]
+                                    ?.filter { it.isDigit() }
+                                    ?.toIntOrNull()
+                                if (pointsTotal != null) {
+                                    val todayDelta = cn.mce.starlight.core.StarlightDailyStore
+                                        .deltaFor(pointsTotal)
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            "+$todayDelta",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Text(
+                                            "今日星光",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

@@ -75,4 +75,25 @@ class SigninRankParseTest {
         println("page2 entries = ${entries.size}")
         assertTrue("第二页片段应解析出 100+ 条，实际 ${entries.size}", entries.size >= 100)
     }
+
+    @Test
+    fun `today rank server order is newest first and rank is complementary`() {
+        val html = load("mobile-live/plugin_php_id_k_misign_sign_operation_list.html")
+        val entries = SigninClient.parseRankEntries(html)
+        // 服务端今日榜是「越晚签到越靠前」。抓包账号 uid=2782 在第 4 行（index=3），
+        // 而签到页显示「您的签到排名：188」→ 真实名次 = 总人数 − 行号 = 191 − 3 = 188。
+        val idx = entries.indexOfFirst { it.uid == 2782 }
+        assertTrue("fixture 应包含 uid=2782 的抓包账号", idx >= 0)
+        assertEquals(3, idx)
+        assertEquals(188, entries.size - idx)
+        assertTrue("今日榜应带签到时间文本", entries.first().lastSignText.orEmpty().isNotBlank())
+    }
+
+    @Test
+    fun `total rank stays descending by days in server order`() {
+        val html = load("mobile-live/plugin_php_id_k_misign_sign_operation_list_op_zong.html")
+        val days = SigninClient.parseRankEntries(html).mapNotNull { it.totalDays }
+        assertTrue("总榜应解析出 10+ 条，实际 ${days.size}", days.size >= 10)
+        assertTrue("总榜顺序不应被反转", days.zipWithNext().all { (a, b) -> a >= b })
+    }
 }

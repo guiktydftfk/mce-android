@@ -52,6 +52,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import cn.mce.starlight.data.TextKind
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -164,7 +173,9 @@ fun ThreadDetailScreen(
                         text = s.detail.title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(16.dp),
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 10.dp),
                     )
                     s.detail.rewardCount?.let { count ->
                         Text(
@@ -177,7 +188,7 @@ fun ThreadDetailScreen(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -259,7 +270,11 @@ fun ThreadDetailScreen(
                             }
                         },
                     )
-                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                    HorizontalDivider(
+                        Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                    )
                 }
             }
         }
@@ -273,7 +288,7 @@ fun ThreadDetailScreen(
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface)
                     .imePadding()
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
@@ -698,11 +713,12 @@ private fun PostItem(
     onRate: () -> Unit,
     onOpenUser: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+        // v0.3.8 楼层头部：头像 40dp、楼层徽标 + 时间（单行省略），评分/回复移到楼层底部
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
-                    .size(34.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable(onClick = onOpenUser),
@@ -717,45 +733,145 @@ private fun PostItem(
                     )
                 }
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f).clickable(onClick = onOpenUser)) {
-                Text(post.author, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                 Text(
-                    listOfNotNull(post.floorLabel, post.dateText).joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    post.author,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    post.floorLabel?.let { floor ->
+                        Text(
+                            floor,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .background(
+                                    MaterialTheme.colorScheme.primaryContainer,
+                                    RoundedCornerShape(4.dp),
+                                )
+                                .padding(horizontal = 5.dp, vertical = 1.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    post.dateText?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
+        }
+        Spacer(Modifier.height(10.dp))
+        // v0.3.8 正文：块间留白、正文行距加宽、彩色文字/引用块还原
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            post.blocks.forEach { block ->
+                when (block) {
+                    is ContentBlock.Text -> PostTextBlock(block)
+                    is ContentBlock.Image -> if (block.url.contains("/smiley/")) {
+                        // 正文表情（小红龙等）：按原尺寸小图显示，不要拉满整行
+                        AsyncImage(
+                            model = block.url,
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.size(30.dp),
+                        )
+                    } else AsyncImage(
+                        model = block.url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 380.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                    )
+                }
+            }
+        }
+        // 操作按钮放楼层底部右侧，头部只保留「谁 / 何时 / 几楼」
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             if (!post.isOp) {
                 TextButton(onClick = onRate) { Text("评分", style = MaterialTheme.typography.labelSmall) }
             }
             TextButton(onClick = onReply) { Text("回复", style = MaterialTheme.typography.labelSmall) }
         }
-        Spacer(Modifier.height(8.dp))
-        post.blocks.forEach { block ->
-            when (block) {
-                is ContentBlock.Text -> Text(
-                    text = block.text,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                is ContentBlock.Image -> if (block.url.contains("/smiley/")) {
-                    // 正文表情（小红龙等）：按原尺寸小图显示，不要拉满整行
-                    AsyncImage(
-                        model = block.url,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.size(30.dp),
-                    )
-                } else AsyncImage(
-                    model = block.url,
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 380.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+    }
+}
+
+/**
+ * 正文文字块（v0.3.8）：
+ * - 彩色文字 / 加粗 / 斜体 / 下划线 / 删除线 / `<font size>` 通过 AnnotatedString 还原；
+ * - 行距比默认 bodyMedium 略宽（中文长帖更好读）；
+ * - 引用块（kind = Quote）用左侧竖条 + 灰色小字区分。
+ * `remember(block)` 避免每次重组都重建 AnnotatedString。
+ */
+@Composable
+private fun PostTextBlock(block: ContentBlock.Text) {
+    val baseColor = MaterialTheme.colorScheme.onSurface
+    val quotedColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val annotated = remember(block) {
+        buildAnnotatedString {
+            append(block.text)
+            block.spans.forEach { span ->
+                val start = span.start.coerceIn(0, block.text.length)
+                val end = span.end.coerceIn(start, block.text.length)
+                if (end <= start) return@forEach
+                val color = span.color?.let { Color(it) }
+                addStyle(
+                    SpanStyle(
+                        color = color ?: (if (block.kind == TextKind.Quote) quotedColor else baseColor),
+                        fontWeight = if (span.bold) FontWeight.Bold else null,
+                        fontStyle = if (span.italic) FontStyle.Italic else null,
+                        textDecoration = when {
+                            span.underline && span.strike -> TextDecoration.combine(
+                                listOf(TextDecoration.Underline, TextDecoration.LineThrough),
+                            )
+                            span.underline -> TextDecoration.Underline
+                            span.strike -> TextDecoration.LineThrough
+                            else -> null
+                        },
+                        fontSize = span.sizeEm?.let { androidx.compose.ui.unit.TextUnit(it, androidx.compose.ui.unit.TextUnitType.Em) } ?: androidx.compose.ui.unit.TextUnit.Unspecified,
+                    ),
+                    start,
+                    end,
                 )
             }
         }
+    }
+    val textStyle = if (block.kind == TextKind.Quote) {
+        MaterialTheme.typography.bodySmall.copy(lineHeight = 21.sp)
+    } else {
+        MaterialTheme.typography.bodyMedium.copy(lineHeight = 23.sp, fontSize = 15.sp)
+    }
+    if (block.kind == TextKind.Quote) {
+        Row(Modifier.fillMaxWidth()) {
+            Box(
+                Modifier
+                    .width(3.dp)
+                    .heightIn(min = 18.dp)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp)),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = annotated,
+                style = textStyle,
+                color = quotedColor,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    } else {
+        Text(text = annotated, style = textStyle, color = baseColor)
     }
 }

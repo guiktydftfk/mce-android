@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import cn.mce.starlight.core.SettingsStore
 import cn.mce.starlight.data.HttpForumRepository
 import cn.mce.starlight.data.ThreadSummary
 
@@ -54,11 +55,21 @@ fun HomeFeedScreen(
 
     Box(Modifier.fillMaxSize()) {
         PagedThreadList(
-            resetKey = view to reloadKey,
+            // 过滤阈值变化时也重建列表（resetKey 变化 → 重新加载第 1 页）
+            resetKey = Triple(view, reloadKey, SettingsStore.feedMinChars),
             topPadding = topInset + 104.dp,
             horizontalPadding = 12.dp,
-            emptyText = "这个分类还没有帖子，下拉刷新试试",
+            emptyText = if (SettingsStore.feedFilterEnabled) {
+                "当前设置过滤了少于 ${SettingsStore.feedMinChars} 字的帖子\n可在「设置 → 内容」里调整或关闭"
+            } else {
+                "这个分类还没有帖子，下拉刷新试试"
+            },
             loader = { page -> repo.loadGuide(view, page) },
+            // v0.3.8：按字数过滤（只看首页信息流，不影响板块/搜索）
+            filter = { thread ->
+                val min = SettingsStore.feedMinChars
+                min <= 0 || threadCharCount(thread) >= min
+            },
             onOpenThread = onOpenThread,
         )
 
@@ -96,3 +107,10 @@ fun HomeFeedScreen(
         }
     }
 }
+
+/** 首页过滤用的「字数」：优先用摘要（正文节选），没有摘要时退回标题长度 */
+private fun threadCharCount(thread: ThreadSummary): Int {
+    val s = thread.summary?.trim().orEmpty()
+    return if (s.isNotEmpty()) s.length else thread.title.trim().length
+}
+

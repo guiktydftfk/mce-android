@@ -37,6 +37,11 @@ object UpdateClient {
         val versionCode: Int,
         val notes: String,
         val apkUrl: String?,
+        /**
+         * 紧急推送（v0.3.8）：version.json 里 `"emergency": true` 时，
+         * 客户端不弹「是否更新」确认框，直接后台下载；下载完仍会拉起系统安装器（需用户点一次安装）。
+         */
+        val emergency: Boolean = false,
     )
 
     private fun httpGet(url: String): String? = runCatching {
@@ -120,6 +125,7 @@ object UpdateClient {
             versionCode = code,
             notes = json.optString("notes", ""),
             apkUrl = json.optString("apk").takeIf { it.isNotBlank() },
+            emergency = json.optBoolean("emergency", false) || json.optBoolean("urgent", false),
         )
     }.getOrNull()
 

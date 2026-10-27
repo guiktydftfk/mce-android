@@ -85,6 +85,8 @@ fun PagedThreadList(
     showRefreshFab: Boolean = true,
     /** 列表顶部固定内容（如「草稿箱」入口），空列表时也显示 */
     header: (@Composable () -> Unit)? = null,
+    /** 帖子过滤（v0.3.8）：返回 false 的帖子不展示；分页仍按服务端原始页判断「还有没有下一页」 */
+    filter: ((ThreadSummary) -> Boolean)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val st = remember(resetKey) { PagedState() }
@@ -125,6 +127,9 @@ fun PagedThreadList(
         if (!listState.isScrollInProgress) fetchThumbWindow()
     }
 
+    fun applyFilter(list: List<ThreadSummary>): List<ThreadSummary> =
+        if (filter == null) list else list.filter(filter)
+
     suspend fun loadFirst() {
         val gen = ++st.generation
         st.loading = st.items.isEmpty()
@@ -133,7 +138,8 @@ fun PagedThreadList(
             .onSuccess { page ->
                 if (gen != st.generation) return@onSuccess
                 st.page = 1
-                st.items = page.threads
+                st.items = applyFilter(page.threads)
+                // 用服务端原始页判断是否还有下一页（过滤后可能本页全被隐藏）
                 st.hasNext = page.threads.isNotEmpty()
                 st.error = null
             }
@@ -142,22 +148,31 @@ fun PagedThreadList(
     }
 
     suspend fun loadMore() {
-        if (!st.hasNext || st.loadingMore || st.refreshing || st.items.isEmpty()) return
+        // v0.3.8：不要求 st.items 非空 —— 首页被过滤空了也要能继续往后翻
+        if (!st.hasNext || st.loadingMore || st.refreshing) return
         val gen = st.generation
         st.loadingMore = true
-        runCatching { loader(st.page + 1) }
-            .onSuccess { page ->
-                if (gen != st.generation) return@onSuccess
-                if (page.threads.isEmpty()) {
-                    st.hasNext = false
-                } else {
-                    val merged = (st.items + page.threads).distinctBy { it.id }
-                    if (merged.size == st.items.size) st.hasNext = false
-                    st.items = merged
-                    st.page += 1
+        // 过滤可能把整页都隐藏：连续补抓不超过 3 页，避免列表「静默停住」
+        var attempts = 0
+        while (attempts < 3 && gen == st.generation && st.hasNext) {
+            attempts++
+            var added = false
+            runCatching { loader(st.page + 1) }
+                .onSuccess { page ->
+                    if (gen != st.generation) return@onSuccess
+                    if (page.threads.isEmpty()) {
+                        st.hasNext = false
+                    } else {
+                        val merged = (st.items + applyFilter(page.threads)).distinctBy { it.id }
+                        added = merged.size > st.items.size
+                        st.items = merged
+                        st.page += 1
+                        st.hasNext = true
+                    }
                 }
-            }
-            .onFailure { if (gen == st.generation) st.message = "加载更多失败，请下拉刷新重试" }
+                .onFailure { if (gen == st.generation) st.message = "加载更多失败，请下拉刷新重试" }
+            if (added || !st.hasNext) break
+        }
         st.loadingMore = false
     }
 
@@ -173,7 +188,7 @@ fun PagedThreadList(
                         return@onSuccess
                     }
                     st.page = 1
-                    st.items = page.threads
+                    st.items = applyFilter(page.threads)
                     st.hasNext = page.threads.isNotEmpty()
                     st.error = null
                     st.message = null
@@ -193,7 +208,11 @@ fun PagedThreadList(
         if (!st.hasNext) return@LaunchedEffect
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
             .distinctUntilChanged()
-            .collect { last -> if (st.items.isNotEmpty() && last >= st.items.size - 3) loadMore() }
+            .collect { last ->
+                // header 会占掉 LazyColumn 的第 0 项，阈值要补偏移
+                val headerOffset = if (header != null) 1 else 0
+                if (st.items.isNotEmpty() && last >= headerOffset + st.items.size - 3) loadMore()
+            }
     }
 
     // 失败提示 3 秒后自动消失

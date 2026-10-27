@@ -168,6 +168,7 @@ object MessageCenter {
         latestPmSig = null
         latestNoticeSig = null
         PmReadStore.clear()
+        StarlightDailyStore.clear()
         prefs()?.edit()?.remove(KEY_NOTICE_SIG)?.remove(KEY_PM_SIG)?.apply()
     }
 

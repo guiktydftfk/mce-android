@@ -208,7 +208,8 @@ object ThreadDetailParser {
         val blocks = (contentBlocks + outsideImages.map { ContentBlock.Image(it) })
             .distinctBy { block ->
                 when (block) {
-                    is ContentBlock.Text -> "t:" + block.text
+                    // v0.3.8：去重 key 带上样式/段落类型，避免「同文本不同颜色」被吞掉一段
+                    is ContentBlock.Text -> "t:" + block.text + "|" + block.spans.hashCode() + "|" + block.kind
                     is ContentBlock.Image -> "i:" + block.url
                 }
             }
@@ -234,24 +235,217 @@ object ThreadDetailParser {
         )
     }
 
+    // ---------------- v0.3.8：正文样式（彩色文字/加粗/引用块） ----------------
+
+    /** 当前累积的文字样式（HTML 标签栈合并结果） */
+    private data class RunStyle(
+        val color: Int? = null,
+        val bold: Boolean = false,
+        val italic: Boolean = false,
+        val underline: Boolean = false,
+        val strike: Boolean = false,
+        val sizeEm: Float? = null,
+    ) {
+        fun mergeFrom(el: Element): RunStyle {
+            var s = this
+            val tag = el.tagName().lowercase()
+            when (tag) {
+                "b", "strong" -> s = s.copy(bold = true)
+                "i", "em" -> s = s.copy(italic = true)
+                "u", "ins" -> s = s.copy(underline = true)
+                "s", "strike", "del" -> s = s.copy(strike = true)
+                "font" -> {
+                    CssColor.parse(el.attr("color"))?.let { s = s.copy(color = it) }
+                    el.attr("size").trim().toIntOrNull()?.let { size ->
+                        if (size in 1..7) s = s.copy(sizeEm = FONT_SIZE_EM[size - 1])
+                    }
+                }
+            }
+            // <span style="color:#f00;font-weight:bold"> 之类（列表页模板常见，正文也可能出现）
+            val styleAttr = el.attr("style")
+            if (styleAttr.isNotBlank()) {
+                STYLE_COLOR_REGEX.find(styleAttr)?.let { m ->
+                    CssColor.parse(m.groupValues[1])?.let { s = s.copy(color = it) }
+                }
+                if (styleAttr.contains("font-weight", true) &&
+                    (styleAttr.contains("bold", true) || Regex("""font-weight\s*:\s*[6-9]00""").containsMatchIn(styleAttr))
+                ) {
+                    s = s.copy(bold = true)
+                }
+                if (styleAttr.contains("font-style", true) && styleAttr.contains("italic", true)) {
+                    s = s.copy(italic = true)
+                }
+                if (styleAttr.contains("line-through", true)) s = s.copy(strike = true)
+                if (styleAttr.contains("underline", true)) s = s.copy(underline = true)
+            }
+            return s
+        }
+    }
+
+    /** 一段同一样式的原始区间（偏移基于规范化前的 buffer） */
+    private data class Run(val start: Int, val end: Int, val style: RunStyle)
+
+    /** CSS 颜色解析：支持 #rgb/#rrggbb、rgb()、常见命名色；未知/inherit/transparent 返回 null（沿用主题色） */
+    private object CssColor {
+        private val named: Map<String, Int> = mapOf(
+            "red" to 0xFFFF0000.toInt(),
+            "green" to 0xFF008000.toInt(),
+            "blue" to 0xFF0000FF.toInt(),
+            "black" to 0xFF000000.toInt(),
+            "white" to 0xFFFFFFFF.toInt(),
+            "gray" to 0xFF808080.toInt(),
+            "grey" to 0xFF808080.toInt(),
+            "silver" to 0xFFC0C0C0.toInt(),
+            "fuchsia" to 0xFFFF00FF.toInt(),
+            "magenta" to 0xFFFF00FF.toInt(),
+            "purple" to 0xFF800080.toInt(),
+            "yellow" to 0xFFFFFF00.toInt(),
+            "orange" to 0xFFFFA500.toInt(),
+            "gold" to 0xFFFFD700.toInt(),
+            "pink" to 0xFFFFC0CB.toInt(),
+            "cyan" to 0xFF00FFFF.toInt(),
+            "aqua" to 0xFF00FFFF.toInt(),
+            "lime" to 0xFF00FF00.toInt(),
+            "navy" to 0xFF000080.toInt(),
+            "teal" to 0xFF008080.toInt(),
+            "olive" to 0xFF808000.toInt(),
+            "maroon" to 0xFF800000.toInt(),
+            "brown" to 0xFFA52A2A.toInt(),
+            "darkred" to 0xFF8B0000.toInt(),
+            "darkgreen" to 0xFF006400.toInt(),
+            "darkblue" to 0xFF00008B.toInt(),
+            "royalblue" to 0xFF4169E1.toInt(),
+            "sienna" to 0xFFA0522D.toInt(),
+            "indigo" to 0xFF4B0082.toInt(),
+            "crimson" to 0xFFDC143C.toInt(),
+            "tomato" to 0xFFFF6347.toInt(),
+            "orchid" to 0xFFDA70D6.toInt(),
+        )
+
+        fun parse(raw: String?): Int? {
+            val v = raw?.trim()?.lowercase().orEmpty()
+            if (v.isBlank() || v == "inherit" || v == "transparent" || v == "currentcolor") return null
+            if (v.startsWith("#")) {
+                val hex = v.substring(1)
+                return when (hex.length) {
+                    3 -> {
+                        val r = hex[0].digitToIntOrNull(16) ?: return null
+                        val g = hex[1].digitToIntOrNull(16) ?: return null
+                        val b = hex[2].digitToIntOrNull(16) ?: return null
+                        (0xFF000000.toInt()) or (r * 17 shl 16) or (g * 17 shl 8) or (b * 17)
+                    }
+                    6 -> hex.toLongOrNull(16)?.let { (0xFF000000L or it).toInt() }
+                    else -> null
+                }
+            }
+            if (v.startsWith("rgb")) {
+                val nums = Regex("""(\d{1,3})""").findAll(v).map { it.groupValues[1].toIntOrNull() ?: 0 }.toList()
+                if (nums.size >= 3) {
+                    val (r, g, b) = nums.take(3).map { it.coerceIn(0, 255) }
+                    return (0xFF000000.toInt()) or (r shl 16) or (g shl 8) or b
+                }
+                return null
+            }
+            return named[v]
+        }
+    }
+
+    private val STYLE_COLOR_REGEX = Regex("""color\s*:\s*([#\w(),. ]+)""")
+    private val FONT_SIZE_EM = floatArrayOf(0.7f, 0.85f, 1.0f, 1.15f, 1.3f, 1.5f, 1.8f)
+
     /** Split message HTML into ordered text/image blocks. */
     private fun parseBlocks(element: Element): List<ContentBlock> {
         val blocks = mutableListOf<ContentBlock>()
         val sb = StringBuilder()
+        val runs = mutableListOf<Run>()
+        var currentKind = TextKind.Paragraph
 
         fun flush() {
-            val text = sb.toString()
-                .replace("\u00a0", " ")
-                .replace(trailingSpaceNewlineRegex, "\n")
-                .replace(multiNewlineRegex, "\n\n")
-                .trim()
-            if (text.isNotEmpty()) blocks.add(ContentBlock.Text(text))
+            val raw = sb.toString()
+            val pending = runs.toList()
+            runs.clear()
             sb.setLength(0)
+            if (raw.isBlank()) return
+            runCatching {
+                // 1) 规范化（与旧实现等价：[ \t]+\n → \n、\n{3,} → \n\n、trim）同时生成删除掩码
+                val keep = BooleanArray(raw.length) { true }
+                trailingSpaceNewlineRegex.findAll(raw).forEach { m ->
+                    for (i in m.range) keep[i] = false
+                    keep[m.range.last] = true // 保留换行符
+                }
+                multiNewlineRegex.findAll(raw).forEach { m ->
+                    var seen = 0
+                    for (i in m.range) {
+                        if (raw[i] == '\n') {
+                            seen++
+                            if (seen > 2) keep[i] = false
+                        }
+                    }
+                }
+                // 2) 生成 clean 文本 + raw→clean 偏移映射
+                val clean = StringBuilder(raw.length)
+                val map = IntArray(raw.length + 1) { 0 }
+                for (i in raw.indices) {
+                    map[i] = clean.length
+                    if (keep[i]) clean.append(if (raw[i] == '\u00a0') ' ' else raw[i])
+                }
+                map[raw.length] = clean.length
+                var start = 0
+                var end = clean.length
+                while (start < end && clean[start].isWhitespace()) start++
+                while (end > start && clean[end - 1].isWhitespace()) end--
+                val text = clean.substring(start, end)
+                if (text.isEmpty()) return@runCatching
+                // 3) 重新映射样式区间，丢弃空区间并合并相邻同样式
+                val spans = mutableListOf<TextSpan>()
+                for (r in pending) {
+                    val st = r.style
+                    // 没有任何样式信息的 run 不必生成 span
+                    if (st.color == null && !st.bold && !st.italic && !st.underline &&
+                        !st.strike && st.sizeEm == null
+                    ) {
+                        continue
+                    }
+                    val s = (map[r.start.coerceIn(0, raw.length)] - start).coerceIn(0, text.length)
+                    val e = (map[r.end.coerceIn(0, raw.length)] - start).coerceIn(0, text.length)
+                    if (e <= s) continue
+                    spans.add(
+                        TextSpan(
+                            start = s,
+                            end = e,
+                            color = st.color,
+                            bold = st.bold,
+                            italic = st.italic,
+                            underline = st.underline,
+                            strike = st.strike,
+                            sizeEm = st.sizeEm,
+                        ),
+                    )
+                }
+                blocks.add(
+                    ContentBlock.Text(
+                        text = text,
+                        spans = spans,
+                        kind = currentKind,
+                    ),
+                )
+            }.onFailure {
+                // 兜底：任何解析异常都退回纯文本，绝不整页失败
+                val text = raw.replace(trailingSpaceNewlineRegex, "\n")
+                    .replace(multiNewlineRegex, "\n\n")
+                    .trim()
+                if (text.isNotEmpty()) blocks.add(ContentBlock.Text(text))
+            }
         }
 
-        fun walk(node: Node) {
+        fun walk(node: Node, style: RunStyle) {
             when (node) {
-                is TextNode -> sb.append(node.text())
+                is TextNode -> {
+                    val s = sb.length
+                    sb.append(node.text())
+                    val e = sb.length
+                    if (e > s) runs.add(Run(s, e, style))
+                }
                 is Element -> {
                     // 投票块由 PollCard 单独渲染，不要混进正文文字里
                     // v0.3.7：移动模板里投票首楼正文还夹着 ss_data（浏览数/投票人数/累计票数）与
@@ -262,6 +456,19 @@ object ThreadDetailParser {
                                 it == "polls" || it == "poll_list"
                         }
                     ) {
+                        return
+                    }
+                    val next = style.mergeFrom(node)
+                    // v0.3.8：引用块单独成段（灰色左边条渲染），不混进正文
+                    val isQuote = node.tagName().lowercase() == "blockquote" ||
+                        node.classNames().any { it == "quote" || it == "blockquote" }
+                    if (isQuote) {
+                        flush()
+                        val prev = currentKind
+                        currentKind = TextKind.Quote
+                        node.childNodes().forEach { walk(it, next) }
+                        flush()
+                        currentKind = prev
                         return
                     }
                     when (node.tagName().lowercase()) {
@@ -278,22 +485,22 @@ object ThreadDetailParser {
                                 flush()
                                 blocks.add(ContentBlock.Image(absolutize(href)))
                             } else {
-                                node.childNodes().forEach(::walk)
+                                node.childNodes().forEach { walk(it, next) }
                             }
                         }
-                        "p", "div", "li", "tr", "h1", "h2", "h3", "h4", "blockquote" -> {
+                        "p", "div", "li", "tr", "h1", "h2", "h3", "h4" -> {
                             sb.append('\n')
-                            node.childNodes().forEach(::walk)
+                            node.childNodes().forEach { walk(it, next) }
                             sb.append('\n')
                         }
-                        else -> node.childNodes().forEach(::walk)
+                        else -> node.childNodes().forEach { walk(it, next) }
                     }
                 }
                 else -> {}
             }
         }
 
-        element.childNodes().forEach(::walk)
+        element.childNodes().forEach { walk(it, RunStyle()) }
         flush()
         return blocks
     }

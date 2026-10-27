@@ -273,6 +273,36 @@ fun SettingsScreen(
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
 
+            // v0.3.8：首页帖子过滤（按字数）
+            SectionTitle("内容")
+            Text(
+                "首页帖子过滤",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                if (SettingsStore.feedMinChars == 0) {
+                    "关闭：首页显示全部帖子"
+                } else {
+                    "首页隐藏少于 ${SettingsStore.feedMinChars} 字的帖子（不影响板块 / 搜索）"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Slider(
+                value = SettingsStore.feedMinChars.toFloat(),
+                onValueChange = { v ->
+                    // 每 10 字一档：0 / 10 / 20 … 200；拖动时只改内存，松手才落盘
+                    SettingsStore.updateFeedMinChars(Math.round(v / 10f) * 10, persist = false)
+                },
+                onValueChangeFinished = {
+                    SettingsStore.updateFeedMinChars(SettingsStore.feedMinChars)
+                },
+                valueRange = 0f..200f,
+                steps = 19,
+            )
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+
             SectionTitle("更新")
             Spacer(Modifier.height(8.dp))
             Text(

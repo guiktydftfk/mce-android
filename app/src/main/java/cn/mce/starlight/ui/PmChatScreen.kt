@@ -3,6 +3,7 @@ package cn.mce.starlight.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
+import cn.mce.starlight.core.SessionStore
+import coil.compose.AsyncImage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +55,7 @@ fun PmChatScreen(
     touid: Int,
     name: String,
     onMenu: () -> Unit,
+    onOpenUser: (Int, String) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
@@ -61,14 +72,21 @@ fun PmChatScreen(
                 chat = it
                 error = null
                 if (scrollToEnd && it.messages.isNotEmpty()) {
-                    listState.requestScrollToItem(it.messages.size)
+                    listState.requestScrollToItem((it.messages.size - 1).coerceAtLeast(0))
                 }
             }
             .onFailure { error = it.message ?: "加载失败" }
     }
     LaunchedEffect(touid) { load() }
+    // 消息数量变化（首次加载 / 发送成功重拉）后自动滚到底部
+    LaunchedEffect(chat?.messages?.size) {
+        val n = chat?.messages?.size ?: 0
+        if (n > 0) listState.requestScrollToItem(n - 1)
+    }
 
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // v0.3.8：气泡最大宽度按屏宽 72% 计算（叠加头像与间距后视觉≈微信）
+        val bubbleMax = maxWidth * 0.72f
         when {
             error != null && chat == null -> ErrorBlock(error!!) { scope.launch { load() } }
             chat == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
@@ -89,24 +107,59 @@ fun PmChatScreen(
                     }
                     items(msgs.size, key = { i -> "$i-${msgs[i].incoming}-${msgs[i].text.hashCode()}" }) { i ->
                         val m = msgs[i]
+                        // v0.3.8：类微信气泡 —— 对方头像在左、我的头像在右，气泡带「小尾巴」圆角与时间
+                        val showTime = i == 0 || msgs[i - 1].time != m.time
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = if (m.incoming) Arrangement.Start else Arrangement.End,
+                            verticalAlignment = Alignment.Top,
                         ) {
-                            Text(
-                                m.text,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (m.incoming) MaterialTheme.colorScheme.onSurface
-                                else MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier
-                                    .widthIn(max = 300.dp)
-                                    .background(
-                                        if (m.incoming) MaterialTheme.colorScheme.surfaceVariant
-                                        else MaterialTheme.colorScheme.primaryContainer,
-                                        RoundedCornerShape(12.dp),
+                            if (m.incoming) {
+                                ChatAvatar(
+                                    url = m.avatar,
+                                    fallbackUid = touid,
+                                    onClick = { onOpenUser(touid, name) },
+                                )
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Column(
+                                horizontalAlignment = if (m.incoming) Alignment.Start else Alignment.End,
+                            ) {
+                                if (showTime && !m.time.isNullOrBlank()) {
+                                    Text(
+                                        m.time,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 3.dp),
                                     )
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                            )
+                                }
+                                Text(
+                                    m.text,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (m.incoming) MaterialTheme.colorScheme.onSurface
+                                    else MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier
+                                        .widthIn(max = bubbleMax)
+                                        .background(
+                                            if (m.incoming) MaterialTheme.colorScheme.surfaceVariant
+                                            else MaterialTheme.colorScheme.primaryContainer,
+                                            if (m.incoming) {
+                                                RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
+                                            } else {
+                                                RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
+                                            },
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                                )
+                            }
+                            if (!m.incoming) {
+                                Spacer(Modifier.width(8.dp))
+                                ChatAvatar(
+                                    url = SessionStore.avatarUrl,
+                                    fallbackUid = SessionStore.uid,
+                                    onClick = null,
+                                )
+                            }
                         }
                     }
                 }
@@ -160,5 +213,39 @@ fun PmChatScreen(
             modifier = Modifier.align(Alignment.TopStart),
             onMenu = onMenu,
         )
+    }
+}
+
+/** 聊天头像（v0.3.8）：对方 / 我 都显示；头像缺失时用 uid 拼站点默认头像，再不行显示占位圆 */
+@Composable
+private fun ChatAvatar(
+    url: String?,
+    fallbackUid: Int?,
+    onClick: (() -> Unit)? = null,
+) {
+    val model = url?.takeIf { it.isNotBlank() }
+        ?: fallbackUid?.takeIf { it > 0 }?.let { "https://mce.msi.cn/uc_server/avatar.php?uid=$it&size=small" }
+    Box(
+        Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+    ) {
+        if (model != null) {
+            AsyncImage(
+                model = model,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Text(
+                "?",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
     }
 }

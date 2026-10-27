@@ -22,13 +22,14 @@ fun UpdateDialog(
     downloading: Boolean,
     progress: Int,
     downloadError: String?,
+    emergency: Boolean = false,
     onUpdate: () -> Unit,
     onSnooze: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("发现新版本 ${release.versionName}") },
+        title = { Text(if (emergency) "紧急更新 ${release.versionName}" else "发现新版本 ${release.versionName}") },
         text = {
             Text(
                 buildString {
@@ -39,6 +40,7 @@ fun UpdateDialog(
                     when {
                         downloadError != null -> append("下载失败：$downloadError")
                         downloading -> append("正在后台下载… $progress%")
+                        emergency -> append("这是标记为紧急的版本，已开始自动下载；下载完成后会拉起系统安装器（需点一次「安装」）。")
                         else -> append("点击「立即更新」将在后台下载并安装，装好后下次打开即为新版。")
                     }
                 },

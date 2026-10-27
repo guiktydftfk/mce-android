@@ -264,7 +264,10 @@ fun SigninScreen(
                         )
                     }
                 } else {
-                    itemsIndexed(ranks, key = { i, e -> "${e.uid ?: e.username}-$i" }) { index, entry ->
+                    // v0.3.8：今日榜服务端是「越晚签到越靠前」，与真实名次（第 1 名 = 最早签到）相反；
+                    // 本月 / 总榜服务端已按数值降序，保持原序。页码追页后再整体反转仍是正确全局顺序。
+                    val shown = if (rankType == "today") ranks.asReversed() else ranks
+                    itemsIndexed(shown, key = { i, e -> "${e.uid ?: e.username}-$i" }) { index, entry ->
                         RankRow(index + 1, entry, rankType)
                         HorizontalDivider(
                             Modifier.padding(start = 58.dp),
