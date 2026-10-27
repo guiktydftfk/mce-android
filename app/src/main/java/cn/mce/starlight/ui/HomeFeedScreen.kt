@@ -64,7 +64,22 @@ fun HomeFeedScreen(
             } else {
                 "这个分类还没有帖子，下拉刷新试试"
             },
-            loader = { page -> repo.loadGuide(view, page) },
+            loader = { page ->
+                val base = repo.loadGuide(view, page)
+                // v0.3.9：论坛「导读」偶尔不收录自己刚发的帖子（版块列表能看到、首页看不到，
+                // 但仍会收到该帖的新消息提醒）。首页第一页额外合并「我的最近主题」，
+                // 把自己缺的新帖补到最前面，保证「我刚发的帖子」在首页一定可见。
+                if (page == 1 && view == "newthread") {
+                    val mine = runCatching { repo.loadGuide("my", 1) }.getOrNull()
+                    val extra = mine?.threads
+                        ?.filter { t -> base.threads.none { it.id == t.id } }
+                        ?.take(2)
+                        .orEmpty()
+                    if (extra.isEmpty()) base else base.copy(threads = extra + base.threads)
+                } else {
+                    base
+                }
+            },
             // v0.3.8：按字数过滤（只看首页信息流，不影响板块/搜索）
             filter = { thread ->
                 val min = SettingsStore.feedMinChars
