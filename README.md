@@ -172,8 +172,10 @@ powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -Bump -ToDesktop
   上传中/预览/删除都有状态提示；实测可正常发图并渲染。上传改用站点 html5upload 接口
   （`misc.php?mod=swfupload&operation=upload&type=image&inajax=yes&infloat=yes&simple=2`，先在回帖/发帖页取 `uid`+`hash`，
   回包 `DISCUZUPLOAD|1|0|<aid>|...` 解析 aid）；发帖页的「添加图片」共用同一修复
-- 新图标（v0.3.8）：自适应图标顶层为「小胖星」吉祥物（从官方图抠出，透明底），底层为广东省理工电脑协会 logo 图层——
-  该层整层 alpha≈0（1/255），正常显示完全不可见，只有解包 APK（`res/` 内 217KB PNG，及 `assets/icon_underlay_logo.png` 原图）才能看到
+- 新增：**帖子流水式阅读** —— 取消帖子内翻页，进入后自动把后续页楼层追加到同一列表（标题栏「共 N 楼 · 流水阅读」）；
+  楼层号按「每页 10 楼」连续编号，回帖成功后自动滚到最新楼层
+- 修复：多页帖被误判成「已是最后一页」导致看不到后面楼层 / 回帖后看不到自己的新回复
+- 新增：**新图标** —— 自适应图标改为「小胖星」吉祥物（透明底，随桌面壁纸）
 - 测试：新增彩色文字解析 9 例、签到顺序回归 2 例，单测 **56 个全绿**
 - 版本：0.3.8 / versionCode 42
 
@@ -561,7 +563,81 @@ powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -Bump -ToDesktop
 
 ## 架构说明
 
-- 绞杀者模式：内容页逐屏从 WebView 替换为原生 Compose
-- 数据层：`HttpForumRepository` 携带移动 UA 抓取 Discuz 触屏模板，Jsoup 解析
-- 会话层：WebView 的 Cookie 由 `CookieManager` 保存，原生请求带同一个 Cookie 头
-- 兜底：任何原生页解析失败都能一键切「网页版」
+> 单模块 Android 原生客户端（Kotlin + Jetpack Compose），把 Discuz X3.5 论坛手机模板包装成原生 App。
+> 分层：`ui/`（Compose 界面）→ `data/`（网络 + 解析 + 模型）→ `core/`（会话 / 设置 / 本地状态），
+> 不使用 WebView 渲染正文，仅在需要时用浏览器打开外部链接。
+
+### 运行入口
+
+- `MceApplication`：初始化设置、Cookie、缩略图缓存、草稿、消息中心、私信已读账本、星光日快照、调试抓取；
+  并给 Coil 注入「站点 Cookie + Referer」拦截器（正文附件图需要登录态）
+- `MainActivity` → `ui/MceApp.kt`：单 Activity，自建导航栈（`Route` + `push/pop`），不依赖 Navigation 库；
+  抽屉、登录、更新、签到提醒弹窗与自动更新检查都在这一层
+
+### 网络层 `data/`
+
+- `GenericPageClient`：**唯一 HTTP 栈**。移动 UA、手动跟随 3xx、每一跳保存 `Set-Cookie`、超时与拦截页/登录页识别
+- `Net`：`BASE`、移动/桌面 UA、`formhash` 提取、相对地址补全等公共常量（避免各处硬编码）
+- `ForumRepository` 接口 + `HttpForumRepository`：板块、帖子列表、帖子详情；`Boards` 为静态板块表
+- 业务客户端（均 `Dispatchers.IO` + `suspend`）：`AuthClient` 登录、`SigninClient` 签到、`TaskClient` 任务、
+  `RateClient` 评分、`SearchClient` 搜索、`RanklistClient` 榜单、`PersonalClient` 私信/我的主题、
+  `SocialClient` 好友/勋章/道具、`UserProfileClient`、`ProfileClient`/`ProfileEditClient`、`SmileyClient` 表情、
+  `ImageDiagClient` 图片自检
+- `PostActions`：发帖 / 回帖 / 楼层回复 / 投票 / 收藏 / 图片上传
+  （图床上传走站点 html5upload：先取 `uid`+`hash`，回包 `DISCUZUPLOAD|1|0|<aid>|…` 解析附件 id）
+- 判定与令牌：`DiscuzResponse.judge` 统一成功/失败判定（失败带上服务端原文，避免「假成功」）；
+  `FormhashStore` 进程内缓存 formhash，解析帖子页时自动 seed
+- 图片：`ThreadImageCache`（列表缩略图 LRU + 失败负缓存 + 单飞）、`ThumbCache`（磁盘缩略图），正文图由 Coil 加载
+- 更新：`UpdateClient` 读 `version.json`（含镜像回退、`emergency` 紧急标记），`MceApp` 负责下载并拉起系统安装器
+
+### 解析层
+
+- `MobileForumParser`：列表页 → 标题 / 作者 / 头像 / 回复数 / 摘要 / 缩略图
+- `ThreadDetailParser`：详情页 → `ContentBlock` 分块（文本 / 图片）
+  - 文本样式用 `TextSpan`（半开区间 + ARGB 颜色 / 粗体 / 斜体 / 下划线 / 删除线 / em 字号），
+    UI 用 `buildAnnotatedString` 还原；支持 `<font color>`（hex/#rgb/命名色/inherit）、`<strong>/<i>/<u>/<s>`、
+    `span[style]`，引用块标记为 `TextKind.Quote`
+  - 投票解析为 `PollData`（选项 / 票数 / 百分比 / 参与人数 / 是否已投 / 截止）
+  - 楼层号按「每页 10 楼」换算，流水式阅读追加页面后序号连续
+  - 手机模板没有分页链接（是 ajax「加载更多」），`hasNextPage` 按「本页是否满 10 楼」推断
+  - 全程容错：样式解析异常回退纯文本，绝不因单条内容抛崩
+
+### 本地状态 `core/`
+
+- `CookieJar` / `WebCookies`：自建 Cookie 存储（SharedPreferences，按 domain/path/过期），不依赖 WebView
+- `SessionStore` 登录态与用户信息探测；`SettingsStore` 设置持久化
+  （明暗三态 / 字体缩放 / 主题色 / 背景 / 更新 / 签到提醒 / 首页帖子过滤 / 紧急版本标记）
+- `DraftStore` 本地草稿；`MessageCenter` 消息中心（未读角标 / 顶部横幅 / 签名去重）；
+  `PmReadStore` 私信已读账本（论坛模板不返回已读兜底）；`StarlightDailyStore` 星光值日快照
+- `Diagnostics` / `DebugDump`：自检报告一键复制、页面落盘便于排查
+
+### 界面层 `ui/`
+
+- `MceApp.kt`：导航栈 + 液态玻璃抽屉 + 登录/更新/签到提醒 + 启动更新检查
+- 列表：`HomeFeedScreen` / `ThreadListScreen` + `PagedThreadList`（分页、过滤、下拉刷新、骨架屏）、`FeedCard`
+- 详情：`ThreadDetailScreen` —— **流水式阅读**（进入后自动把后续页追加到同一列表，标题栏显示「共 N 楼」）、
+  回帖（表情 / @提及 / 附图上传预览）、投票卡、评分、楼层回复
+- 发帖：`NewThreadScreen`（板块 / 分类 / 选项 / 投票 / 图片上传 / 草稿）、`DraftBoxScreen`
+- 我的：`ProfileScreen`、`PersonalScreens`（我的主题：草稿 / 已发布 / 回复 / 收藏、消息提醒、今日星光）、
+  `PmChatScreen`（类微信私信：双方头像、气泡、时间）
+- 其它页面：`SettingsScreen`、`SigninScreen`、`TaskScreen`、`RanklistScreen`、`SearchScreen`、
+  `SocialScreens`、`ScanScreen` + `FriendQrScreen` + `QrCode`（扫一扫 / 好友码）、
+  `UserProfileScreen`、`ProfileEditScreen`、`NativePageScreen`（原生未覆盖页面兜底）
+- 通用组件：`Skeleton`、`StateBlocks`、`Chrome`、`DraggableRefreshFab`、`SmileyPanel`、`TextEditing`、
+  `MessageBanner`、`UpdateDialog`、`SigninReminder`；主题 `theme/`（`AppTheme` 明暗 + `AccentTheme` 主题色 +
+  自定义背景 + 全局字体缩放）
+
+### 线程与状态约定
+
+- 所有网络/磁盘 IO 在客户端内部 `withContext(Dispatchers.IO)`，Compose 侧只做状态更新
+- 页面加载统一 `LaunchedEffect(tid / reloadKey)` 触发；列表分页状态封装在 `PagedThreadList` 的 state 对象里
+- 结果统一 `Result(ok, message)`（写操作）或 `XxxState`（Loading / Content / Error），错误文案优先显示服务端原文
+- 图片加载统一走 Coil；列表缩略图另有本地缓存，避免重复请求
+
+### 构建与发布
+
+- 单模块 Gradle：AGP 8.7.3 / Kotlin 2.0.21 / Compose BOM 2024.10.01，minSdk 26 / targetSdk 35，release 开 R8
+- 签名使用仓库内 `keystore/debug.keystore`（与历史安装包同签名，可覆盖升级）
+- `scripts/build-apk.ps1`：自动版本 +0.0.1 → 构建 → 输出 `dist/` 并复制到桌面
+- `scripts/push-release.ps1`：同步仓库根 `MCE-starlight.apk`、`release/MCE-latest.apk`、`version.json` 并推送 `origin/main`
+- 自动更新清单固定指向 `release/MCE-latest.apk`（走 gh-proxy 镜像），`emergency: true` 的版本免确认直接下载安装
