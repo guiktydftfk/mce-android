@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -101,12 +101,17 @@ object PostActions {
             }.getOrNull()
         }
 
+    /** 最近一次上传失败时服务端返回的原文（用于排查/提示） */
+    var lastUploadError: String? = null
+
     /** Upload one image, returns attachment id (aid) or null */
     suspend fun uploadImage(fid: Int, bytes: ByteArray, filename: String): String? =
         withContext(Dispatchers.IO) {
             runCatching {
+                // v0.3.8：补 formhash / mobile（手机模板 swfupload 会校验表单令牌与来路）
+                val uploadHash = FormhashStore.get()
                 val url = "$BASE/misc.php?mod=swfupload&action=swfupload&operation=upload" +
-                    "&simple=1&type=image&fid=$fid"
+                    "&simple=1&type=image&fid=$fid&mobile=2&formhash=$uploadHash"
                 val boundary = "----MCEBoundary${System.currentTimeMillis()}"
                 val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
@@ -115,23 +120,38 @@ object PostActions {
                     readTimeout = 60_000
                     setRequestProperty("User-Agent", HttpForumRepository.MOBILE_UA)
                     setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                    setRequestProperty("X-Requested-With", "XMLHttpRequest")
+                    setRequestProperty("Referer", "$BASE/forum.php?mod=post&action=reply&fid=$fid")
                     cn.mce.starlight.core.WebCookies.cookieHeader()?.let {
                         setRequestProperty("Cookie", it)
                     }
                 }
                 DataOutputStream(conn.outputStream).use { out ->
                     fun write(text: String) = out.write(text.toByteArray(Charsets.UTF_8))
+                    fun field(name: String, value: String) {
+                        write("--$boundary\r\n")
+                        write("Content-Disposition: form-data; name=\"$name\"\r\n\r\n")
+                        write("$value\r\n")
+                    }
+                    if (uploadHash.isNotEmpty()) field("formhash", uploadHash)
+                    cn.mce.starlight.core.SessionStore.uid?.let { field("uid", it.toString()) }
                     write("--$boundary\r\n")
                     write("Content-Disposition: form-data; name=\"Filedata\"; filename=\"$filename\"\r\n")
-                    write("Content-Type: application/octet-stream\r\n\r\n")
+                    write("Content-Type: image/jpeg\r\n\r\n")
                     out.write(bytes)
                     write("\r\n--$boundary--\r\n")
                     out.flush()
                 }
-                val resp = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                val code = runCatching { conn.responseCode }.getOrDefault(-1)
+                val resp = runCatching {
+                    val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                    stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                }.getOrElse { "" }
                 conn.disconnect()
-                aidJsonRegex.find(resp)?.groupValues?.get(1)
+                val aid = aidJsonRegex.find(resp)?.groupValues?.get(1)
                     ?: aidQueryRegex.find(resp)?.groupValues?.get(1)
+                if (aid == null) lastUploadError = "HTTP $code " + resp.take(180)
+                aid
             }.getOrNull()
         }
 
@@ -263,22 +283,34 @@ object PostActions {
         }.getOrElse { Result(false, it.message) }
     }
 
-    suspend fun reply(tid: Int, fid: Int, message: String, replyToPid: Int? = null): Result =
+    suspend fun reply(
+        tid: Int,
+        fid: Int,
+        message: String,
+        replyToPid: Int? = null,
+        /** v0.3.8：回帖附图（先 uploadImage 拿到 aid，再随回复一起提交） */
+        aids: List<String> = emptyList(),
+    ): Result =
         withContext(Dispatchers.IO) {
-            if (message.isBlank()) return@withContext Result(false, "\u56de\u590d\u5185\u5bb9\u4e0d\u80fd\u4e3a\u7a7a")
+            if (message.isBlank() && aids.isEmpty()) {
+                return@withContext Result(false, "\u56de\u590d\u5185\u5bb9\u4e0d\u80fd\u4e3a\u7a7a")
+            }
             runCatching {
                 val hash = FormhashStore.get()
                 if (hash.isEmpty()) {
                     return@withContext Result(false, "\u672a\u83b7\u53d6 formhash\uff08\u53ef\u80fd\u672a\u767b\u5f55\uff09")
                 }
 
-                val body = encode(
+                val fields = mutableListOf(
                     "formhash" to hash,
-                    "message" to message,
+                    "message" to message.ifBlank { "\u56de\u5e16\u9644\u56fe" },
                     "usesig" to "1",
                     "subject" to "",
                     "reppost" to (replyToPid?.toString() ?: ""),
                 )
+                // 已上传的附件要在回帖请求里登记，否则服务端会当孤儿附件
+                aids.forEach { aid -> fields += "attachnew[$aid]" to "1" }
+                val body = encode(*fields.toTypedArray())
                 val url = "$BASE/forum.php?mod=post&action=reply&fid=$fid&tid=$tid&replysubmit=yes&mobile=2"
                 val resp = GenericPageClient.httpPost(url, body, null)
                 // v0.3.3 批 4：旧判定 `!resp.contains("登录后") && !resp.contains("请输入内容")` 几乎恒真，

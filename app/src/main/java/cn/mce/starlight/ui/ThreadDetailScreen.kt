@@ -1,5 +1,6 @@
 package cn.mce.starlight.ui
 
+import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -148,6 +149,35 @@ fun ThreadDetailScreen(
             ?.distinctBy { it.uid ?: it.author }
             ?.take(50)
             .orEmpty()
+    }
+
+    // v0.3.8：回帖附图（本地 uri + 服务端 aid）；上传成功后随回复一起提交
+    val replyImages = remember { androidx.compose.runtime.mutableStateListOf<Pair<Uri, String>>() }
+    var uploadingImage by remember { mutableStateOf(false) }
+    val pickContext = androidx.compose.ui.platform.LocalContext.current
+    val pickReplyImages = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetMultipleContents(),
+    ) { uris ->
+        if (uris.isNullOrEmpty()) return@rememberLauncherForActivityResult
+        val uploadFid = detail?.fid ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            uploadingImage = true
+            uris.forEach { uri ->
+                runCatching {
+                    val bytes = pickContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: return@runCatching
+                    val name = "reply_${System.currentTimeMillis()}.jpg"
+                    val aid = PostActions.uploadImage(uploadFid, bytes, name)
+                    if (aid != null) replyImages.add(uri to aid)
+                }
+            }
+            uploadingImage = false
+            toast = if (replyImages.isEmpty()) {
+                "图片上传失败：" + (PostActions.lastUploadError?.take(80)?.replace("\n", " ") ?: "未知原因")
+            } else {
+                "已上传 ${replyImages.size} 张图片"
+            }
+        }
     }
 
     Box(modifier.fillMaxSize()) {
@@ -302,17 +332,28 @@ fun ThreadDetailScreen(
                     )
                     Spacer(Modifier.width(8.dp))
                     TextButton(
-                        enabled = !sending && replyText.text.isNotBlank() && d.fid != null,
+                        enabled = !sending && (replyText.text.isNotBlank() || replyImages.isNotEmpty()) && d.fid != null,
                         onClick = {
                             val fid = d.fid ?: return@TextButton
                             sending = true
+                            val aids = replyImages.map { it.second }
+                            // v0.3.8：图片用 [attach]aid[/attach] 内嵌到正文（只传 attachnew 会堆在楼末）
+                            val message = buildString {
+                                val body = replyText.text.trim()
+                                if (body.isNotEmpty()) append(body)
+                                aids.forEach { aid ->
+                                    if (isNotEmpty()) append('\n')
+                                    append("[attach]").append(aid).append("[/attach]")
+                                }
+                            }
                             scope.launch {
-                                val r = PostActions.reply(tid, fid, replyText.text.trim(), replyTo?.pid)
+                                val r = PostActions.reply(tid, fid, message, replyTo?.pid, aids = aids)
                                 sending = false
                                 toast = r.message
                                 if (r.ok) {
                                     replyText = TextFieldValue("")
                                     replyTo = null
+                                    replyImages.clear()
                                     // 回帖的 POST 响应是提示/跳转页，不能直接当帖子页解析，
                                     // 必须重新 GET（带时间戳绕过缓存）再渲染。
                                     val fresh = runCatching { repo.loadThreadDetail(tid, page, noCache = true) }.getOrNull()
@@ -334,6 +375,38 @@ fun ThreadDetailScreen(
                         },
                     ) { Text(if (sending) "发送中" else "回复") }
                 }
+                // v0.3.8：已上传的回帖图片预览（点 × 移除）
+                if (replyImages.isNotEmpty()) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(bottom = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        replyImages.forEach { (uri, aid) ->
+                            Box {
+                                AsyncImage(
+                                    model = uri,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(52.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                                )
+                                Text(
+                                    "×",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .clickable { replyImages.remove(uri to aid) }
+                                        .padding(horizontal = 4.dp),
+                                )
+                            }
+                        }
+                    }
+                }
                 // v0.3.6：表情 / @ 工具栏（先收键盘再弹窗，避免弹窗被 IME 挤压）
                 Row(
                     Modifier
@@ -350,6 +423,10 @@ fun ThreadDetailScreen(
                         keyboard?.hide()
                         showMention = true
                     }) { Text("@ 提及") }
+                    TextButton(
+                        enabled = !uploadingImage,
+                        onClick = { pickReplyImages.launch("image/*") },
+                    ) { Text(if (uploadingImage) "上传中…" else "图片") }
                     if (replyTo != null) {
                         TextButton(onClick = { replyTo = null }) { Text("取消楼层回复") }
                     }
