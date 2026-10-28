@@ -78,15 +78,18 @@ fun HomeFeedScreen(
             loader = { page ->
                 val base = repo.loadGuide(view, page)
                 // v0.3.9：论坛「导读」偶尔不收录自己刚发的帖子（版块列表能看到、首页看不到，
-                // 但仍会收到该帖的新消息提醒）。首页第一页额外合并「我的最近主题」，
-                // 把自己缺的新帖补到最前面，保证「我刚发的帖子」在首页一定可见。
+                // 但仍会收到该帖的新消息提醒）。首页第一页额外合并「我的最近主题」。
+                // v0.4.0 修正：**不再顶到最前面**（旧实现把缺失的自己的帖子无条件 prepend，
+                // 导致它们永远钉在首页顶端）。现在按时间归位，且只补仍在当前页时间范围内的帖子。
                 if (page == 1 && view == "newthread") {
                     val mine = runCatching { repo.loadGuide("my", 1) }.getOrNull()
-                    val extra = mine?.threads
+                    val extras = mine?.threads
                         ?.filter { t -> base.threads.none { it.id == t.id } }
                         ?.take(2)
                         .orEmpty()
-                    if (extra.isEmpty()) base else base.copy(threads = extra + base.threads)
+                    if (extras.isEmpty()) base else base.copy(
+                        threads = cn.mce.starlight.core.FeedTime.mergeExtras(base.threads, extras),
+                    )
                 } else {
                     base
                 }
