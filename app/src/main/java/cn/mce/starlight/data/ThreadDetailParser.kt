@@ -111,6 +111,10 @@ object ThreadDetailParser {
      * 解析网页端「管理组」才可见的管理操作链接（编辑/删除/置顶/精华/关闭…）。
      * 普通用户页面里没有这些链接 → 返回空列表 → APP 不显示管理入口。
      */
+    /** v0.4.1：从「电脑版」帖子页解析版主管理条（手机模板常不渲染管理条） */
+    fun parseModActionsFromHtml(html: String, baseUrl: String): List<ModAction> =
+        runCatching { parseModActions(Jsoup.parse(html, baseUrl)) }.getOrDefault(emptyList())
+
     private fun parseModActions(doc: Document): List<ModAction> {
             // 与网页端版主管理条对齐：删除主题/升降/置顶/直播/高亮/精华/图章/关闭/移动/分类/复制/合并/分割/修复/警告/屏蔽/用户标签
             val keywords = listOf(

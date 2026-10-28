@@ -52,6 +52,8 @@ object ProfileClient {
             val username = ProfileCommon.username(doc)
             val group = ProfileCommon.group(doc, text)
             val staff = ProfileCommon.staffTitle(doc, text)
+            // v0.4.1：记录管理身份，帖子页据此判断是否补抓电脑版管理条
+            cn.mce.starlight.core.SessionStore.updateStaff(staff)
             val level = ProfileCommon.level(doc, text)
             val stats = ProfileCommon.stats(text, listOf("主题", "回帖", "积分", "好友", "威望"))
             val fields = ProfileCommon.fields(text, FIELD_LABELS)

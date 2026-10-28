@@ -96,6 +96,8 @@ fun PagedThreadList(
     initialHasNext: Boolean = true,
     /** 第 1 页加载成功时回调（用于写缓存） */
     onFirstPage: ((ForumPage) -> Unit)? = null,
+    /** v0.4.1：变化时把列表滚回顶部（从帖子返回时用） */
+    scrollToTopKey: Int = 0,
 ) {
     val scope = rememberCoroutineScope()
     val st = remember(resetKey) {
@@ -105,6 +107,11 @@ fun PagedThreadList(
         )
     }
     val listState = remember(resetKey) { LazyListState() }
+
+    // v0.4.1：从帖子返回列表时回到顶部（旧实现只有刷新才回顶）
+    LaunchedEffect(scrollToTopKey) {
+        if (scrollToTopKey > 0) runCatching { listState.requestScrollToItem(0) }
+    }
 
     // v0.3.7：缩略图改为「列表级 + 滚动停止后再抓」。
     // 旧实现每张卡片在自己的 LaunchedEffect 里抓一次完整 viewthread 页面（网络 + 整页 DOM 解析），

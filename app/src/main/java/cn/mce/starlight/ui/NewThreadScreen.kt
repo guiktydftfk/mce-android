@@ -141,6 +141,8 @@ fun NewThreadScreen(
     // v0.4.0：选区跟踪（工具栏/弹窗失焦后仍能作用于原选区）+ 视频插入
     var lastSelection by remember { mutableStateOf(androidx.compose.ui.text.TextRange(0, 0)) }
     var lastSelectionTextLen by remember { mutableStateOf(-1) }
+    // v0.4.1：最近一次光标位置（点工具栏时输入框失焦，光标可能被重置为 0）
+    var lastCursor by remember { mutableStateOf(0) }
     var pendingColorSelection by remember { mutableStateOf<androidx.compose.ui.text.TextRange?>(null) }
     var showVideoDialog by remember { mutableStateOf(false) }
     var videoUrl by remember { mutableStateOf("") }
@@ -297,7 +299,11 @@ fun NewThreadScreen(
         lastSelection = contentField.selection
     }
 
-    /** 对齐：有选中就包住选区，没选中就包住光标所在整行（v0.4.0） */
+    /**
+     * 对齐（v0.4.1 修复「左/中/右对齐失效」）：
+     *  - 有选中 → 包住选区；
+     *  - 没选中 → 包住「最近一次光标所在行」；该行为空则对整段正文生效，保证一定看得到效果。
+     */
     fun applyAlign(direction: String) {
         val label = when (direction) {
             "left" -> "左对齐"
@@ -305,23 +311,28 @@ fun NewThreadScreen(
             "right" -> "右对齐"
             else -> "对齐"
         }
+        val text = contentField.text
+        if (text.isBlank()) {
+            draftTip = "内容还是空的，先写点东西再${label}"
+            return
+        }
         val sel = effectiveSelection()
+        val cursor = contentField.selection.min.takeIf { it > 0 } ?: lastCursor.coerceIn(0, text.length)
         val (start, end) = if (sel != null) {
             sel.min to sel.max
         } else {
-            val text = contentField.text
-            val cursor = contentField.selection.min.coerceIn(0, text.length)
             val lineStart = text.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { if (it < 0) 0 else it + 1 }
             val lineEnd = text.indexOf('\n', cursor).let { if (it < 0) text.length else it }
-            lineStart to lineEnd
+            if (text.substring(lineStart, lineEnd).isBlank()) 0 to text.length else lineStart to lineEnd
         }
-        val target = contentField.text.substring(start, end)
+        val target = text.substring(start, end)
         if (target.isBlank()) {
             draftTip = "请先选中要${label}的内容"
             return
         }
         contentField = contentField.wrapRange(start, end, "[align=$direction]", "[/align]")
         lastSelection = contentField.selection
+        draftTip = "已${label}"
     }
 
     /** 存草稿：只存本地（Discuz 手机模板没有草稿箱），不会发布 */
@@ -542,6 +553,8 @@ fun NewThreadScreen(
                 if (it.selection.min != it.selection.max) {
                     lastSelection = it.selection
                     lastSelectionTextLen = it.text.length
+                } else {
+                    lastCursor = it.selection.start
                 }
             },
             label = { Text("内容（选中文字后可加粗/颜色/斜体/下划线，效果直接在框内显示）") },

@@ -145,6 +145,8 @@ fun MceApp() {
     val drawerItemBounds = remember { mutableStateMapOf<Int, ClosedFloatingPointRange<Float>>() }
     var stack by remember { mutableStateOf(listOf<Route>()) }
     var dataVersion by remember { mutableIntStateOf(0) }
+    // v0.4.1：从帖子返回首页时回到顶部
+    var feedTopTick by remember { mutableIntStateOf(0) }
     var showLogin by remember { mutableStateOf(false) }
     // v0.3.7：板块分组默认全部折叠（用户要求「全国交流」保持折叠）
     var expandedGroups by remember { mutableStateOf(emptySet<String>()) }
@@ -169,7 +171,12 @@ fun MceApp() {
     fun openDrawer() { scope.launch { drawerState.open() } }
     fun closeDrawer() { scope.launch { drawerState.close() } }
     fun push(route: Route) { stack = stack + route }
-    fun pop() { stack = stack.dropLast(1) }
+    fun pop() {
+        val popped = stack.lastOrNull()
+        stack = stack.dropLast(1)
+        // v0.4.1：从帖子详情返回列表时回到顶部（其它页面保持原位）
+        if (popped is Route.Thread) feedTopTick++
+    }
 
     /** 下载并拉起安装（普通更新与紧急更新共用；紧急更新只是不需要用户先点「立即更新」） */
     fun startUpdate(release: UpdateClient.Release) {
@@ -623,6 +630,7 @@ fun MceApp() {
                     onMenu = ::openDrawer,
                     reloadKey = dataVersion,
                     onOpenThread = { push(Route.Thread(it.id, it.title)) },
+                    scrollToTopKey = feedTopTick,
                 )
 
                 Dest.Profile -> ProfileScreen(

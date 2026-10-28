@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -40,7 +40,23 @@ class HttpForumRepository(
         withContext(Dispatchers.IO) {
             val cacheBust = if (noCache) "&t=${System.currentTimeMillis()}&mobile=2" else ""
             val url = "$baseHost/forum.php?mod=viewthread&tid=$tid&page=$page$cacheBust"
-            ThreadDetailParser.parse(fetch(url), url, tid, page)
+            val detail = ThreadDetailParser.parse(fetch(url), url, tid, page)
+            // v0.4.1：版主管理条只在网页端「电脑版」完整渲染（手机模板经常没有）；
+            // 已知当前账号是管理组时补抓一次电脑版页面解析管理操作，普通用户不会多发请求。
+            if (detail.modActions.isEmpty() && cn.mce.starlight.core.SessionStore.staff != null) {
+                runCatching {
+                    val desktopUrl = "$baseHost/forum.php?mod=viewthread&tid=$tid&mobile=no"
+                    val desktopHtml = GenericPageClient.get(
+                        desktopUrl,
+                        userAgent = Net.DESKTOP_UA,
+                        isolateCookies = true,
+                        retryOnFailure = false,
+                    )
+                    ThreadDetailParser.parseModActionsFromHtml(desktopHtml, desktopUrl)
+                }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { detail.copy(modActions = it) } ?: detail
+            } else {
+                detail
+            }
         }
 
     private fun fetch(url: String): String {

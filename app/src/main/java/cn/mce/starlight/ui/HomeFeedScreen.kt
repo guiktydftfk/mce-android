@@ -47,6 +47,8 @@ fun HomeFeedScreen(
     onMenu: () -> Unit,
     reloadKey: Int = 0,
     onOpenThread: (ThreadSummary) -> Unit,
+    /** v0.4.1：从帖子返回时回到顶部 */
+    scrollToTopKey: Int = 0,
 ) {
     val repo = remember { HttpForumRepository() }
     var view by remember { mutableStateOf("newthread") }
@@ -64,6 +66,7 @@ fun HomeFeedScreen(
         PagedThreadList(
             // 过滤阈值变化时也重建列表（resetKey 变化 → 重新加载第 1 页）
             resetKey = Triple(view, reloadKey, SettingsStore.feedMinChars),
+            scrollToTopKey = scrollToTopKey,
             topPadding = topInset + 104.dp,
             horizontalPadding = 12.dp,
             initialItems = cached?.threads.orEmpty(),

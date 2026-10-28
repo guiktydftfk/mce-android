@@ -33,6 +33,14 @@ object SessionStore {
     var uid by mutableStateOf<Int?>(null)
         private set
 
+    /** v0.4.1：当前用户的管理身份（管理员/超级版主/版主）；普通用户为 null */
+    var staff by mutableStateOf<String?>(null)
+        private set
+
+    fun updateStaff(value: String?) {
+        staff = value
+    }
+
     private val usernameTitleRegex = Regex("""^(.{1,24}?)的个人资料""")
     private val uidRegex = Regex("""uid=(\d+)""")
     private const val PROFILE_URL = "https://mce.msi.cn/home.php?mod=space&do=profile"

@@ -321,7 +321,9 @@ fun ThreadDetailScreen(
                         )
                     }
                     // v0.4.1：版主管理条（与网页端一致：删除主题/升降/置顶/直播/高亮/精华/图章/关闭/移动/分类/复制/合并/分割/修复/警告/屏蔽/用户标签）
-                    if (s.detail.modActions.isNotEmpty()) {
+                    // v0.4.1：测试模式——普通账号也显示管理条用于界面测试；有真实管理链接时走真实链接
+                    val modBarActions = if (s.detail.modActions.isNotEmpty()) s.detail.modActions else DEFAULT_MOD_ACTIONS
+                    if (true) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -336,9 +338,15 @@ fun ThreadDetailScreen(
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(end = 4.dp),
                             )
-                            s.detail.modActions.forEach { action ->
+                            modBarActions.forEach { action ->
                                 TextButton(
-                                    onClick = { onOpenPage(action.url, action.label) },
+                                    onClick = {
+                                        if (action.url.isBlank()) {
+                                            toast = "「${action.label}」需要版主/管理员权限（当前仅界面测试）"
+                                        } else {
+                                            onOpenPage(action.url, action.label)
+                                        }
+                                    },
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                 ) {
                                     Text(action.label, style = MaterialTheme.typography.labelSmall)
@@ -1061,6 +1069,12 @@ private fun PostItem(
 /** 正文里的网址（v0.3.10）：点击直接用系统默认浏览器打开 */
 private val postUrlRegex = Regex("""https?://[^\s<>"'，。；、）】\[\]]+""")
 
+/** v0.4.1 测试模式：没有真实管理链接时用网页端版主管理条默认动作占位（点击提示需要权限） */
+private val DEFAULT_MOD_ACTIONS = listOf(
+    "删除主题", "升降", "置顶", "直播", "高亮", "精华", "图章", "关闭",
+    "移动", "分类", "复制", "合并", "分割", "修复", "警告", "屏蔽", "用户标签",
+).map { cn.mce.starlight.data.ModAction(it, "") }
+
 @Composable
 private fun PostTextBlock(block: ContentBlock.Text) {
     val baseColor = MaterialTheme.colorScheme.onSurface
@@ -1125,20 +1139,25 @@ private fun PostTextBlock(block: ContentBlock.Text) {
         MaterialTheme.typography.bodyMedium.copy(lineHeight = 23.sp, fontSize = 15.sp)
     }
     if (block.kind == TextKind.Quote) {
-        Row(Modifier.fillMaxWidth()) {
-            Box(
-                Modifier
-                    .width(3.dp)
-                    .heightIn(min = 18.dp)
-                    .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp)),
+        // v0.4.1：被引用的内容加独立引用框（圆角 + 浅底色 + 「引用」标签），与正文区分
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+        ) {
+            Text(
+                "引用",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.padding(top = 2.dp))
             ClickableText(
                 text = annotated,
                 style = textStyle.copy(color = quotedColor),
                 onClick = onUrlClick,
-                modifier = Modifier.weight(1f),
             )
         }
     } else {
