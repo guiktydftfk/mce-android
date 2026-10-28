@@ -136,6 +136,8 @@ fun NewThreadScreen(
     // v0.3.10：颜色选择器 / 退出提醒
     var showColorPicker by remember { mutableStateOf(false) }
     var showExitConfirm by remember { mutableStateOf(false) }
+    // v0.4.0：独立的发帖预览页（非实时）
+    var showPreview by remember { mutableStateOf(false) }
 
     val fid = selectedFid
     val pollChoices = pollOptions.split('\n').map { it.trim() }.filter { it.isNotBlank() }.distinct()
@@ -233,9 +235,29 @@ fun NewThreadScreen(
         contentField = contentField.insertAtCursor(text)
     }
 
+    /** 是否选中了文字（v0.4.0：加粗/斜体/下划线/颜色只对选中文字生效） */
+    fun hasSelection(): Boolean = contentField.selection.start != contentField.selection.end
+
+    /**
+     * v0.4.0：B/I/U/颜色 只在「选中文字」时生效；没选中就只给一句提示，
+     * 不再往内容框里塞 `[b]加粗文字[/b]` 这类占位文字（用户反馈"没选中也显示在内容框里"）。
+     */
+    fun styleSelection(open: String, close: String, label: String) {
+        if (!hasSelection()) {
+            draftTip = "请先选中要${label}的文字，再点「${label}」"
+            return
+        }
+        contentField = contentField.wrapSelection(open, close, "")
+    }
+
     /** 选中文字后直接套用预设颜色（与网页编辑器同款色板） */
     fun applyColor(hex: String) {
-        contentField = contentField.wrapSelection("[color=$hex]", "[/color]", "彩色文字")
+        if (!hasSelection()) {
+            draftTip = "请先选中要变色的文字，再点「颜色」"
+            showColorPicker = false
+            return
+        }
+        contentField = contentField.wrapSelection("[color=$hex]", "[/color]", "")
         showColorPicker = false
     }
 
@@ -422,11 +444,17 @@ fun NewThreadScreen(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            ToolButton("B") { wrap("[b]", "[/b]", "加粗文字") }
-            ToolButton("I") { wrap("[i]", "[/i]", "斜体文字") }
-            ToolButton("U") { wrap("[u]", "[/u]", "下划线文字") }
-            // v0.3.10：颜色改为「选中文字 → 点颜色 → 选预设色」，预设色与网页版论坛编辑器一致
-            ToolButton("颜色") { showColorPicker = true }
+            ToolButton("B") { styleSelection("[b]", "[/b]", "加粗") }
+            ToolButton("I") { styleSelection("[i]", "[/i]", "斜体") }
+            ToolButton("U") { styleSelection("[u]", "[/u]", "下划线") }
+            // v0.4.0：颜色同样只对选中文字生效；没选中只提示、不插入占位文字
+            ToolButton("颜色") {
+                if (hasSelection()) {
+                    showColorPicker = true
+                } else {
+                    draftTip = "请先选中要变色的文字，再点「颜色」"
+                }
+            }
             ToolButton("链接") { wrap("[url]", "[/url]", "https://") }
             ToolButton("图片") { pickImages.launch("image/*") }
             ToolButton("图链") { wrap("[img]", "[/img]", "图片链接") }
@@ -445,8 +473,18 @@ fun NewThreadScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        // v0.3.10：图文预览（类小黑盒：图片在光标处插入，按段落顺序和文字混排）
-        DraftPreview(text = contentField.text, images = uploaded)
+        // v0.4.0：预览改为独立页面（点按钮才生成一次），编辑区不再实时预览
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(
+                enabled = contentField.text.isNotBlank(),
+                onClick = { showPreview = true },
+            ) { Text("发帖预览") }
+            Text(
+                "点开后按发布后的样子查看排版/颜色/图片（不是实时预览）",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         // ---------- 投票设置 ----------
         if (pollMode) {
@@ -661,6 +699,24 @@ fun NewThreadScreen(
         )
     }
 
+    if (showPreview) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showPreview = false },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            DraftPreviewScreen(
+                title = subject.trim(),
+                content = contentField.text,
+                images = uploaded.toList(),
+                pollOptions = if (pollMode) pollChoices else emptyList(),
+                onBack = { showPreview = false },
+            )
+        }
+    }
+
     ImmersiveTopBar(title = if (pollMode) "发起投票" else "发帖", onMenu = onMenu)
 }
 
@@ -750,44 +806,3 @@ private fun ColorPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
     )
 }
 
-/**
- * 图文预览（v0.3.10）：把正文里的 `[attach]aid[/attach]` 还原成本地图片，
- * 按段落顺序和文字混排展示，方便发布前确认图片位置。
- */
-@Composable
-private fun DraftPreview(text: String, images: List<Pair<Uri, String>>) {
-    if (text.isBlank()) return
-    val byAid = remember(images.toList()) { images.associateBy({ it.second }, { it.first }) }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(
-            "预览",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        text.split('\n').forEach { line ->
-            val marker = attachMarkerRegex.find(line)
-            if (marker != null) {
-                val uri = byAid[marker.groupValues[1]]
-                if (uri != null) {
-                    AsyncImage(
-                        model = uri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 240.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                    )
-                }
-            } else if (line.isNotBlank()) {
-                Text(line, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
