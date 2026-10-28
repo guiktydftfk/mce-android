@@ -110,6 +110,8 @@ private enum class Dest(val label: String) {
 @Composable
 fun MceApp() {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    // v0.4.1：抽屉内容首次打开前不参与组合（关闭状态下也能省掉一整套抽屉 UI 的首次合成）
+    var drawerEverOpened by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // v0.3.7 液态玻璃：抽屉开合动画只驱动抽屉自身（右侧内容区不参与逐帧重组）。
@@ -126,6 +128,8 @@ fun MceApp() {
     // 用 Animatable + LaunchedEffect(drawerOpened) 触发；值只在抽屉子树里读取，不影响右侧内容重组。
     val glassSheen = remember { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(drawerOpened) {
+        // v0.4.1：一旦有打开意图（点菜单或边缘滑动），才真正合成抽屉内容
+        if (drawerOpened) drawerEverOpened = true
         if (drawerOpened) {
             glassSheen.snapTo(0f)
             glassSheen.animateTo(
@@ -177,7 +181,10 @@ fun MceApp() {
         }
     }
 
-    fun openDrawer() { scope.launch { drawerState.open() } }
+    fun openDrawer() {
+        drawerEverOpened = true
+        scope.launch { drawerState.open() }
+    }
     fun closeDrawer() { scope.launch { drawerState.close() } }
     fun push(route: Route) { stack = stack + route }
     fun pop() {
@@ -311,7 +318,9 @@ fun MceApp() {
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     ModalNavigationDrawer(
         drawerState = drawerState,
-        drawerContent = {
+        drawerContent = drawer@{
+            // v0.4.1：首次打开前不合成抽屉内容（省启动首帧的合成开销）
+            if (!drawerEverOpened) return@drawer
             // 只在抽屉自己的作用域里读动画值：抽屉外观逐帧动画不会导致右侧首页列表重组
             val progress = drawerAnimation.value
             // 玻璃流光：0→1 的一次性扫过（由 MceApp 顶部的 Animatable 驱动，播完即停），
