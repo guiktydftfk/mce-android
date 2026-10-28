@@ -48,6 +48,13 @@ object CookieJar {
         return header
     }
 
+    /**
+     * v0.4.1：启动预热 —— 后台线程解密一次全部 Cookie 并填 header 缓存，
+     * 避免首次网络请求（图片/列表）时才在调用线程做 Keystore 解密。
+     */
+    fun warmUp() {
+        runCatching { header() }
+    }
     fun all(): Map<String, String> {
         val p = store() ?: return emptyMap()
         return p.all.entries

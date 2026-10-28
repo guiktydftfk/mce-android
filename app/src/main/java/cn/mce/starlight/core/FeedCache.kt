@@ -34,6 +34,14 @@ object FeedCache {
         loaded = false
     }
 
+    /** v0.4.1：后台预热（启动时在线程池里先把磁盘缓存读进内存，避免首帧在主线程解析 JSON） */
+    @Synchronized
+    fun prewarm() {
+        ensureLoaded()
+    }
+
+    /** 是否已完成预热（未完成时调用方不要在主线程 get，以免解析卡首帧） */
+    fun isReady(): Boolean = loaded
     /** 同步读内存；首次调用时顺带把磁盘缓存读进内存（文件很小，几毫秒） */
     @Synchronized
     fun get(key: String): Entry? {

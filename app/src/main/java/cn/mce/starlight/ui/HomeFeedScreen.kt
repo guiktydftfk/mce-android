@@ -68,7 +68,14 @@ fun HomeFeedScreen(
         min <= 0 || threadCharCount(thread) >= min
     }
     val cacheKey = "guide_$view"
-    val cached = remember(view, reloadKey) { cn.mce.starlight.core.FeedCache.get(cacheKey) }
+    // v0.4.1：缓存由 Application 后台预热；未就绪时先走网络加载，不在主线程解析 JSON
+    val cached = remember(view, reloadKey) {
+        if (cn.mce.starlight.core.FeedCache.isReady()) {
+            cn.mce.starlight.core.FeedCache.get(cacheKey)
+        } else {
+            null
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         PagedThreadList(

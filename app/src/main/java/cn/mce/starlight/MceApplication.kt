@@ -25,8 +25,6 @@ class MceApplication : Application(), ImageLoaderFactory {
         // 只做必要的同步初始化；ThumbCache 的 200 条记录解析已改为懒加载（见 ThumbCache.ensureLoaded）
         SettingsStore.init(this)
         CookieJar.init(this)
-        // 兜底：清掉"强制电脑版模板"残留的 mobile Cookie（否则所有页面会按电脑版渲染、移动版解析全空）
-        CookieJar.removeMobileCookies()
         cn.mce.starlight.data.ThumbCache.init(this)
         cn.mce.starlight.core.DraftStore.init(this)
         cn.mce.starlight.core.MessageCenter.init(this)
@@ -34,6 +32,18 @@ class MceApplication : Application(), ImageLoaderFactory {
         cn.mce.starlight.core.StarlightDailyStore.init(this)
         cn.mce.starlight.core.FeedCache.init(this)
         DebugDump.init(this)
+        // v0.4.1：启动预热放后台线程，减少首帧主线程工作（Cookie 清理/解密、首页缓存解析）
+        // 兜底：清掉"强制电脑版模板"残留的 mobile Cookie（否则所有页面会按电脑版渲染、移动版解析全空）
+        Thread {
+            runCatching { CookieJar.removeMobileCookies() }
+            runCatching { CookieJar.warmUp() }
+            runCatching { cn.mce.starlight.core.FeedCache.prewarm() }
+            // v0.4.1：把 Coil ImageLoader（OkHttp 构建 + 磁盘缓存）也放到后台线程初始化，首图不再卡主线程
+            runCatching { coil.Coil.imageLoader(this) }
+        }.apply {
+            isDaemon = true
+            priority = Thread.MIN_PRIORITY
+        }.start()
     }
 
     override fun newImageLoader(): ImageLoader {
