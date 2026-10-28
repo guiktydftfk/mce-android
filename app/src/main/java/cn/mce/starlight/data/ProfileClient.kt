@@ -34,9 +34,15 @@ object ProfileClient {
         val staff: String? = null,
         /** v0.4.1：用户等级（与用户组分开显示） */
         val level: String? = null,
+        /** v0.4.1：积分明细（社区值/赞赏值/职务值/活动值/实践值/已使用） */
+        val credits: Map<String, String> = emptyMap(),
     )
 
-    private val FIELD_LABELS = listOf("UID", "姓名", "年级", "学校", "专业", "生日", "来自", "个人网站", "血型")
+    private val FIELD_LABELS = listOf(
+        "UID", "用户ID", "姓名", "年级", "学校", "专业", "生日", "来自", "个人网站", "血型", "QQ号", "微信号",
+    )
+    /** v0.4.1：积分明细字段顺序（网页端资料页 ul.user_box 里刚好是这些） */
+    private val CREDIT_LABELS = listOf("社区值", "赞赏值", "职务值", "活动值", "实践值", "已使用")
 
     suspend fun load(): Profile? = withContext(Dispatchers.IO) {
         runCatching {
@@ -56,7 +62,12 @@ object ProfileClient {
             cn.mce.starlight.core.SessionStore.updateStaff(staff)
             val level = ProfileCommon.level(doc, text)
             val stats = ProfileCommon.stats(text, listOf("主题", "回帖", "积分", "好友", "威望"))
-            val fields = ProfileCommon.fields(text, FIELD_LABELS)
+            val fields = ProfileCommon.fieldsFromBox(doc, text, FIELD_LABELS)
+            // v0.4.1：积分明细（社区值/赞赏值/…）也在 ul.user_box 里
+            val creditBox = ProfileCommon.boxKv(doc)
+            val credits = CREDIT_LABELS.mapNotNull { label ->
+                creditBox[label]?.takeIf { it.isNotBlank() }?.let { label to it }
+            }.toMap()
 
             val entries = doc.select("a[href]").mapNotNull { a ->
                 val href = a.attr("href")
@@ -78,6 +89,7 @@ object ProfileClient {
                 entries = entries,
                 staff = staff,
                 level = level,
+                credits = credits,
             )
         }.getOrNull()
     }

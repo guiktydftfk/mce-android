@@ -75,6 +75,8 @@ fun ProfileScreen(
     var reloadTick by remember { mutableStateOf(0) }
     // v0.3.10：今日星光=当日新增，改成随资料加载一起刷新（旧实现每次重组现算，还会在组合期写 SharedPreferences）
     var todayDelta by remember { mutableStateOf(0) }
+    // v0.4.1：点「星光值」查看积分明细（社区值/赞赏值/…）
+    var showCredits by remember { mutableStateOf(false) }
 
     suspend fun load() {
         if (!SessionStore.isLoggedIn) {
@@ -233,14 +235,18 @@ fun ProfileScreen(
                                 val ordered = preferred.mapNotNull { key -> p.stats[key]?.let { key to it } }
                                     .ifEmpty { p.stats.entries.take(3).map { it.key to it.value } }
                                 ordered.forEach { (label, value) ->
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    val shown = cn.mce.starlight.data.ProfileCommon.displayStatName(label)
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable(enabled = label == "积分") { showCredits = true },
+                                    ) {
                                         Text(
                                             value,
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold,
                                         )
                                         Text(
-                                            displayStatName(label),
+                                            shown,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -396,6 +402,40 @@ fun ProfileScreen(
         ImmersiveTopBar(title = "我的", modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
     }
     // v0.4.1：退出登录二次确认
+    // v0.4.1：点「星光值」查看积分明细（社区值/赞赏值/职务值/活动值/实践值/已使用）
+    if (showCredits) {
+        val credits = (state as? ProfileState.Content)?.profile?.credits.orEmpty()
+        val order = listOf("社区值", "赞赏值", "职务值", "活动值", "实践值", "已使用")
+        AlertDialog(
+            onDismissRequest = { showCredits = false },
+            title = { Text("星光值明细") },
+            text = {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (credits.isEmpty()) {
+                        Text("暂无明细数据", style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        order.forEach { key ->
+                            credits[key]?.let { value ->
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(key, style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        value,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showCredits = false }) { Text("关闭") } },
+        )
+    }
+
     if (showLogoutConfirm) {
         AlertDialog(
             onDismissRequest = { showLogoutConfirm = false },

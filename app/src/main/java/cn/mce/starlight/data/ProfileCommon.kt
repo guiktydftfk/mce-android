@@ -72,6 +72,47 @@ object ProfileCommon {
 
     private val STAFF_TOKENS = listOf("\u7ba1\u7406\u5458", "\u8d85\u7ea7\u7248\u4e3b", "\u7248\u4e3b")
 
+    /**
+     * v0.4.1：从资料页的 `ul.user_box` 结构化字段取值。
+     * 实测结构：<li><span>QQ号</span><p>3065537005</p></li>
+     * （旧的整页正则按 "QQ" 匹配会截到「号」字，导致 QQ/微信显示成「号」）
+     */
+    fun boxKv(doc: org.jsoup.nodes.Document): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        doc.select("ul.user_box li, .user_box li").forEach { li ->
+            val label = (li.selectFirst("span") ?: li.selectFirst("b") ?: li.selectFirst("em"))
+                ?.text()?.trim()
+            val value = (li.selectFirst("p") ?: li.selectFirst("a"))?.text()?.trim()
+            if (!label.isNullOrBlank() && !value.isNullOrBlank() &&
+                label.length <= 10 && value.length <= 64
+            ) {
+                out.putIfAbsent(label, value)
+            }
+        }
+        return out
+    }
+
+    /** v0.4.1：资料字段优先按 `ul.user_box` 结构化解析，取不到再退回整页正则 */
+    fun fieldsFromBox(doc: org.jsoup.nodes.Document, text: String, labels: List<String>): Map<String, String> {
+        val box = boxKv(doc)
+        val fallback = fields(text, labels)
+        val out = LinkedHashMap<String, String>()
+        labels.forEach { label ->
+            val hit = box.entries.firstOrNull { (k, _) ->
+                k == label || k == label + "号" || k + "号" == label
+            }?.value
+            val value = hit ?: fallback[label]
+            if (!value.isNullOrBlank()) out[label] = value
+        }
+        return out
+    }
+
+    /** v0.4.1：站点字段「积分」对外显示为「星光值」（解析/提交仍用原字段） */
+    fun displayStatName(name: String): String = when (name) {
+        "积分" -> "星光值"
+        else -> name
+    }
+
     /** 统计数字（主题 / 回帖 / 积分…） */
     fun stats(text: String, labels: List<String>): Map<String, String> {
         val result = mutableMapOf<String, String>()

@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,7 +39,9 @@ object UserProfileClient {
         val isSelf: Boolean,
     )
 
-    private val FIELD_LABELS = listOf("性别", "生日", "家乡", "居住地", "学历", "学校", "年级", "专业", "姓名", "QQ", "微信")
+    private val FIELD_LABELS = listOf(
+        "性别", "生日", "家乡", "居住地", "学历", "学校", "年级", "专业", "姓名", "QQ号", "微信号",
+    )
 
     suspend fun load(uid: Int?): Profile? = withContext(Dispatchers.IO) {
         runCatching {
@@ -61,7 +63,8 @@ object UserProfileClient {
                 text,
                 listOf("主题", "回帖", "积分", "好友", "威望", "在线时间"),
             )
-            val fields = ProfileCommon.fields(text, FIELD_LABELS)
+            // v0.4.1：优先按 ul.user_box 结构化字段解析（旧正则把「QQ号」截成「号」）
+            val fields = ProfileCommon.fieldsFromBox(doc, text, FIELD_LABELS)
 
             val threads = doc.select("a[href*=viewthread]").mapNotNull { a ->
                 val tid = tidRegex.find(a.attr("href"))

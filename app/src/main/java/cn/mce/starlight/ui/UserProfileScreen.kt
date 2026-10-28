@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.ui
+package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -155,6 +155,7 @@ fun UserProfileScreen(
                                     p.stats[key]?.let { key to it }
                                 }.ifEmpty { p.stats.entries.take(3).map { it.key to it.value } }
                                 ordered.forEach { (label, value) ->
+                                    val shown = cn.mce.starlight.data.ProfileCommon.displayStatName(label)
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text(
                                             value,
@@ -162,7 +163,7 @@ fun UserProfileScreen(
                                             fontWeight = FontWeight.Bold,
                                         )
                                         Text(
-                                            label,
+                                            shown,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
