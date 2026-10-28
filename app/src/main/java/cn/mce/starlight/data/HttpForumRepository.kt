@@ -1,6 +1,11 @@
 package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
@@ -59,6 +64,39 @@ class HttpForumRepository(
             }
         }
 
+    /**
+     * v0.4.1：并行拉取**所有板块**的最新一页主题，合并去重后按发布时间倒序。
+     * 首页「最新」用它兜底导读延迟收录（用户要求覆盖全部板块）。
+     * - 并发 6，避免一次打满论坛导致限流；
+     * - 结果带 15 秒内存缓存，连续下拉不会重复打 30+ 个请求。
+     */
+    suspend fun loadLatestAllBoards(): List<ThreadSummary> = withContext(Dispatchers.IO) {
+        val cached = latestAllCache
+        if (cached != null && System.currentTimeMillis() - cached.first < 15_000L) {
+            return@withContext cached.second
+        }
+        val fids = Boards.all.map { it.fid }.filter { it > 0 }.distinct()
+        val semaphore = Semaphore(6)
+        val all = coroutineScope {
+            fids.map { fid ->
+                async {
+                    semaphore.withPermit {
+                        runCatching { loadThreads(fid, 1).threads }.getOrDefault(emptyList())
+                    }
+                }
+            }.awaitAll().flatten()
+        }
+        val merged = all.distinctBy { it.id }
+            .sortedWith(
+                compareByDescending { cn.mce.starlight.core.FeedTime.parseApproxMs(it.metaText) ?: 0L },
+            )
+        latestAllCache = System.currentTimeMillis() to merged
+        merged
+    }
+
+    /** v0.4.1：全板块最新主题的内存缓存（时间戳 + 列表） */
+    @Volatile
+    private var latestAllCache: Pair<Long, List<ThreadSummary>>? = null
     private fun fetch(url: String): String {
         val html = GenericPageClient.get(url)
         if (GenericPageClient.isBlockedPage(html)) {

@@ -23,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import cn.mce.starlight.core.SettingsStore
 import cn.mce.starlight.data.HttpForumRepository
 import cn.mce.starlight.data.ThreadSummary
@@ -91,14 +93,25 @@ fun HomeFeedScreen(
                 // v0.4.0 修正：**不再顶到最前面**（旧实现把缺失的自己的帖子无条件 prepend，
                 // 导致它们永远钉在首页顶端）。现在按时间归位，且只补仍在当前页时间范围内的帖子。
                 if (page == 1 && view == "newthread") {
-                    // v0.4.1：导读「最新」会延迟收录（甚至不收）刚发的新主题 —— 刷新时额外合并
-                    // 「综合交流」版块最新一页 + 我的最近主题，保证网页端新帖在 APP 第一时间可见。
-                    val mine = runCatching { repo.loadGuide("my", 1) }.getOrNull()
-                    val board = runCatching { repo.loadThreads(2, 1) }.getOrNull()
+                    // v0.4.1：导读「最新」会延迟收录（甚至不收）刚发的新主题 ——
+                    // 刷新时**并行**拉取所有板块的最新一页 + 我的最近主题，按时间归位合并。
+                    val (mine, allBoards) = coroutineScope {
+                        val mineAsync = async {
+                            runCatching { repo.loadGuide("my", 1) }.getOrNull()
+                        }
+                        val allAsync = async {
+                            runCatching { repo.loadLatestAllBoards() }.getOrDefault(emptyList())
+                        }
+                        mineAsync.await() to allAsync.await()
+                    }
                     val known = base.threads.mapTo(HashSet()) { it.id }
-                    val extras = (board?.threads.orEmpty() + mine?.threads.orEmpty())
+                    val extras = (allBoards + mine?.threads.orEmpty())
                         .filter { it.id !in known }
                         .distinctBy { it.id }
+                        .sortedByDescending {
+                            cn.mce.starlight.core.FeedTime.parseApproxMs(it.metaText) ?: 0L
+                        }
+                        .take(20)
                     if (extras.isEmpty()) base else base.copy(
                         threads = cn.mce.starlight.core.FeedTime.mergeExtras(base.threads, extras),
                     )
