@@ -310,7 +310,10 @@ fun ThreadDetailScreen(
                                 toast = r.message
                             }
                         }) { Text("收藏") }
-                        TextButton(onClick = { showModPanel = !showModPanel }) { Text("管理") }
+                        // v0.4.1：只有网页端确实给出管理链接（管理组）才显示「管理」入口；普通账号隐藏
+                        if (s.detail.modActions.isNotEmpty()) {
+                            TextButton(onClick = { showModPanel = !showModPanel }) { Text("管理") }
+                        }
 
 
                         // v0.3.10：评论数与楼层数分开显示，避免「回复 6」和「共 7 楼」看起来对不上；
@@ -324,9 +327,8 @@ fun ThreadDetailScreen(
                         )
                     }
                     // v0.4.1：版主管理条（与网页端一致：删除主题/升降/置顶/直播/高亮/精华/图章/关闭/移动/分类/复制/合并/分割/修复/警告/屏蔽/用户标签）
-                    // v0.4.1：测试模式——普通账号也显示管理条用于界面测试；有真实管理链接时走真实链接
-                    val modBarActions = if (s.detail.modActions.isNotEmpty()) s.detail.modActions else DEFAULT_MOD_ACTIONS
-                    if (showModPanel) {
+                    // v0.4.1：展开的管理操作面板（仅管理组可见；选项可左右滑动）
+                    if (showModPanel && s.detail.modActions.isNotEmpty()) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -341,7 +343,7 @@ fun ThreadDetailScreen(
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(end = 4.dp),
                             )
-                            modBarActions.forEach { action ->
+                            s.detail.modActions.forEach { action ->
                                 TextButton(
                                     onClick = {
                                         if (action.url.isBlank()) {
@@ -1071,12 +1073,6 @@ private fun PostItem(
  */
 /** 正文里的网址（v0.3.10）：点击直接用系统默认浏览器打开 */
 private val postUrlRegex = Regex("""https?://[^\s<>"'，。；、）】\[\]]+""")
-
-/** v0.4.1 测试模式：没有真实管理链接时用网页端版主管理条默认动作占位（点击提示需要权限） */
-private val DEFAULT_MOD_ACTIONS = listOf(
-    "删除主题", "升降", "置顶", "直播", "高亮", "精华", "图章", "关闭",
-    "移动", "分类", "复制", "合并", "分割", "修复", "警告", "屏蔽", "用户标签",
-).map { cn.mce.starlight.data.ModAction(it, "") }
 
 @Composable
 private fun PostTextBlock(block: ContentBlock.Text) {
