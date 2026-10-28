@@ -127,6 +127,8 @@ fun ThreadDetailScreen(
     var showSmiley by remember { mutableStateOf(false) }
     var smileySets by remember { mutableStateOf(emptyList<SmileyClient.SmileySet>()) }
     var smileySetIndex by remember { mutableIntStateOf(0) }
+    // v0.4.1：版主操作合并为「管理」，展开后横向滑动查看全部动作
+    var showModPanel by remember { mutableStateOf(false) }
     var showMention by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -308,6 +310,7 @@ fun ThreadDetailScreen(
                                 toast = r.message
                             }
                         }) { Text("收藏") }
+                        TextButton(onClick = { showModPanel = !showModPanel }) { Text("管理") }
 
 
                         // v0.3.10：评论数与楼层数分开显示，避免「回复 6」和「共 7 楼」看起来对不上；
@@ -323,7 +326,7 @@ fun ThreadDetailScreen(
                     // v0.4.1：版主管理条（与网页端一致：删除主题/升降/置顶/直播/高亮/精华/图章/关闭/移动/分类/复制/合并/分割/修复/警告/屏蔽/用户标签）
                     // v0.4.1：测试模式——普通账号也显示管理条用于界面测试；有真实管理链接时走真实链接
                     val modBarActions = if (s.detail.modActions.isNotEmpty()) s.detail.modActions else DEFAULT_MOD_ACTIONS
-                    if (true) {
+                    if (showModPanel) {
                         Row(
                             Modifier
                                 .fillMaxWidth()

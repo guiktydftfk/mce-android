@@ -687,6 +687,11 @@ fun MceApp() {
                     onMenu = ::openDrawer,
                     reloadKey = dataVersion,
                     onOpenFriendQr = { push(Route.FriendQr) },
+                    onOpenMyProfile = {
+                        val uid = SessionStore.uid
+                        val name = SessionStore.username ?: "我的资料"
+                        if (uid != null) push(Route.User(uid, name)) else appToast = "先登录才能查看我的资料"
+                    },
                     onOpenScan = { push(Route.Scan) },
                     onLogin = { showLogin = true },
                     onLogout = {

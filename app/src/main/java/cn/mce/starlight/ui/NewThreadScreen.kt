@@ -273,6 +273,7 @@ fun NewThreadScreen(
         }
         contentField = contentField.wrapRange(sel.min, sel.max, open, close)
         lastSelection = contentField.selection
+        lastSelectionTextLen = contentField.text.length
     }
 
     /** 打开颜色弹窗时记住选区（弹窗打开后输入框会失焦，选区可能被清掉） */
@@ -297,12 +298,14 @@ fun NewThreadScreen(
         }
         contentField = contentField.wrapRange(sel.min, sel.max, "[color=$hex]", "[/color]")
         lastSelection = contentField.selection
+        lastSelectionTextLen = contentField.text.length
     }
 
     /**
-     * 对齐（v0.4.1 修复「左/中/右对齐失效」）：
-     *  - 有选中 → 包住选区；
-     *  - 没选中 → 包住「最近一次光标所在行」；该行为空则对整段正文生效，保证一定看得到效果。
+     * 对齐（v0.4.1）：
+     *  - 有选中 → 作用于选区；没选中 → 作用于光标所在行（空行则整段）；
+     *  - 若目标已被对齐标签包裹，直接**替换**对齐方式，不产生嵌套标签；
+     *  - 套用后保持选中，连续点「居中/右对齐」无需重新全选。
      */
     fun applyAlign(direction: String) {
         val label = when (direction) {
@@ -318,21 +321,38 @@ fun NewThreadScreen(
         }
         val sel = effectiveSelection()
         val cursor = contentField.selection.min.takeIf { it > 0 } ?: lastCursor.coerceIn(0, text.length)
-        val (start, end) = if (sel != null) {
-            sel.min to sel.max
+        var start: Int
+        var end: Int
+        if (sel != null) {
+            start = sel.min
+            end = sel.max
         } else {
             val lineStart = text.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { if (it < 0) 0 else it + 1 }
             val lineEnd = text.indexOf('\n', cursor).let { if (it < 0) text.length else it }
-            if (text.substring(lineStart, lineEnd).isBlank()) 0 to text.length else lineStart to lineEnd
+            if (text.substring(lineStart, lineEnd).isBlank()) {
+                start = 0
+                end = text.length
+            } else {
+                start = lineStart
+                end = lineEnd
+            }
         }
-        val target = text.substring(start, end)
+        // 若目标外面已经包着 [align=x]…[/align]，把这一对标签一起纳入替换范围，避免嵌套
+        val before = text.substring(0, start)
+        val openTail = alignOpenTailRegex.find(before)
+        if (openTail != null && text.startsWith("[/align]", end)) {
+            start = openTail.range.first
+            end += "[/align]".length
+        }
+        val target = text.substring(start, end).replace(alignAnyRegex, "")
         if (target.isBlank()) {
             draftTip = "请先选中要${label}的内容"
             return
         }
-        contentField = contentField.wrapRange(start, end, "[align=$direction]", "[/align]")
+        contentField = contentField.wrapRange(start, end, "[align=$direction]", "[/align]", target)
         lastSelection = contentField.selection
-        draftTip = "已${label}"
+        lastSelectionTextLen = contentField.text.length
+        draftTip = "已$label"
     }
 
     /** 存草稿：只存本地（Discuz 手机模板没有草稿箱），不会发布 */
@@ -540,6 +560,7 @@ fun NewThreadScreen(
                 val all = androidx.compose.ui.text.TextRange(0, contentField.text.length)
                 contentField = contentField.copy(selection = all)
                 lastSelection = all
+                lastSelectionTextLen = contentField.text.length
             }
             ToolButton("@") { insertText("@") }
             ToolButton("\u8868\u60c5") { showSmiley = true }
@@ -904,6 +925,10 @@ private fun OptionRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
 
 /** 移动版编辑器原有的 5 个预设色（`data-color`） */
 private val SITE_COLORS = listOf("#222222", "#E64346", "#FF9501", "#AAC238", "#1A497D")
+
+/** v0.4.1：对齐标签（用于替换旧对齐方式，避免嵌套 [align]） */
+private val alignOpenTailRegex = Regex("""\[align=(?:left|center|right)]$""")
+private val alignAnyRegex = Regex("""\[/?align[^\]]*]""", RegexOption.IGNORE_CASE)
 
 /**
  * 网页版论坛编辑器色板（v0.4.0 补充）：

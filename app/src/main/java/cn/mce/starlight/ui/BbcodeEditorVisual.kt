@@ -2,6 +2,7 @@ package cn.mce.starlight.ui
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -9,17 +10,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 
 /**
- * v0.4.0：编辑框「所见即所得」——
+ * v0.4.1：编辑框「所见即所得」——
  *
  * 文本本身仍是 BBCode（不改存储、不改发布内容），但编辑时**把 BBCode 标签整段隐藏**，
- * 只显示文字效果：`[b]粗[/b]` 在框里就是「粗」（加粗），颜色块直接着色，链接带下划线。
+ * 只显示文字效果：加粗/斜体/下划线/颜色/链接，以及 **左对齐/居中/右对齐（实时显示）**。
  *
- * 因为隐藏标签会改变可见文本长度，这里实现了原文↔显示文本的 [OffsetMapping]：
- * 光标/选区/输入法仍然操作原文偏移，删除/输入行为与普通文本框一致。
+ * 隐藏标签会改变可见文本长度，这里实现了原文↔显示文本的 [OffsetMapping]，
+ * 光标/选区/输入法仍然操作原文偏移。
  */
 class BbcodeVisualTransformation : VisualTransformation {
 
@@ -33,15 +35,16 @@ class BbcodeVisualTransformation : VisualTransformation {
         return TransformedText(display, TagOffsetMapping(tags, raw.length, display.length))
     }
 
-    /** 去掉标签后的显示文本 + 内文样式 */
+    /** 去掉标签后的显示文本 + 内文样式 + 段落对齐 */
     private fun buildDisplay(raw: String, tags: List<Pair<Int, Int>>): AnnotatedString {
         var bold = 0
         var italic = 0
         var underline = 0
         var color: Color? = null
         var url = false
+        var align: TextAlign? = null
 
-        fun currentStyle(): SpanStyle? {
+        fun spanStyle(): SpanStyle? {
             if (bold == 0 && italic == 0 && underline == 0 && color == null && !url) return null
             return SpanStyle(
                 fontWeight = if (bold > 0) FontWeight.Bold else null,
@@ -56,32 +59,53 @@ class BbcodeVisualTransformation : VisualTransformation {
             tags.forEach { (tagStart, tagEnd) ->
                 if (tagStart > position) {
                     val chunk = raw.substring(position, tagStart)
-                    val style = currentStyle()
-                    if (style == null) append(chunk) else withStyle(style) { append(chunk) }
+                    appendChunk(chunk, spanStyle(), align)
                 }
                 val tagText = raw.substring(tagStart, tagEnd)
                 val closing = tagText.startsWith("[/")
                 val match = tagRegex.matchEntire(tagText)
                 if (match != null) {
                     val tag = match.groupValues[2].lowercase()
-                    val arg = match.groupValues[3].trim().removePrefix("=").trim()
+                    val arg = match.groupValues[3].trim().removePrefix("=").trim().lowercase()
                     when (tag) {
                         "b" -> bold = if (closing) (bold - 1).coerceAtLeast(0) else bold + 1
                         "i" -> italic = if (closing) (italic - 1).coerceAtLeast(0) else italic + 1
                         "u" -> underline = if (closing) (underline - 1).coerceAtLeast(0) else underline + 1
                         "color" -> color = if (closing) null else parseColor(arg)
                         "url" -> url = !closing
+                        "align" -> align = if (closing) null else textAlignOf(arg)
+                        // Discuz 也支持 [center]/[right]/[left] 简写
+                        "center", "right", "left" -> align = if (closing) null else textAlignOf(tag)
                         else -> Unit
                     }
                 }
                 position = tagEnd
             }
             if (position < raw.length) {
-                val chunk = raw.substring(position)
-                val style = currentStyle()
-                if (style == null) append(chunk) else withStyle(style) { append(chunk) }
+                appendChunk(raw.substring(position), spanStyle(), align)
             }
         }
+    }
+
+    /** 同一段文字同时带「行内样式 + 段落对齐」时，Compose 只支持分别 withStyle，这里嵌套处理 */
+    private fun androidx.compose.ui.text.AnnotatedString.Builder.appendChunk(
+        chunk: String,
+        span: SpanStyle?,
+        align: TextAlign?,
+    ) {
+        val spanStyle = span ?: SpanStyle()
+        val paragraph = align?.let { ParagraphStyle(textAlign = it) }
+        if (paragraph == null) {
+            withStyle(spanStyle) { append(chunk) }
+        } else {
+            withStyle(paragraph) { withStyle(spanStyle) { append(chunk) } }
+        }
+    }
+    private fun textAlignOf(value: String): TextAlign? = when (value.trim().lowercase()) {
+        "center" -> TextAlign.Center
+        "right" -> TextAlign.End
+        "left" -> TextAlign.Start
+        else -> null
     }
 
     private fun parseColor(raw: String): Color? {
@@ -92,10 +116,6 @@ class BbcodeVisualTransformation : VisualTransformation {
 
     /**
      * 原文（含标签）↔ 显示文本（去标签）的偏移映射。
-     *
-     * 规则（与系统文本框常用做法一致）：
-     *  - 原文中落在标签内部的偏移 → 映射到标签起点之前的显示位置（光标不会停在隐藏区域里）；
-     *  - 显示文本中恰好处于「被删标签」边界时 → 映射到标签之后的原文位置（点击/输入都落在正确文字处）。
      */
     private class TagOffsetMapping(
         private val tags: List<Pair<Int, Int>>,
@@ -123,7 +143,6 @@ class BbcodeVisualTransformation : VisualTransformation {
                 val visibleTagStart = tagStart - removed
                 when {
                     target > visibleTagStart -> removed += tagEnd - tagStart
-                    // 恰好落在被隐藏标签的位置：光标放到标签之后，避免"卡在隐藏区域"
                     target == visibleTagStart -> return tagEnd.coerceIn(0, originalLength)
                     else -> break
                 }

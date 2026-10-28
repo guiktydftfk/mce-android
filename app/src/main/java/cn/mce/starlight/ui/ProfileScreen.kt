@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -64,7 +65,11 @@ fun ProfileScreen(
     onOpenPage: (String, String) -> Unit,
     onOpenFriendQr: () -> Unit = {},
     onOpenScan: () -> Unit = {},
+    /** v0.4.1：打开「我的资料」（个人资料详情页） */
+    onOpenMyProfile: () -> Unit = {},
 ) {
+    // v0.4.1：退出登录二次确认
+    var showLogoutConfirm by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<ProfileState>(ProfileState.Loading) }
     var reloadTick by remember { mutableStateOf(0) }
@@ -295,6 +300,15 @@ fun ProfileScreen(
                                         .padding(horizontal = 14.dp, vertical = 12.dp),
                                 )
                             }
+                            // v0.4.1：我的资料（个人资料详情页）
+                            Text(
+                                "我的资料",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenMyProfile() }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                            )
                             // v0.3.4：好友码 / 扫一扫（放在入口列表末尾，不改变原有跳转逻辑）
                             Text(
                                 "我的好友码",
@@ -371,7 +385,7 @@ fun ProfileScreen(
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable(onClick = onLogout)
+                                .clickable { showLogoutConfirm = true }
                                 .padding(vertical = 12.dp),
                         )
                     }
@@ -380,6 +394,23 @@ fun ProfileScreen(
         }
 
         ImmersiveTopBar(title = "我的", modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
+    }
+    // v0.4.1：退出登录二次确认
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirm = false },
+            title = { Text("退出登录？") },
+            text = { Text("退出后本机会清除登录态与列表缓存，需要重新登录才能发帖、查看私信等。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogoutConfirm = false
+                    onLogout()
+                }) { Text("退出登录", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirm = false }) { Text("取消") }
+            },
+        )
     }
 }
 
