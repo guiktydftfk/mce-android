@@ -49,11 +49,15 @@ fun HomeFeedScreen(
     onOpenThread: (ThreadSummary) -> Unit,
     /** v0.4.1：从帖子返回时回到顶部 */
     scrollToTopKey: Int = 0,
-    /** v0.4.1：首页列表滚动状态（由 MceApp 持有，从帖子返回时保持位置） */
-    listState: androidx.compose.foundation.lazy.LazyListState? = null,
+    /** v0.4.1：首页各导读 tab 的滚动状态（由 MceApp 持有，从帖子返回时保持位置） */
+    listStates: MutableMap<String, androidx.compose.foundation.lazy.LazyListState>? = null,
 ) {
     val repo = remember { HttpForumRepository() }
     var view by remember { mutableStateOf("newthread") }
+    // v0.4.1：每个导读 tab 独立滚动状态；从帖子返回时同一 tab 复用原状态（不再回顶）
+    val listState: androidx.compose.foundation.lazy.LazyListState? =
+        if (listStates == null) null
+        else remember(view) { listStates.getOrPut(view) { androidx.compose.foundation.lazy.LazyListState() } }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     // v0.3.10：首页列表缓存 —— 首次打开/从帖子返回时先用缓存秒开，再后台刷新

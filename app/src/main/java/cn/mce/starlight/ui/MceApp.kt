@@ -149,8 +149,8 @@ fun MceApp() {
     var dataVersion by remember { mutableIntStateOf(0) }
     // v0.4.1：从帖子返回首页时回到顶部
     var feedTopTick by remember { mutableIntStateOf(0) }
-    // v0.4.1：首页滚动状态放在导航之上——从帖子返回时保持当前滚动位置
-    val feedListState = remember { androidx.compose.foundation.lazy.LazyListState() }
+    // v0.4.1：首页各 tab 的滚动状态放在导航之上——从帖子返回时保持当前滚动位置
+    val feedListStates = remember { mutableStateMapOf<String, androidx.compose.foundation.lazy.LazyListState>() }
     // v0.4.1：液态玻璃「重点框」直接拖动（拖动时框跟随手指，松手进入对应菜单）
     var drawerDragActive by remember { mutableStateOf(false) }
     var drawerDragDelta by remember { mutableStateOf(0f) }
@@ -680,7 +680,7 @@ fun MceApp() {
                     reloadKey = dataVersion,
                     onOpenThread = { push(Route.Thread(it.id, it.title)) },
                     scrollToTopKey = feedTopTick,
-                    listState = feedListState,
+                    listStates = feedListStates,
                 )
 
                 Dest.Profile -> ProfileScreen(

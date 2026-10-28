@@ -111,10 +111,6 @@ fun PagedThreadList(
     val ownListState = remember(resetKey) { LazyListState() }
     // v0.4.1：外部状态优先——返回首页时保留滚动位置
     val listState = externalListState ?: ownListState
-    // 切换导读 tab / 筛选条件时，外部状态也要回到顶部
-    LaunchedEffect(resetKey) {
-        if (externalListState != null) runCatching { externalListState.requestScrollToItem(0) }
-    }
 
     // v0.4.1：从帖子返回列表时回到顶部（旧实现只有刷新才回顶）
     LaunchedEffect(scrollToTopKey) {
