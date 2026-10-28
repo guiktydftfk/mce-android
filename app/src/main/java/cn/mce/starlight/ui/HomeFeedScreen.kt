@@ -87,22 +87,17 @@ fun HomeFeedScreen(
                 "这个分类还没有帖子，下拉刷新试试"
             },
             loader = { page ->
-                val base = repo.loadGuide(view, page)
-                // v0.3.9：论坛「导读」偶尔不收录自己刚发的帖子（版块列表能看到、首页看不到，
-                // 但仍会收到该帖的新消息提醒）。首页第一页额外合并「我的最近主题」。
-                // v0.4.0 修正：**不再顶到最前面**（旧实现把缺失的自己的帖子无条件 prepend，
-                // 导致它们永远钉在首页顶端）。现在按时间归位，且只补仍在当前页时间范围内的帖子。
                 if (page == 1 && view == "newthread") {
-                    // v0.4.1：导读「最新」会延迟收录（甚至不收）刚发的新主题 ——
-                    // 刷新时**并行**拉取所有板块的最新一页 + 我的最近主题，按时间归位合并。
-                    val (mine, allBoards) = coroutineScope {
+                    // v0.4.1：导读 + 我的最近主题 + 全板块最新**三路并行**，刷新等待 = 最慢的一路
+                    val (base, mine, allBoards) = coroutineScope {
+                        val guideAsync = async { repo.loadGuide(view, page) }
                         val mineAsync = async {
                             runCatching { repo.loadGuide("my", 1) }.getOrNull()
                         }
                         val allAsync = async {
                             runCatching { repo.loadLatestAllBoards() }.getOrDefault(emptyList())
                         }
-                        mineAsync.await() to allAsync.await()
+                        Triple(guideAsync.await(), mineAsync.await(), allAsync.await())
                     }
                     val known = base.threads.mapTo(HashSet()) { it.id }
                     val extras = (allBoards + mine?.threads.orEmpty())
@@ -116,7 +111,8 @@ fun HomeFeedScreen(
                         threads = cn.mce.starlight.core.FeedTime.mergeExtras(base.threads, extras),
                     )
                 } else {
-                    base
+                    // 非「最新」页/非第 1 页：直接走导读，无需额外合并
+                    repo.loadGuide(view, page)
                 }
             },
             // v0.3.8：按字数过滤（只看首页信息流，不影响板块/搜索）

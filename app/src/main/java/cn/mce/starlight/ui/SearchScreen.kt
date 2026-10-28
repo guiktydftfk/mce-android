@@ -184,7 +184,7 @@ fun SearchScreen(
                 OutlinedTextField(
                     value = keyword,
                     onValueChange = { keyword = it },
-                    label = { Text(if (mode == "user") "用户名/UID" else "关键词") },
+                    label = { Text(if (mode == "user") "用户名/UID" else "关键词（匹配标题与正文）") },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )

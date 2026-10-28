@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -34,27 +34,46 @@ object SearchClient {
     )
 
     private suspend fun formhash(): String = FormhashStore.get()
-
-    private fun post(fields: List<Pair<String, String>>): String {
+    /**
+     * v0.4.1：支持电脑版模板回退（mobile=no + 桌面 UA）。
+     * 手机模板的帖子搜索偶尔只回「标题命中」，电脑版搜索能覆盖到正文。
+     */
+    private fun post(
+        fields: List<Pair<String, String>>,
+        mobile: Boolean = true,
+    ): String {
         val body = fields.joinToString("&") {
             URLEncoder.encode(it.first, "UTF-8") + "=" + URLEncoder.encode(it.second, "UTF-8")
         }
-        return GenericPageClient.httpPost("$BASE/search.php?searchsubmit=yes", body, null)
+        val url = if (mobile) {
+            "$BASE/search.php?searchsubmit=yes"
+        } else {
+            "$BASE/search.php?searchsubmit=yes&mobile=no"
+        }
+        return GenericPageClient.httpPost(
+            url,
+            body,
+            null,
+            if (mobile) null else GenericPageClient.DESKTOP_UA,
+        )
     }
 
+    /**
+     * v0.4.1：帖子关键词搜索 —— 关键词同时匹配**标题与正文**（论坛全文搜索）。
+     * 手机模板若只回标题命中（结果为空/不全），回退电脑版模板再搜一次。
+     */
     suspend fun searchThreads(query: String): List<Hit> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext emptyList()
-        val html = post(
-            listOf(
-                "formhash" to formhash(),
-                "mod" to "forum",
-                "srchtxt" to query,
-                "searchsubmit" to "yes",
-            ),
+        val fields = listOf(
+            "formhash" to formhash(),
+            "mod" to "forum",
+            "srchtxt" to query,
+            "searchsubmit" to "yes",
         )
-        parseThreads(html)
+        val mobileHits = runCatching { parseThreads(post(fields, mobile = true)) }.getOrDefault(emptyList())
+        if (mobileHits.isNotEmpty()) return@withContext mobileHits
+        runCatching { parseThreads(post(fields, mobile = false)) }.getOrDefault(emptyList())
     }
-
     suspend fun advancedSearch(advanced: Advanced): List<Hit> = withContext(Dispatchers.IO) {
         val fields = mutableListOf(
             "formhash" to formhash(),

@@ -82,8 +82,11 @@ object MessageCenter {
      * 消息页加载/刷新列表后立即调用 → 页签角标与列表行永远同源。
      */
     fun applyPmItems(items: List<PersonalClient.PmItem>) {
-        unreadPm = items.sumOf { it.unread.coerceAtLeast(0) }
-        pmConversations = items.count { it.unread > 0 }
+        // v0.4.1：先套用「本地已读账本」——论坛模板读完私信仍返回未读，
+        // 不套用的话角标不消失、还会被当成新消息弹提示。
+        val effective = PmReadStore.overlay(items)
+        unreadPm = effective.sumOf { it.unread.coerceAtLeast(0) }
+        pmConversations = effective.count { it.unread > 0 }
     }
 
     /**
@@ -107,9 +110,11 @@ object MessageCenter {
             val noticesDeferred = async { runCatching { PersonalClient.loadNotices(1) }.getOrNull() }
 
             val pm = pmDeferred.await()
-            val curPmBaseline: Map<Int, Int>? = if (pm != null) {
-                applyPmItems(pm)
-                pmBaselineOf(pm).also { latestPmSig = MessageNotifyRules.encodeBaseline(it) }
+            // v0.4.1：刷新前先套用本地已读账本：已读会话不再算未读、也不再被判成「新消息」弹窗
+            val pmEffective = pm?.let { PmReadStore.overlay(it) }
+            val curPmBaseline: Map<Int, Int>? = if (pmEffective != null) {
+                applyPmItems(pmEffective)
+                pmBaselineOf(pmEffective).also { latestPmSig = MessageNotifyRules.encodeBaseline(it) }
             } else {
                 null
             }

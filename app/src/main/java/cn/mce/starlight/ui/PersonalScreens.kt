@@ -268,10 +268,12 @@ fun NoticesScreen(
     suspend fun loadPm() {
         runCatching { PersonalClient.loadPm(1) }
             .onSuccess {
-                pmState = PState.Content(it)
+                // v0.4.1：列表先套本地已读账本，已读会话不再显示红点/角标
+                val overlaid = cn.mce.starlight.core.PmReadStore.overlay(it)
+                pmState = PState.Content(overlaid)
                 // v0.3.7：列表就是未读真源 —— 拉到什么就写回 MessageCenter，
                 // 页签角标与列表行不再出现「列表读完了、角标还挂着 (2)」的错位
-                MessageCenter.applyPmItems(it)
+                MessageCenter.applyPmItems(overlaid)
             }
             .onFailure { pmState = PState.Error(it.message ?: "加载失败") }
     }
@@ -367,6 +369,10 @@ fun NoticesScreen(
                                 cn.mce.starlight.core.PmReadStore.markRead(
                                     item.touid,
                                     cn.mce.starlight.core.PmReadStore.signature(item),
+                                )
+                                // v0.4.1：点开会话立即把该会话从未读里扣掉（不必等返回列表重拉）
+                                cn.mce.starlight.core.MessageCenter.applyPmItems(
+                                    cn.mce.starlight.core.PmReadStore.overlay(s.items),
                                 )
                                 onOpenPm(item.touid, item.title.ifBlank { "私信" })
                             }

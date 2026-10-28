@@ -68,11 +68,11 @@ class HttpForumRepository(
      * v0.4.1：并行拉取**所有板块**的最新一页主题，合并去重后按发布时间倒序。
      * 首页「最新」用它兜底导读延迟收录（用户要求覆盖全部板块）。
      * - 并发 6，避免一次打满论坛导致限流；
-     * - 结果带 15 秒内存缓存，连续下拉不会重复打 30+ 个请求。
+     * - 结果带 120 秒内存缓存：首次刷新并行拉全板块，后续刷新直接命中缓存（明显更快）。
      */
     suspend fun loadLatestAllBoards(): List<ThreadSummary> = withContext(Dispatchers.IO) {
         val cached = latestAllCache
-        if (cached != null && System.currentTimeMillis() - cached.first < 15_000L) {
+        if (cached != null && System.currentTimeMillis() - cached.first < 120_000L) {
             return@withContext cached.second
         }
         val fids = Boards.all.map { it.fid }.filter { it > 0 }.distinct()

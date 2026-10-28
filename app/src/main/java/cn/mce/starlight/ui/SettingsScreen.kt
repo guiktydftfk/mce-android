@@ -29,6 +29,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -331,7 +332,51 @@ fun SettingsScreen(
             }
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
 
+            // v0.4.1：存储 —— 显示缓存占用 + 一键清理（图片/首页列表等可再生成缓存）
+            SectionTitle("存储")
+            Spacer(Modifier.height(8.dp))
+            var cacheBytes by remember { mutableStateOf(0L) }
+            var clearingCache by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                cacheBytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    cn.mce.starlight.core.CacheManager.sizeBytes(context)
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("缓存占用", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "图片 / 首页列表等本地缓存，当前约 " +
+                            cn.mce.starlight.core.CacheManager.format(cacheBytes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.size(12.dp))
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        if (clearingCache) return@TextButton
+                        clearingCache = true
+                        scope.launch {
+                            val before = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                cn.mce.starlight.core.CacheManager.clear(context)
+                            }
+                            cacheBytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                cn.mce.starlight.core.CacheManager.sizeBytes(context)
+                            }
+                            message = "已清理 " + cn.mce.starlight.core.CacheManager.format(before)
+                            clearingCache = false
+                        }
+                    },
+                ) { Text(if (clearingCache) "清理中…" else "清理缓存") }
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
             SectionTitle("更新")
             Spacer(Modifier.height(8.dp))
             Text(

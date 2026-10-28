@@ -253,9 +253,13 @@ object GenericPageClient {
         throw IOException("too many redirects")
     }
 
-    fun httpPost(url: String, body: String, cookie: String?): String =
-        follow(url, "POST", cookie ?: WebCookies.cookieHeader(url), body)
-
+    fun httpPost(
+        url: String,
+        body: String,
+        cookie: String?,
+        userAgent: String? = null,
+    ): String =
+        follow(url, "POST", cookie ?: WebCookies.cookieHeader(url), body, userAgent)
     /** 保存响应 Cookie：只写入自建 CookieJar（v0.3.3 批 2 已删除 CookieManager 镜像/flush） */
     private fun storeCookies(url: String, conn: HttpURLConnection) {
         runCatching {

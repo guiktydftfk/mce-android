@@ -78,6 +78,17 @@ fun PmChatScreen(
             .onSuccess {
                 chat = it
                 error = null
+                // v0.4.1：打开会话即记「已读签名」（论坛侧读完仍返回未读），并刷新未读角标
+                val last = it.messages.lastOrNull()
+                val sig = (last?.text?.trim().orEmpty().ifBlank { last?.time?.trim().orEmpty() }).take(120)
+                if (touid > 0 && sig.isNotBlank()) {
+                    cn.mce.starlight.core.PmReadStore.markRead(touid, sig)
+                    scope.launch {
+                        runCatching {
+                            cn.mce.starlight.core.MessageCenter.refresh(showBanner = false)
+                        }
+                    }
+                }
                 if (scrollToEnd && it.messages.isNotEmpty()) {
                     listState.requestScrollToItem((it.messages.size - 1).coerceAtLeast(0))
                 }
