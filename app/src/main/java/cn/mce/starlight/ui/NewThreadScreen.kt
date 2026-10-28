@@ -513,9 +513,9 @@ fun NewThreadScreen(
             // v0.4.0：颜色只对选中文字生效（弹窗会记住选区），没选中只提示
             ToolButton("颜色") { openColorPicker() }
             // v0.4.0：对齐（有选中包选中，没选中包当前行）
-            ToolButton("左") { applyAlign("left") }
-            ToolButton("中") { applyAlign("center") }
-            ToolButton("右") { applyAlign("right") }
+            ToolButton("左对齐") { applyAlign("left") }
+            ToolButton("居中") { applyAlign("center") }
+            ToolButton("右对齐") { applyAlign("right") }
             ToolButton("链接") { wrap("[url]", "[/url]", "https://") }
             ToolButton("图片") { pickImages.launch("image/*") }
             ToolButton("图链") { wrap("[img]", "[/img]", "图片链接") }

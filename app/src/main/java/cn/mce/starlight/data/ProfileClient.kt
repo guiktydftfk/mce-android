@@ -32,6 +32,8 @@ object ProfileClient {
         val entries: List<Pair<String, String>>,
         /** v0.3.10：管理员 / 超级版主 / 版主；普通用户为 null（界面不变） */
         val staff: String? = null,
+        /** v0.4.1：用户等级（与用户组分开显示） */
+        val level: String? = null,
     )
 
     private val FIELD_LABELS = listOf("UID", "姓名", "年级", "学校", "专业", "生日", "来自", "个人网站", "血型")
@@ -39,6 +41,8 @@ object ProfileClient {
     suspend fun load(): Profile? = withContext(Dispatchers.IO) {
         runCatching {
             val html = GenericPageClient.get(URL)
+            // v0.4.1 复核用：临时把资料页 HTML 落盘（验证后关闭）
+            cn.mce.starlight.core.DebugDump.dump("profile", html)
             val doc = Jsoup.parse(html, URL)
             val text = doc.text()
 
@@ -48,6 +52,7 @@ object ProfileClient {
             val username = ProfileCommon.username(doc)
             val group = ProfileCommon.group(doc, text)
             val staff = ProfileCommon.staffTitle(doc, text)
+            val level = ProfileCommon.level(doc, text)
             val stats = ProfileCommon.stats(text, listOf("主题", "回帖", "积分", "好友", "威望"))
             val fields = ProfileCommon.fields(text, FIELD_LABELS)
 
@@ -70,6 +75,7 @@ object ProfileClient {
                 fields = fields,
                 entries = entries,
                 staff = staff,
+                level = level,
             )
         }.getOrNull()
     }

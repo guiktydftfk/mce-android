@@ -85,6 +85,8 @@ object ThreadDetailParser {
             formhash = Net.formhashOf(html),
             rewardCount = rewardCount,
             poll = parsePoll(doc),
+            // v0.4.1：同步网页端管理组权限——只有页面上真存在管理链接时才给入口
+            modActions = parseModActions(doc),
         )
     }
 
@@ -105,6 +107,28 @@ object ThreadDetailParser {
      *  - 多选上限来自页面脚本 `var max_obj = N`（Discuz 用 0 表示不限）
      *  - 已投票时没有 input、选项带 `.poll_done`，并有 `div.poll_note4`「您已经投过票」
      */
+    /**
+     * 解析网页端「管理组」才可见的管理操作链接（编辑/删除/置顶/精华/关闭…）。
+     * 普通用户页面里没有这些链接 → 返回空列表 → APP 不显示管理入口。
+     */
+    private fun parseModActions(doc: Document): List<ModAction> {
+        val keywords = listOf(
+            "管理", "编辑", "删除", "置顶", "精华", "关闭", "打开", "警告",
+            "移动", "复制", "合并", "分割", "修复", "审核", "高亮", "提升",
+            "下沉", "推荐", "锁定", "解除", "主题", "帖子",
+        )
+        return doc.select("a[href]").mapNotNull { a ->
+            val href = a.attr("href").replace("&amp;", "&")
+            val label = a.text().trim()
+            // 只有「管理操作」类链接才算：普通用户的快速回复/编辑自己帖子不算
+            val looksLikeMod = href.contains("topicadmin") || href.contains("mod=modcp") ||
+                href.contains("moderate=1") || href.contains("action=moderate")
+            if (!looksLikeMod || label.isEmpty() || label.length > 10) return@mapNotNull null
+            if (keywords.none { label.contains(it) }) return@mapNotNull null
+            ModAction(label = label, url = absolutize(href))
+        }.distinctBy { it.url }.take(12)
+    }
+
     private fun parsePoll(doc: Document): PollData? {
         val form = doc.selectFirst("form#poll") ?: doc.selectFirst("form[name=poll]")
         val list = doc.selectFirst("div.poll_list")

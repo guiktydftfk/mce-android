@@ -11,6 +11,9 @@ import org.jsoup.nodes.Document
 object ProfileCommon {
     private val usernameTitleRegex = Regex("""^(.{1,24}?)的个人资料""")
     private val groupRegex = Regex("""用户组[:：]?\s*([^\s|]{1,20})""")
+    /** v0.4.1：用户等级（网页端资料页「用户等级 / 等级: Lv.x」）；与用户组分开解析，两者互不覆盖 */
+    private val levelRegex = Regex("""(?:用户)?等级[:：]?\s*([^\s|]{1,24})""")
+    private val lvRegex = Regex("""Lv\.?\s*\d+""", RegexOption.IGNORE_CASE)
     private val labelNumberCache = mutableMapOf<String, Regex>()
     private val labelTextCache = mutableMapOf<String, Regex>()
 
@@ -30,8 +33,25 @@ object ProfileCommon {
 
     /** 用户组：「用户组：Lv.4」或样式类 */
     fun group(doc: Document, text: String): String? =
-        groupRegex.find(text)?.groupValues?.get(1)
+        // 实测：资料页头部 <div class="usernames"><i>用户组</i><i>Lv.4</i>，按「非 Lv 的那一个 i」取完整用户组（不再被空格截断）
+        doc.select("div.usernames i, .usernames i").map { it.text().trim() }
+            .firstOrNull { it.isNotBlank() && !it.matches(lvRegex) }
             ?: doc.selectFirst(".grouptitle, .xw1")?.text()?.trim()
+            ?: groupRegex.find(text)?.groupValues?.get(1)
+
+    /** v0.4.1：用户等级（Lv.x / 星星等级等；与用户组分开解析，两者互不覆盖） */
+    fun level(doc: Document, text: String): String? {
+        // 实测资料页结构：<div class="usernames"><span>昵称</span><i>用户组</i><i>Lv.4</i></div>
+        doc.select("div.usernames i, .usernames i").map { it.text().trim() }
+            .firstOrNull { it.matches(lvRegex) || it.startsWith("Lv", ignoreCase = true) }
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return it }
+        levelRegex.find(text)?.groupValues?.get(1)?.trim()
+            ?.takeIf { it.isNotBlank() && it.length <= 24 }
+            ?.let { return it }
+        return doc.selectFirst(".user_level, .level")?.text()?.trim()
+            ?.takeIf { it.isNotBlank() && it.length <= 24 }
+    }
 
     /**
      * 管理身份（v0.3.10）：论坛里的「管理员 / 超级版主 / 版主」。

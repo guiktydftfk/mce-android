@@ -184,7 +184,15 @@ fun ProfileScreen(
                                             color = MaterialTheme.colorScheme.primary,
                                         )
                                     }
-                                    // v0.3.10：管理员/超级版主/版主按实际用户组显示身份徽标；普通用户不显示
+                                    // v0.4.1：用户等级与用户组分开显示（修「显示了用户组就不显示用户等级」）
+                                    p.level?.let { level ->
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            level,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }                                    // v0.3.10：管理员/超级版主/版主按实际用户组显示身份徽标；普通用户不显示
                                     p.staff?.let { staff ->
                                         Spacer(Modifier.width(6.dp))
                                         Text(

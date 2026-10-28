@@ -128,6 +128,8 @@ fun ThreadDetailScreen(
     var smileySets by remember { mutableStateOf(emptyList<SmileyClient.SmileySet>()) }
     var smileySetIndex by remember { mutableIntStateOf(0) }
     var showMention by remember { mutableStateOf(false) }
+    // v0.4.1：管理组可见的「管理」入口（仅当网页端真的给出管理链接时显示）
+    var showModDialog by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
@@ -308,6 +310,11 @@ fun ThreadDetailScreen(
                                 toast = r.message
                             }
                         }) { Text("收藏") }
+
+                        // v0.4.1：同步网页端站点管理组权限——页面有管理链接才显示
+                        if (s.detail.modActions.isNotEmpty()) {
+                            TextButton(onClick = { showModDialog = true }) { Text("管理") }
+                        }
 
                         // v0.3.10：评论数与楼层数分开显示，避免「回复 6」和「共 7 楼」看起来对不上；
                         // 楼主不计入回复楼层（见 ThreadDetailParser：楼主=楼主，回复从 1楼 起）。
@@ -571,6 +578,40 @@ fun ThreadDetailScreen(
     }
 
     // @ 提及弹窗：从本页楼层作者里选人，插入 Discuz @ BBCode
+    // v0.4.1：管理操作（编辑/删除/置顶/精华…）——用 APP 原生页打开论坛管理页，避免误操作
+    if (showModDialog) {
+        val modActions = (state as? DetailState.Content)?.detail?.modActions.orEmpty()
+        AlertDialog(
+            onDismissRequest = { showModDialog = false },
+            title = { Text("帖子管理") },
+            text = {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 380.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        "以下操作来自网页端管理组权限；点开后用 APP 内页面完成",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    modActions.forEach { action ->
+                        TextButton(
+                            onClick = {
+                                showModDialog = false
+                                onOpenPage(action.url, "管理 · ${action.label}")
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(action.label, Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showModDialog = false }) { Text("关闭") } },
+        )
+    }
     if (showMention) {
         AlertDialog(
             onDismissRequest = { showMention = false },
@@ -914,7 +955,15 @@ private fun PostItem(
     onRate: () -> Unit,
     onOpenUser: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+    // v0.4.1：类酷安观感——每个楼层一张卡片（圆角 + 浅底色），与页面背景区分开
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)) {
         // v0.3.8 楼层头部：头像 40dp、楼层徽标 + 时间（单行省略），评分/回复移到楼层底部
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -1012,6 +1061,7 @@ private fun PostItem(
             }
             TextButton(onClick = onReply) { Text("回复", style = MaterialTheme.typography.labelSmall) }
         }
+    }
     }
 }
 

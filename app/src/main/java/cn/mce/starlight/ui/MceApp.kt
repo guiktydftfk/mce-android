@@ -42,6 +42,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -50,6 +51,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -135,6 +140,9 @@ fun MceApp() {
     }
 
     var dest by remember { mutableStateOf(Dest.Feed) }
+    // v0.4.1：液态玻璃「高亮框」支持上下拖动切换——拖动时高亮跟随手指，松手后执行对应菜单项
+    var drawerDragIndex by remember { mutableStateOf(-1) }
+    val drawerItemBounds = remember { mutableStateMapOf<Int, ClosedFloatingPointRange<Float>>() }
     var stack by remember { mutableStateOf(listOf<Route>()) }
     var dataVersion by remember { mutableIntStateOf(0) }
     var showLogin by remember { mutableStateOf(false) }
@@ -294,6 +302,66 @@ fun MceApp() {
             // 玻璃流光：0→1 的一次性扫过（由 MceApp 顶部的 Animatable 驱动，播完即停），
             // 映射到 -0.35→1.35 让高光从中偏左扫到右侧消失
             val sheen = -0.35f + glassSheen.value * 1.7f
+            // v0.4.1：可拖动切换的菜单项（与索引一一对应）
+            val dragActions = listOf<() -> Unit>(
+                { dest = Dest.Feed; stack = emptyList(); closeDrawer() },
+                { dest = Dest.Profile; stack = emptyList(); closeDrawer() },
+                { dest = Dest.SignIn; stack = emptyList(); closeDrawer() },
+                { dest = Dest.Feed; stack = listOf(Route.Compose(null)); closeDrawer() },
+                { dest = Dest.Feed; stack = listOf(Route.DraftBox); closeDrawer() },
+                { dest = Dest.Tasks; stack = emptyList(); closeDrawer() },
+                { dest = Dest.Search; stack = emptyList(); closeDrawer() },
+                { dest = Dest.Ranklist; stack = emptyList(); closeDrawer() },
+                { dest = Dest.Notice; stack = emptyList(); closeDrawer() },
+                { dest = Dest.Settings; stack = emptyList(); closeDrawer() },
+            )
+            fun dragModifierFor(index: Int, isSelected: Boolean): Modifier {
+                if (!isSelected) return Modifier
+                return Modifier.pointerInput(index) {
+                    var dragY = 0f
+                    detectVerticalDragGestures(
+                        onDragStart = { offset ->
+                            dragY = (drawerItemBounds[index]?.start ?: 0f) + offset.y
+                            drawerDragIndex = index
+                        },
+                        onVerticalDrag = { _, delta ->
+                            dragY += delta
+                            var best = -1
+                            var bestDist = Float.MAX_VALUE
+                            drawerItemBounds.forEach { (i, range) ->
+                                val center = (range.start + range.endInclusive) / 2f
+                                val dist = kotlin.math.abs(center - dragY)
+                                if (dist < bestDist) {
+                                    bestDist = dist
+                                    best = i
+                                }
+                            }
+                            if (best >= 0) drawerDragIndex = best
+                        },
+                        onDragEnd = {
+                            val target = drawerDragIndex
+                            drawerDragIndex = -1
+                            if (target in dragActions.indices) dragActions[target]()
+                        },
+                        onDragCancel = { drawerDragIndex = -1 },
+                    )
+                }
+            }
+            @Composable
+            fun DrawerEntry(index: Int, label: String, selected: Boolean) {
+                DrawerItem(
+                    label = label,
+                    selected = selected || drawerDragIndex == index,
+                    sheen = sheen,
+                    onClick = { dragActions[index]() },
+                    modifier = Modifier
+                        .onGloballyPositioned { coords ->
+                            val bounds = coords.boundsInRoot()
+                            drawerItemBounds[index] = bounds.top..bounds.bottom
+                        }
+                        .then(dragModifierFor(index, selected)),
+                )
+            }
             // v0.3.7 液态玻璃抽屉：半透明玻璃底板 + 白色高光/主题色底光（随呼出淡入）+ 玻璃边缘
             Box(
                 Modifier
@@ -339,16 +407,10 @@ fun MceApp() {
                             }
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
 
-                            DrawerItem("全部最新", dest == Dest.Feed && stack.isEmpty(), sheen) {
-                                dest = Dest.Feed; stack = emptyList(); closeDrawer()
-                            }
-                            DrawerItem("我的", dest == Dest.Profile, sheen) {
-                                dest = Dest.Profile; stack = emptyList(); closeDrawer()
-                            }
+                            DrawerEntry(0, "全部最新", dest == Dest.Feed && stack.isEmpty())
+                            DrawerEntry(1, "我的", dest == Dest.Profile)
                             // v0.3.7：签到入口提到「我的」下方（用户要求调整菜单顺序）
-                            DrawerItem("签到", dest == Dest.SignIn, sheen) {
-                                dest = Dest.SignIn; stack = emptyList(); closeDrawer()
-                            }
+                            DrawerEntry(2, "签到", dest == Dest.SignIn)
 
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
                             Text(
@@ -382,32 +444,17 @@ fun MceApp() {
 
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
 
-                            // 发帖入口（签到同时也在「我的」页，菜单里保留签到）
-                            DrawerItem("发帖", false, sheen) {
-                                dest = Dest.Feed
-                                stack = listOf(Route.Compose(null))
-                                closeDrawer()
-                            }
-                            DrawerItem("草稿箱" + if (cn.mce.starlight.core.DraftStore.drafts.isEmpty()) "" else "（${cn.mce.starlight.core.DraftStore.drafts.size}）", false, sheen) {
-                                dest = Dest.Feed
-                                stack = listOf(Route.DraftBox)
-                                closeDrawer()
-                            }
-                            DrawerItem("任务中心", dest == Dest.Tasks, sheen) {
-                                dest = Dest.Tasks; stack = emptyList(); closeDrawer()
-                            }
-                            DrawerItem("搜索", dest == Dest.Search, sheen) {
-                                dest = Dest.Search; stack = emptyList(); closeDrawer()
-                            }
-                            DrawerItem("排行榜", dest == Dest.Ranklist, sheen) {
-                                dest = Dest.Ranklist; stack = emptyList(); closeDrawer()
-                            }
-                            DrawerItem("消息提醒", dest == Dest.Notice, sheen) {
-                                dest = Dest.Notice; stack = emptyList(); closeDrawer()
-                            }
-                            DrawerItem("设置", dest == Dest.Settings, sheen) {
-                                dest = Dest.Settings; stack = emptyList(); closeDrawer()
-                            }
+                            DrawerEntry(3, "发帖", false)
+                            DrawerEntry(
+                                4,
+                                "草稿箱" + if (cn.mce.starlight.core.DraftStore.drafts.isEmpty()) "" else "（${cn.mce.starlight.core.DraftStore.drafts.size}）",
+                                false,
+                            )
+                            DrawerEntry(5, "任务中心", dest == Dest.Tasks)
+                            DrawerEntry(6, "搜索", dest == Dest.Search)
+                            DrawerEntry(7, "排行榜", dest == Dest.Ranklist)
+                            DrawerEntry(8, "消息提醒", dest == Dest.Notice)
+                            DrawerEntry(9, "设置", dest == Dest.Settings)
                         }
                     }
                 }
@@ -576,7 +623,6 @@ fun MceApp() {
                     onMenu = ::openDrawer,
                     reloadKey = dataVersion,
                     onOpenThread = { push(Route.Thread(it.id, it.title)) },
-                    onCompose = { push(Route.Compose(null)) },
                 )
 
                 Dest.Profile -> ProfileScreen(
@@ -760,6 +806,7 @@ private fun DrawerItem(
     label: String,
     selected: Boolean,
     sheen: Float = 0f,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     // v0.3.7 修订：尺寸对齐上一版 NavigationDrawerItem（56dp 高、胶囊形、左右各约 12dp 留白），
@@ -775,8 +822,9 @@ private fun DrawerItem(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 2.dp)
             .height(56.dp)
-            .clip(shape)
-            .clickable(onClick = onClick),
+                .clip(shape)
+                .then(modifier)
+                .clickable(onClick = onClick),
     ) {
         if (selectedFraction > 0.01f) {
             // 玻璃质感高亮层：随 sheen 横向流动的渐变 + 1dp 白色边缘

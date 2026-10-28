@@ -47,7 +47,6 @@ fun HomeFeedScreen(
     onMenu: () -> Unit,
     reloadKey: Int = 0,
     onOpenThread: (ThreadSummary) -> Unit,
-    onCompose: () -> Unit,
 ) {
     val repo = remember { HttpForumRepository() }
     var view by remember { mutableStateOf("newthread") }
@@ -103,8 +102,6 @@ fun HomeFeedScreen(
             title = "全部最新",
             modifier = Modifier.align(Alignment.TopStart),
             onMenu = onMenu,
-            actionLabel = "发帖",
-            onAction = onCompose,
         )
 
         // 导读分类
