@@ -227,7 +227,7 @@ fun ProfileScreen(
                                             fontWeight = FontWeight.Bold,
                                         )
                                         Text(
-                                            label,
+                                            displayStatName(label),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -323,7 +323,7 @@ fun ProfileScreen(
                                 p.fields.entries.forEach { (label, value) ->
                                     Row(Modifier.fillMaxWidth()) {
                                         Text(
-                                            label,
+                                            displayStatName(label),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.width(72.dp),
@@ -380,4 +380,13 @@ private fun staffColor(staff: String): androidx.compose.ui.graphics.Color = when
     staff.contains("\u7ba1\u7406\u5458") -> androidx.compose.ui.graphics.Color(0xFFC62828)
     staff.contains("\u8d85\u7ea7\u7248\u4e3b") -> androidx.compose.ui.graphics.Color(0xFFEF6C00)
     else -> androidx.compose.ui.graphics.Color(0xFF2E7D32)
+}
+
+/**
+ * v0.4.0：论坛字段名沿用「积分」，产品对外统一叫「星光值」。
+ * 只在显示层改名，解析/提交仍用站点的「积分」字段，避免影响其它逻辑。
+ */
+private fun displayStatName(name: String): String = when (name) {
+    "积分" -> "星光值"
+    else -> name
 }

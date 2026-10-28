@@ -544,9 +544,11 @@ fun NewThreadScreen(
                     lastSelectionTextLen = it.text.length
                 }
             },
-            label = { Text("内容（支持 BBCode；选中文字后可加粗/颜色/斜体/下划线）") },
+            label = { Text("内容（选中文字后可加粗/颜色/斜体/下划线，效果直接在框内显示）") },
             minLines = if (pollMode) 4 else 8,
-            modifier = Modifier.fillMaxWidth(),
+    // v0.4.0：编辑框内直接预览 BBCode 样式（加粗/斜体/下划线/颜色/链接），不用去预览页确认
+    visualTransformation = BbcodeVisualTransformation(),
+    modifier = Modifier.fillMaxWidth(),
         )
 
         // v0.4.0：预览改为独立页面（点按钮才生成一次），编辑区不再实时预览

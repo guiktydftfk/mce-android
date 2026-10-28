@@ -2,4 +2,7 @@
 <resources>
     <!-- aMCE 品牌色（与 Compose 主题 primary 一致） -->
     <color name="ic_launcher_background">#1B6FF1</color>
+    <!-- 启动窗口背景（v0.4.0：与 Compose 主题背景一致，避免暗色模式启动白屏闪一下） -->
+    <color name="splash_background">#F7F8FA</color>
+    <color name="splash_status_bar">#F7F8FA</color>
 </resources>

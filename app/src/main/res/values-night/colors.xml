@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- v0.4.0：暗色模式启动窗口用应用深色背景，避免启动瞬间白屏 -->
+    <color name="splash_background">#0E0F11</color>
+    <color name="splash_status_bar">#0E0F11</color>
+</resources>

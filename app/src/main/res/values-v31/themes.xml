@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- v0.4.0：Android 12+ 系统启动画面背景（与应用背景一致，暗色见 values-night-v31） -->
+    <style name="Theme.MCE" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:statusBarColor">@color/splash_status_bar</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -978,6 +980,7 @@ private fun PostItem(
             post.blocks.forEach { block ->
                 when (block) {
                     is ContentBlock.Text -> PostTextBlock(block)
+                    is ContentBlock.Table -> PostTableBlock(block)
                     is ContentBlock.Image -> if (block.url.contains("/smiley/")) {
                         // 正文表情（小红龙等）：按原尺寸小图显示，不要拉满整行
                         AsyncImage(
@@ -1108,5 +1111,42 @@ private fun PostTextBlock(block: ContentBlock.Text) {
             style = textStyle.copy(color = baseColor),
             onClick = onUrlClick,
         )
+    }
+}
+
+/**
+ * v0.4.0：帖子里的表格（`[table]`/HTML 表格）按行列渲染：
+ * 表头高亮、单元格描边、超宽表格可横向滚动（长表格比以前摊平成文字好读很多）。
+ */
+@Composable
+private fun PostTableBlock(table: ContentBlock.Table) {
+    val borderColor = MaterialTheme.colorScheme.outlineVariant
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(8.dp)),
+    ) {
+        table.rows.forEachIndexed { rowIndex, row ->
+            Row(Modifier.fillMaxWidth()) {
+                row.forEach { cell ->
+                    val isHeader = rowIndex == 0 && table.hasHeader
+                    Box(
+                        Modifier
+                            .widthIn(min = 96.dp, max = 240.dp)
+                            .background(if (isHeader) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+                            .border(0.5.dp, borderColor)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    ) {
+                        Text(
+                            text = cell,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = if (isHeader) FontWeight.SemiBold else null,
+                        )
+                    }
+                }
+            }
+        }
     }
 }

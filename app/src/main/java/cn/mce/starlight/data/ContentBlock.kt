@@ -13,6 +13,15 @@ sealed interface ContentBlock {
     ) : ContentBlock
 
     data class Image(val url: String) : ContentBlock
+
+    /**
+     * v0.4.0：帖子里的 HTML 表格（BBCode `[table]` 或编辑器粘贴的表格）。
+     * 旧实现把 `<tr>/<td>` 摊平成一行行文字，长表格完全没法读；现在单独成块渲染。
+     */
+    data class Table(
+        val rows: List<List<String>>,
+        val hasHeader: Boolean = true,
+    ) : ContentBlock
 }
 
 /** 正文超链接区间：[start, end) 是链接文字，[url] 是跳转地址（绝对地址） */

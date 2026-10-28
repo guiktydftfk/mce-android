@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- v0.4.0：暗色模式（系统深色）启动画面用深色背景，避免白屏闪一下 -->
+    <style name="Theme.MCE" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:statusBarColor">@color/splash_status_bar</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
+    </style>
+</resources>

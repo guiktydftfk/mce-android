@@ -225,6 +225,8 @@ object ThreadDetailParser {
                     // v0.3.8：去重 key 带上样式/段落类型，避免「同文本不同颜色」被吞掉一段
                     is ContentBlock.Text -> "t:" + block.text + "|" + block.spans.hashCode() + "|" + block.kind
                     is ContentBlock.Image -> "i:" + block.url
+                    // v0.4.0：表格去重 key（行内容哈希）
+                    is ContentBlock.Table -> "tb:" + block.rows.hashCode() + "|" + block.hasHeader
                 }
             }
 
@@ -499,6 +501,20 @@ object ThreadDetailParser {
                         return
                     }
                     when (node.tagName().lowercase()) {
+                        // v0.4.0：表格单独成块（按行/列解析），不再把 td/tr 摊平成普通文字
+                        "table" -> {
+                            flush()
+                            val rows = node.select("tr").mapNotNull { tr ->
+                                val cells = tr.children()
+                                    .filter { it.tagName().lowercase() in setOf("td", "th") }
+                                    .map { it.text().replace("\u00a0", " ").trim() }
+                                if (cells.isEmpty() || cells.all { it.isBlank() }) null else cells
+                            }
+                            if (rows.isNotEmpty()) {
+                                blocks.add(ContentBlock.Table(rows = rows, hasHeader = node.select("th").isNotEmpty()))
+                            }
+                            return
+                        }
                         "br" -> sb.append('\n')
                         "img" -> {
                             imageUrlOf(node, allowSmiley = true)?.let { url ->
