@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.buildAnnotatedString
@@ -126,6 +127,7 @@ fun ThreadDetailScreen(
     var smileySetIndex by remember { mutableIntStateOf(0) }
     var showMention by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
     /**
      * v0.3.8 流水式阅读：第 2 页起把楼层追加到已有列表（不再翻页），
@@ -140,7 +142,8 @@ fun ThreadDetailScreen(
                 cn.mce.starlight.data.FormhashStore.seed(d.formhash)
                 val existing = (state as? DetailState.Content)?.detail
                 val merged = if (existing != null && targetPage > 1) {
-                    d.copy(posts = existing.posts + d.posts)
+                    val seen = existing.posts.mapTo(HashSet()) { it.pid }
+                    d.copy(posts = existing.posts + d.posts.filterNot { it.pid in seen })
                 } else {
                     d
                 }
@@ -169,8 +172,16 @@ fun ThreadDetailScreen(
             runCatching { repo.loadThreadDetail(tid, nextPage) }
                 .onSuccess { d ->
                     if (d.posts.isNotEmpty()) {
+                        // v0.4.0：手机模板对超范围的 page 会重复返回同一页（同批 pid），
+                        // 旧实现直接 append 会把楼层重复累加（详情页出现「共 300 楼」而实际 10 楼）
                         page = nextPage
-                        state = DetailState.Content(d.copy(posts = cur.posts + d.posts))
+                        val seen = cur.posts.mapTo(HashSet()) { it.pid }
+                        val fresh = d.posts.filterNot { it.pid in seen }
+                        if (fresh.isEmpty()) {
+                            state = DetailState.Content(cur.copy(hasNextPage = false))
+                            return
+                        }
+                        state = DetailState.Content(d.copy(posts = cur.posts + fresh))
                     } else {
                         // 没有更多楼层：把当前页标记为最后一页即可
                         state = DetailState.Content(cur.copy(hasNextPage = false))
@@ -450,6 +461,9 @@ fun ThreadDetailScreen(
                                     replyText = TextFieldValue("")
                                     replyTo = null
                                     replyImages.clear()
+                                    // v0.4.0：回帖成功后自动收起输入法并把焦点移出输入框（不再一直挂着键盘）
+                                    keyboard?.hide()
+                                    focusManager.clearFocus()
                                     // v0.3.8 流水式阅读：回帖成功后从第 1 页重新聚合所有楼层，
                                     // 新回复会自动出现在列表末尾，并滚到底部。
                                     page = 1

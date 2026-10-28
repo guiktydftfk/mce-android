@@ -13,10 +13,13 @@ package cn.mce.starlight.data
 object BbcodePreview {
 
     sealed interface Block {
-        data class Text(val segments: List<BbSegment>) : Block
+        data class Text(val segments: List<BbSegment>, val align: String? = null) : Block
 
         /** [attachAid] 非空表示是本地刚上传的图片（用本地 Uri 预览）；否则 [src] 是图片地址 */
         data class Image(val src: String, val attachAid: String? = null) : Block
+
+        /** 视频：预览页展示为"视频卡片"（真正播放由论坛网页播放器负责） */
+        data class Video(val src: String) : Block
     }
 
     data class BbSegment(
@@ -32,45 +35,57 @@ object BbcodePreview {
 
     private val tagRegex = Regex("""\[(/?)([a-zA-Z]+)([^\]]*)\]""")
     private val attachLineRegex = Regex("""^\s*\[attach](\d+)\[/attach]\s*$""")
+    private val mediaAnyRegex = Regex("""\[media[^\]]*](.+?)\[/media]""", RegexOption.IGNORE_CASE)
+    private val alignOpenRegex = Regex("""\[(align=(left|center|right)|left|center|right)]""", RegexOption.IGNORE_CASE)
+    private val alignCloseRegex = Regex("""\[/(align|left|center|right)]""", RegexOption.IGNORE_CASE)
     private val imgLineRegex = Regex("""^\s*\[img](.+?)\[/img]\s*$""", RegexOption.IGNORE_CASE)
-    private val imgAnyRegex = Regex("""\[img].*?\[/img]""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+    private val imgAnyRegex = Regex("""\[img](.+?)\[/img]""", RegexOption.IGNORE_CASE)
     private val attachAnyRegex = Regex("""\[attach]\d+\[/attach]""", RegexOption.IGNORE_CASE)
 
     fun render(text: String): List<Block> {
         val blocks = mutableListOf<Block>()
+        var currentAlign: String? = null
         text.split('\n').forEach { rawLine ->
-            val line = rawLine.trimEnd()
-            attachLineRegex.find(line)?.let { m ->
-                blocks.add(Block.Image(src = "", attachAid = m.groupValues[1]))
-                return@forEach
+            var line = rawLine.trimEnd()
+            // 对齐标签可能单独成行，也可能和正文同一行（单行 [align=center]x[/align] 也要生效）
+            val openMatch = alignOpenRegex.find(line)
+            val lineAlign = if (openMatch != null) {
+                val g = openMatch.groupValues[1]
+                (if (g.contains('=')) g.substringAfter('=') else g).lowercase()
+            } else {
+                currentAlign
             }
-            imgLineRegex.find(line)?.let { m ->
-                blocks.add(Block.Image(src = m.groupValues[1].trim()))
-                return@forEach
+            line = line.replace(alignOpenRegex, "")
+            val closesAlign = alignCloseRegex.containsMatchIn(line)
+            if (closesAlign) line = line.replace(alignCloseRegex, "")
+            if (openMatch != null) currentAlign = lineAlign
+
+            // v0.4.0：视频/图片标签可能被 [color]/[align] 等包裹在同一行，
+            // 所以先把它们整段抽成独立块，剩余文字再按行内样式渲染。
+            mediaAnyRegex.findAll(line).forEach { m ->
+                val src = m.groupValues[1].trim()
+                if (src.isNotBlank()) blocks.add(Block.Video(src))
             }
-            // 行内夹着图片：图片单独成块，其余文字按行处理
-            val cleaned = line.replace(attachAnyRegex, "").replace(imgAnyRegex, "")
-            if (cleaned.isBlank()) {
-                if (line.isNotBlank() && cleaned != line) {
-                    // 一行里只有图片标签但没匹配到整行规则时，尽力把图片提出来
-                    attachAnyRegex.findAll(line).forEach { m ->
-                        val aid = Regex("""\d+""").find(m.value)?.value
-                        if (!aid.isNullOrBlank()) blocks.add(Block.Image("", aid))
-                    }
-                    imgAnyRegex.findAll(line).forEach { m ->
-                        val src = m.value.removePrefix("[").removeSuffix("]")
-                            .substringAfter("[img]", "").substringBefore("[/img]")
-                        if (src.isNotBlank()) blocks.add(Block.Image(src))
-                    }
-                }
-                return@forEach
+            var work = line.replace(mediaAnyRegex, "")
+            attachAnyRegex.findAll(work).forEach { m ->
+                val aid = Regex("""\d+""").find(m.value)?.value
+                if (!aid.isNullOrBlank()) blocks.add(Block.Image("", aid))
             }
-            val segments = renderInline(cleaned)
-            if (segments.isNotEmpty()) blocks.add(Block.Text(segments))
+            work = work.replace(attachAnyRegex, "")
+            imgAnyRegex.findAll(work).forEach { m ->
+                val src = m.groupValues[1].trim()
+                if (src.isNotBlank()) blocks.add(Block.Image(src))
+            }
+            work = work.replace(imgAnyRegex, "")
+            val cleaned = work.trim()
+            if (cleaned.isNotEmpty()) {
+                val segments = renderInline(cleaned)
+                if (segments.isNotEmpty()) blocks.add(Block.Text(segments, lineAlign))
+            }
+            if (closesAlign) currentAlign = null
         }
         return blocks
     }
-
     /** 行内 BBCode → 带样式的文字片段；未知标签只丢弃标签本身、保留内部文字 */
     fun renderInline(line: String): List<BbSegment> {
         if (line.isEmpty()) return emptyList()

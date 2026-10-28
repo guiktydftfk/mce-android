@@ -138,6 +138,12 @@ fun NewThreadScreen(
     var showExitConfirm by remember { mutableStateOf(false) }
     // v0.4.0：独立的发帖预览页（非实时）
     var showPreview by remember { mutableStateOf(false) }
+    // v0.4.0：选区跟踪（工具栏/弹窗失焦后仍能作用于原选区）+ 视频插入
+    var lastSelection by remember { mutableStateOf(androidx.compose.ui.text.TextRange(0, 0)) }
+    var lastSelectionTextLen by remember { mutableStateOf(-1) }
+    var pendingColorSelection by remember { mutableStateOf<androidx.compose.ui.text.TextRange?>(null) }
+    var showVideoDialog by remember { mutableStateOf(false) }
+    var videoUrl by remember { mutableStateOf("") }
 
     val fid = selectedFid
     val pollChoices = pollOptions.split('\n').map { it.trim() }.filter { it.isNotBlank() }.distinct()
@@ -235,30 +241,87 @@ fun NewThreadScreen(
         contentField = contentField.insertAtCursor(text)
     }
 
-    /** 是否选中了文字（v0.4.0：加粗/斜体/下划线/颜色只对选中文字生效） */
-    fun hasSelection(): Boolean = contentField.selection.start != contentField.selection.end
+    /**
+     * 取「有效选区」：优先当前选区；如果因为点工具栏/弹窗失焦被输入法清掉，
+     * 就用最近一次非空选区（v0.4.0：修「全选文字后点颜色改不了颜色」）。
+     */
+    fun effectiveSelection(): TextRange? {
+        val cur = contentField.selection
+        if (cur.min != cur.max && contentField.text.substring(cur.min, cur.max).isNotBlank()) return cur
+        val last = lastSelection
+        // 只有「文本长度未变」时才信任记住的选区，避免用户改过正文后把标签包错位置
+        if (lastSelectionTextLen == contentField.text.length &&
+            last.min != last.max && last.max <= contentField.text.length &&
+            contentField.text.substring(last.min, last.max).isNotBlank()
+        ) {
+            return last
+        }
+        return null
+    }
 
     /**
-     * v0.4.0：B/I/U/颜色 只在「选中文字」时生效；没选中就只给一句提示，
-     * 不再往内容框里塞 `[b]加粗文字[/b]` 这类占位文字（用户反馈"没选中也显示在内容框里"）。
+     * v0.4.0：B/I/U 只对选中文字生效；没选中就只给提示，
+     * 不再往内容框里塞 `[b]加粗文字[/b]` 这类占位文字。
      */
     fun styleSelection(open: String, close: String, label: String) {
-        if (!hasSelection()) {
+        val sel = effectiveSelection()
+        if (sel == null) {
             draftTip = "请先选中要${label}的文字，再点「${label}」"
             return
         }
-        contentField = contentField.wrapSelection(open, close, "")
+        contentField = contentField.wrapRange(sel.min, sel.max, open, close)
+        lastSelection = contentField.selection
     }
 
-    /** 选中文字后直接套用预设颜色（与网页编辑器同款色板） */
-    fun applyColor(hex: String) {
-        if (!hasSelection()) {
+    /** 打开颜色弹窗时记住选区（弹窗打开后输入框会失焦，选区可能被清掉） */
+    fun openColorPicker() {
+        val sel = effectiveSelection()
+        if (sel == null) {
             draftTip = "请先选中要变色的文字，再点「颜色」"
-            showColorPicker = false
             return
         }
-        contentField = contentField.wrapSelection("[color=$hex]", "[/color]", "")
+        pendingColorSelection = sel
+        showColorPicker = true
+    }
+
+    /** 用打开弹窗时记住的选区套用颜色 —— 即使输入框已失焦也不会丢 */
+    fun applyColor(hex: String) {
+        val sel = pendingColorSelection ?: effectiveSelection()
         showColorPicker = false
+        pendingColorSelection = null
+        if (sel == null) {
+            draftTip = "请先选中要变色的文字，再点「颜色」"
+            return
+        }
+        contentField = contentField.wrapRange(sel.min, sel.max, "[color=$hex]", "[/color]")
+        lastSelection = contentField.selection
+    }
+
+    /** 对齐：有选中就包住选区，没选中就包住光标所在整行（v0.4.0） */
+    fun applyAlign(direction: String) {
+        val label = when (direction) {
+            "left" -> "左对齐"
+            "center" -> "居中"
+            "right" -> "右对齐"
+            else -> "对齐"
+        }
+        val sel = effectiveSelection()
+        val (start, end) = if (sel != null) {
+            sel.min to sel.max
+        } else {
+            val text = contentField.text
+            val cursor = contentField.selection.min.coerceIn(0, text.length)
+            val lineStart = text.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { if (it < 0) 0 else it + 1 }
+            val lineEnd = text.indexOf('\n', cursor).let { if (it < 0) text.length else it }
+            lineStart to lineEnd
+        }
+        val target = contentField.text.substring(start, end)
+        if (target.isBlank()) {
+            draftTip = "请先选中要${label}的内容"
+            return
+        }
+        contentField = contentField.wrapRange(start, end, "[align=$direction]", "[/align]")
+        lastSelection = contentField.selection
     }
 
     /** 存草稿：只存本地（Discuz 手机模板没有草稿箱），不会发布 */
@@ -447,27 +510,40 @@ fun NewThreadScreen(
             ToolButton("B") { styleSelection("[b]", "[/b]", "加粗") }
             ToolButton("I") { styleSelection("[i]", "[/i]", "斜体") }
             ToolButton("U") { styleSelection("[u]", "[/u]", "下划线") }
-            // v0.4.0：颜色同样只对选中文字生效；没选中只提示、不插入占位文字
-            ToolButton("颜色") {
-                if (hasSelection()) {
-                    showColorPicker = true
-                } else {
-                    draftTip = "请先选中要变色的文字，再点「颜色」"
-                }
-            }
+            // v0.4.0：颜色只对选中文字生效（弹窗会记住选区），没选中只提示
+            ToolButton("颜色") { openColorPicker() }
+            // v0.4.0：对齐（有选中包选中，没选中包当前行）
+            ToolButton("左") { applyAlign("left") }
+            ToolButton("中") { applyAlign("center") }
+            ToolButton("右") { applyAlign("right") }
             ToolButton("链接") { wrap("[url]", "[/url]", "https://") }
             ToolButton("图片") { pickImages.launch("image/*") }
             ToolButton("图链") { wrap("[img]", "[/img]", "图片链接") }
+            // v0.4.0：插入视频（Discuz [media] BBCode）
+            ToolButton("视频") { videoUrl = ""; showVideoDialog = true }
             ToolButton("引用") { wrap("[quote]", "[/quote]", "引用内容") }
             ToolButton("代码") { wrap("[code]", "[/code]", "代码") }
             ToolButton("隐藏") { wrap("[hide]", "[/hide]", "隐藏内容（回复可见）") }
+            // v0.4.0：一键全选（配合颜色/加粗等只对选区生效的功能）
+            ToolButton("全选") {
+                val all = androidx.compose.ui.text.TextRange(0, contentField.text.length)
+                contentField = contentField.copy(selection = all)
+                lastSelection = all
+            }
             ToolButton("@") { insertText("@") }
             ToolButton("\u8868\u60c5") { showSmiley = true }
         }
 
         OutlinedTextField(
             value = contentField,
-            onValueChange = { contentField = it },
+            onValueChange = {
+                contentField = it
+                // 记录最近一次非空选区：弹窗/失焦把选区清掉时还能还原
+                if (it.selection.min != it.selection.max) {
+                    lastSelection = it.selection
+                    lastSelectionTextLen = it.text.length
+                }
+            },
             label = { Text("内容（支持 BBCode；选中文字后可加粗/颜色/斜体/下划线）") },
             minLines = if (pollMode) 4 else 8,
             modifier = Modifier.fillMaxWidth(),
@@ -672,7 +748,47 @@ fun NewThreadScreen(
         )
     }
     if (showColorPicker) {
-        ColorPickerDialog(onPick = { applyColor(it) }, onDismiss = { showColorPicker = false })
+        ColorPickerDialog(
+            onPick = { applyColor(it) },
+            onDismiss = { showColorPicker = false; pendingColorSelection = null },
+        )
+    }
+
+    if (showVideoDialog) {
+        AlertDialog(
+            onDismissRequest = { showVideoDialog = false },
+            title = { Text("插入视频") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "填入视频页面地址（B 站 / 腾讯视频 / 优酷等），发布后由论坛播放器解析。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedTextField(
+                        value = videoUrl,
+                        onValueChange = { videoUrl = it },
+                        label = { Text("视频地址") },
+                        placeholder = { Text("https://www.bilibili.com/video/BV…") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val url = videoUrl.trim()
+                    if (url.isBlank()) {
+                        draftTip = "视频地址不能为空"
+                        return@TextButton
+                    }
+                    insertText("[media=x,500,375]$url[/media]")
+                    showVideoDialog = false
+                    draftTip = "已插入视频（发布后由论坛播放器展开）"
+                }) { Text("插入") }
+            },
+            dismissButton = { TextButton(onClick = { showVideoDialog = false }) { Text("取消") } },
+        )
     }
 
     if (showExitConfirm) {
@@ -771,33 +887,52 @@ private fun OptionRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     }
 }
 
-/** 网页版论坛编辑器（Discuz）的预设颜色，取自 forum.php?mod=post 编辑页的 data-color 列表 */
+/** 移动版编辑器原有的 5 个预设色（`data-color`） */
 private val SITE_COLORS = listOf("#222222", "#E64346", "#FF9501", "#AAC238", "#1A497D")
 
-private val attachMarkerRegex = Regex("""\[attach\](\d+)\[/attach\]""")
+/**
+ * 网页版论坛编辑器色板（v0.4.0 补充）：
+ * 前 30 色按用户提供的网页编辑器色板截图逐像素取样，后 6 色为黑/灰/白与常用亮色。
+ */
+private val WEB_COLORS = listOf(
+    "#70482E", "#505C36", "#18611A", "#3B345D", "#020356", "#3B065E",
+    "#A96F26", "#767824", "#226D1B", "#227175", "#070487", "#5A616B",
+    "#75481F", "#7D8D42", "#3B6D50", "#428985", "#233877", "#5E0D5C",
+    "#AE802B", "#918F2B", "#54B331", "#35B5B4", "#2889A9", "#65307E",
+    "#503D1C", "#3C3A13", "#30621D", "#255152", "#25434E", "#4F264E",
+    "#000000", "#444444", "#888888", "#CCCCCC", "#FFFFFF", "#E64346",
+)
 
-/** 选颜色弹窗：选中文字后点「颜色」→ 直接点色块即可套用 */
+/** 选颜色弹窗：选中文字后点「颜色」→ 直接点色块即可套用（36 色，来自网页版编辑器色板） */
 @Composable
 private fun ColorPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    val palette = (SITE_COLORS + WEB_COLORS).distinct()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("文字颜色") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                Modifier
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text(
-                    "与网页版论坛编辑器一致的预设颜色；先选中要变色的文字，再点色块",
+                    "先选中要变色的文字，再点色块（色板含网页版论坛编辑器的预设色）",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SITE_COLORS.forEach { hex ->
-                        Box(
-                            Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex)))
-                                .clickable { onPick(hex) },
-                        )
+                palette.chunked(6).forEach { rowColors ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        rowColors.forEach { hex ->
+                            Box(
+                                Modifier
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex)))
+                                    .clickable { onPick(hex) },
+                            )
+                        }
                     }
                 }
             }
@@ -805,4 +940,3 @@ private fun ColorPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
         confirmButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
 }
-

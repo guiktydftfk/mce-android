@@ -136,7 +136,40 @@ fun DraftPreviewScreen(
                                 )
                                 androidx.compose.foundation.text.BasicText(
                                     text = annotated,
-                                    style = style,
+                                    style = style.copy(
+                                        textAlign = when (block.align) {
+                                            "center" -> androidx.compose.ui.text.style.TextAlign.Center
+                                            "right" -> androidx.compose.ui.text.style.TextAlign.End
+                                            else -> androidx.compose.ui.text.style.TextAlign.Start
+                                        },
+                                    ),
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+
+                        is BbcodePreview.Block.Video -> {
+                            // 视频：发布后由论坛播放器展开，这里只做"视频卡片"预览（含地址）
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        RoundedCornerShape(10.dp),
+                                    )
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    "▶ 视频",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Text(
+                                    block.src,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
                                 )
                             }
                         }

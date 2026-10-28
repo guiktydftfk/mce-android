@@ -54,6 +54,25 @@ class TextEditingTest {
     }
 
     @Test
+    fun wrapSelection_blankSelection_withEmptyPlaceholder_doesNotInsert() {
+        // v0.4.0：选中空白且没有占位文本时，不能留下 [color=#x][/color] 这种空标签
+        val field = TextFieldValue("a  b", TextRange(1, 3))
+        val out = field.wrapSelection("[color=#E64346]", "[/color]", "")
+        assertEquals("a  b", out.text)
+        assertEquals(TextRange(1, 3), out.selection)
+    }
+
+    @Test
+    fun wrapRange_appliesToRememberedSelection() {
+        // v0.4.0：弹窗期间输入框失焦、选区丢失后，仍按打开弹窗时记住的区间套色
+        val field = TextFieldValue("全选文字", TextRange(0, 0))
+        val out = field.wrapRange(0, 4, "[color=#E64346]", "[/color]")
+        assertEquals("[color=#E64346]全选文字[/color]", out.text)
+        assertEquals(7, out.selection.min)
+        assertEquals(11, out.selection.max)
+    }
+
+    @Test
     fun mentionBbcode_withUid_usesDiscuzUrlBbcode() {
         assertEquals(
             "[url=home.php?mod=space&uid=42]@流云闲鹿[/url] ",

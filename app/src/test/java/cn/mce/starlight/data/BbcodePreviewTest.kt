@@ -72,6 +72,31 @@ class BbcodePreviewTest {
     }
 
     @Test
+    fun block_alignCenter_appliesToTextBlock() {
+        val blocks = BbcodePreview.render("[align=center]居中文字[/align]")
+        assertEquals(1, blocks.size)
+        val text = blocks[0] as BbcodePreview.Block.Text
+        assertEquals("center", text.align)
+        assertEquals("居中文字", text.segments.joinToString("") { it.text })
+    }
+
+    @Test
+    fun block_alignRight_coversMultipleLines() {
+        val blocks = BbcodePreview.render("[align=right]第一行x\n第二行[/align]")
+        val texts = blocks.filterIsInstance<BbcodePreview.Block.Text>()
+        assertEquals(2, texts.size)
+        assertTrue(texts.all { it.align == "right" })
+    }
+
+    @Test
+    fun block_media_becomesVideo() {
+        val blocks = BbcodePreview.render("[media=x,500,375]https://www.bilibili.com/video/BV1xx[/media]")
+        assertEquals(1, blocks.size)
+        val video = blocks[0] as BbcodePreview.Block.Video
+        assertEquals("https://www.bilibili.com/video/BV1xx", video.src)
+    }
+
+    @Test
     fun block_emptyText_returnsNoBlocks() {
         assertTrue(BbcodePreview.render("   \n\n  ").isEmpty())
     }
