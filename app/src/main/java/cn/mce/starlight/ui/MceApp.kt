@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -147,6 +149,13 @@ fun MceApp() {
     var dataVersion by remember { mutableIntStateOf(0) }
     // v0.4.1：从帖子返回首页时回到顶部
     var feedTopTick by remember { mutableIntStateOf(0) }
+    // v0.4.1：首页滚动状态放在导航之上——从帖子返回时保持当前滚动位置
+    val feedListState = remember { androidx.compose.foundation.lazy.LazyListState() }
+    // v0.4.1：液态玻璃「重点框」直接拖动（拖动时框跟随手指，松手进入对应菜单）
+    var drawerDragActive by remember { mutableStateOf(false) }
+    var drawerDragDelta by remember { mutableStateOf(0f) }
+    var drawerDragStartTop by remember { mutableStateOf(0f) }
+    var drawerContentTop by remember { mutableStateOf(0f) }
     var showLogin by remember { mutableStateOf(false) }
     // v0.3.7：板块分组默认全部折叠（用户要求「全国交流」保持折叠）
     var expandedGroups by remember { mutableStateOf(emptySet<String>()) }
@@ -175,7 +184,6 @@ fun MceApp() {
         val popped = stack.lastOrNull()
         stack = stack.dropLast(1)
         // v0.4.1：从帖子详情返回列表时回到顶部（其它页面保持原位）
-        if (popped is Route.Thread) feedTopTick++
     }
 
     /** 下载并拉起安装（普通更新与紧急更新共用；紧急更新只是不需要用户先点「立即更新」） */
@@ -325,19 +333,21 @@ fun MceApp() {
             fun dragModifierFor(index: Int, isSelected: Boolean): Modifier {
                 if (!isSelected) return Modifier
                 return Modifier.pointerInput(index) {
-                    var dragY = 0f
                     detectVerticalDragGestures(
                         onDragStart = { offset ->
-                            dragY = (drawerItemBounds[index]?.start ?: 0f) + offset.y
+                            drawerDragStartTop = drawerItemBounds[index]?.start ?: 0f
+                            drawerDragDelta = offset.y
+                            drawerDragActive = true
                             drawerDragIndex = index
                         },
                         onVerticalDrag = { _, delta ->
-                            dragY += delta
+                            drawerDragDelta += delta
+                            val pointerY = drawerDragStartTop + drawerDragDelta
                             var best = -1
                             var bestDist = Float.MAX_VALUE
                             drawerItemBounds.forEach { (i, range) ->
                                 val center = (range.start + range.endInclusive) / 2f
-                                val dist = kotlin.math.abs(center - dragY)
+                                val dist = kotlin.math.abs(center - pointerY)
                                 if (dist < bestDist) {
                                     bestDist = dist
                                     best = i
@@ -347,10 +357,16 @@ fun MceApp() {
                         },
                         onDragEnd = {
                             val target = drawerDragIndex
+                            drawerDragActive = false
+                            drawerDragDelta = 0f
                             drawerDragIndex = -1
                             if (target in dragActions.indices) dragActions[target]()
                         },
-                        onDragCancel = { drawerDragIndex = -1 },
+                        onDragCancel = {
+                            drawerDragActive = false
+                            drawerDragDelta = 0f
+                            drawerDragIndex = -1
+                        },
                     )
                 }
             }
@@ -358,7 +374,9 @@ fun MceApp() {
             fun DrawerEntry(index: Int, label: String, selected: Boolean) {
                 DrawerItem(
                     label = label,
-                    selected = selected || drawerDragIndex == index,
+                    // 拖动时由浮层画高亮，条目只负责加粗
+                    selected = (drawerDragIndex == index) || (selected && !drawerDragActive),
+                    showHighlight = !drawerDragActive && selected,
                     sheen = sheen,
                     onClick = { dragActions[index]() },
                     modifier = Modifier
@@ -368,8 +386,7 @@ fun MceApp() {
                         }
                         .then(dragModifierFor(index, selected)),
                 )
-            }
-            // v0.3.7 液态玻璃抽屉：半透明玻璃底板 + 白色高光/主题色底光（随呼出淡入）+ 玻璃边缘
+            }            // v0.3.7 液态玻璃抽屉：半透明玻璃底板 + 白色高光/主题色底光（随呼出淡入）+ 玻璃边缘
             Box(
                 Modifier
                     .fillMaxHeight()
@@ -381,7 +398,11 @@ fun MceApp() {
                     drawerContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f),
                     drawerTonalElevation = 0.dp,
                 ) {
-                    Box(Modifier.fillMaxSize()) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .onGloballyPositioned { drawerContentTop = it.boundsInRoot().top },
+                    ) {
                         Box(
                             Modifier
                                 .fillMaxSize()
@@ -462,6 +483,34 @@ fun MceApp() {
                             DrawerEntry(7, "排行榜", dest == Dest.Ranklist)
                             DrawerEntry(8, "消息提醒", dest == Dest.Notice)
                             DrawerEntry(9, "设置", dest == Dest.Settings)
+                        }
+                        // v0.4.1：拖动时由这个浮层绘制「重点框」，直接跟手移动（条目自身不再画高亮）
+                        if (drawerDragActive && drawerDragIndex >= 0) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp)
+                                    .height(56.dp)
+                                    .offset {
+                                        IntOffset(
+                                            x = 0,
+                                            y = (drawerDragStartTop + drawerDragDelta - drawerContentTop).toInt(),
+                                        )
+                                    }
+                                    .clip(RoundedCornerShape(28.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.42f),
+                                                Color.White.copy(alpha = 0.16f),
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                            ),
+                                            start = Offset(1600f * sheen - 300f, 0f),
+                                            end = Offset(1600f * sheen + 500f, 420f),
+                                        ),
+                                    )
+                                    .border(1.dp, Color.White.copy(alpha = 0.38f), RoundedCornerShape(28.dp)),
+                            )
                         }
                     }
                 }
@@ -631,6 +680,7 @@ fun MceApp() {
                     reloadKey = dataVersion,
                     onOpenThread = { push(Route.Thread(it.id, it.title)) },
                     scrollToTopKey = feedTopTick,
+                    listState = feedListState,
                 )
 
                 Dest.Profile -> ProfileScreen(
@@ -815,6 +865,8 @@ private fun DrawerItem(
     selected: Boolean,
     sheen: Float = 0f,
     modifier: Modifier = Modifier,
+    /** v0.4.1：拖动重点框时由浮层统一绘制高亮，条目自身不再画，避免重影 */
+    showHighlight: Boolean = selected,
     onClick: () -> Unit,
 ) {
     // v0.3.7 修订：尺寸对齐上一版 NavigationDrawerItem（56dp 高、胶囊形、左右各约 12dp 留白），

@@ -45,12 +45,20 @@ fun FeedCard(
     thumbUrl: String? = null,
     onClick: () -> Unit,
 ) {
-    Column(
+    // v0.4.1：与帖子详情一致的卡片化（圆角 + 浅底色 + 卡片间距），不再靠纯留白分层
+    Box(
         modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -135,6 +143,7 @@ fun FeedCard(
                 }
             }
         }
+    }
     }
 }
 

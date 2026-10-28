@@ -49,6 +49,8 @@ fun HomeFeedScreen(
     onOpenThread: (ThreadSummary) -> Unit,
     /** v0.4.1：从帖子返回时回到顶部 */
     scrollToTopKey: Int = 0,
+    /** v0.4.1：首页列表滚动状态（由 MceApp 持有，从帖子返回时保持位置） */
+    listState: androidx.compose.foundation.lazy.LazyListState? = null,
 ) {
     val repo = remember { HttpForumRepository() }
     var view by remember { mutableStateOf("newthread") }
@@ -67,6 +69,7 @@ fun HomeFeedScreen(
             // 过滤阈值变化时也重建列表（resetKey 变化 → 重新加载第 1 页）
             resetKey = Triple(view, reloadKey, SettingsStore.feedMinChars),
             scrollToTopKey = scrollToTopKey,
+            externalListState = listState,
             topPadding = topInset + 104.dp,
             horizontalPadding = 12.dp,
             initialItems = cached?.threads.orEmpty(),
