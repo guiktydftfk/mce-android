@@ -91,11 +91,14 @@ fun HomeFeedScreen(
                 // v0.4.0 修正：**不再顶到最前面**（旧实现把缺失的自己的帖子无条件 prepend，
                 // 导致它们永远钉在首页顶端）。现在按时间归位，且只补仍在当前页时间范围内的帖子。
                 if (page == 1 && view == "newthread") {
+                    // v0.4.1：导读「最新」会延迟收录（甚至不收）刚发的新主题 —— 刷新时额外合并
+                    // 「综合交流」版块最新一页 + 我的最近主题，保证网页端新帖在 APP 第一时间可见。
                     val mine = runCatching { repo.loadGuide("my", 1) }.getOrNull()
-                    val extras = mine?.threads
-                        ?.filter { t -> base.threads.none { it.id == t.id } }
-                        ?.take(2)
-                        .orEmpty()
+                    val board = runCatching { repo.loadThreads(2, 1) }.getOrNull()
+                    val known = base.threads.mapTo(HashSet()) { it.id }
+                    val extras = (board?.threads.orEmpty() + mine?.threads.orEmpty())
+                        .filter { it.id !in known }
+                        .distinctBy { it.id }
                     if (extras.isEmpty()) base else base.copy(
                         threads = cn.mce.starlight.core.FeedTime.mergeExtras(base.threads, extras),
                     )

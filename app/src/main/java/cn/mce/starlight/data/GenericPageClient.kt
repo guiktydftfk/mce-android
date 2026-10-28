@@ -213,6 +213,10 @@ object GenericPageClient {
                 readTimeout = Net.READ_TIMEOUT_MS
                 instanceFollowRedirects = false
                 requestMethod = currentMethod
+                // v0.4.1：论坛/代理/CDN 会缓存页面，导致「网页有新帖、APP 刷新看不到」——强制不走缓存
+                useCaches = false
+                setRequestProperty("Cache-Control", "no-cache")
+                setRequestProperty("Pragma", "no-cache")
                 setRequestProperty("User-Agent", ua)
                 currentCookie?.let { setRequestProperty("Cookie", it) }
                 if (currentMethod == "POST") {

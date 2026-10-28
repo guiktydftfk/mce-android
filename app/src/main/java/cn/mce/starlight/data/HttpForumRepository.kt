@@ -26,7 +26,7 @@ class HttpForumRepository(
                 "digest" -> "&filter=digest&digest=1"
                 else -> ""
             }
-            val url = "$baseHost/forum.php?mod=forumdisplay&fid=$fid&page=$page$extra"
+            val url = "$baseHost/forum.php?mod=forumdisplay&fid=$fid&page=$page$extra&t=${System.currentTimeMillis()}"
             MobileForumParser.parse(fetch(url), url, page)
         }
 
