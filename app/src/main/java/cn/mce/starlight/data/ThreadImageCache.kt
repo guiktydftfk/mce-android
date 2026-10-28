@@ -37,6 +37,12 @@ object ThreadImageCache {
     private val semaphore = Semaphore(CONCURRENCY)
     private val inflight = mutableMapOf<Int, CompletableDeferred<String?>>()
 
+    /** v0.4.0：内存紧张时清空缩略图正/负缓存（磁盘 ThumbCache 保留） */
+    fun trimMemory() {
+        synchronized(positive) { positive.clear() }
+        synchronized(negative) { negative.clear() }
+    }
+
     suspend fun firstImage(tid: Int): String? = withContext(Dispatchers.IO) {
         synchronized(positive) { positive[tid] }?.let { return@withContext it }
 

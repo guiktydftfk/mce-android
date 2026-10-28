@@ -1,14 +1,15 @@
 MCE 星光班 Android 客户端 · 稳定版归档
 =====================================
-版本: 0.4.0 (versionCode 44)
+版本: 0.4.1 (versionCode 45)
 包名: cn.mce.starlight
 签名: 与全部历史版本相同（SHA-256 证书指纹 089ebd7851397257e085e17086203794dbc7ba2e88b245d070107ffa7a78fc8c）
-文件: MCE-starlight-v0.4.0-stable.apk（与 release/MCE-latest.apk 同内容）
-SHA256: 0AC3EB97C14ADA17B46544CCCADD8CD1980555C4AB95FF34F5FD8EDE9600B3AA
+文件: MCE-starlight-v0.4.1-stable.apk（与 release/MCE-latest.apk 同内容）
+SHA256: B14367F45937323F0899647DAD5FB879D15A148452F0691A0C4F211AE9EBE91F
 最小系统: Android 8.0 (API 26)
 
 历史归档
 --------
+- 0.4.0 (versionCode 44): MCE-starlight-v0.4.0-stable.apk
 - 0.3.9 (versionCode 43): MCE-starlight-v0.3.9-stable.apk
 - 0.3.8 (versionCode 42): MCE-starlight-v0.3.8-stable.apk
 
@@ -17,7 +18,7 @@ SHA256: 0AC3EB97C14ADA17B46544CCCADD8CD1980555C4AB95FF34F5FD8EDE9600B3AA
 - 直接安装即可；已装任意历史版本（0.2.3 / 0.3.x / 0.4.x …）均可覆盖升级，无需卸载
 - 因包名与签名一致，系统视为同一应用，数据（登录态、设置、草稿）保留
 - 校验完整性（Windows PowerShell）:
-  Get-FileHash .\MCE-starlight-v0.4.0-stable.apk -Algorithm SHA256
+  Get-FileHash .\MCE-starlight-v0.4.1-stable.apk -Algorithm SHA256
   结果应为上面的 SHA256
 
 长期可用性

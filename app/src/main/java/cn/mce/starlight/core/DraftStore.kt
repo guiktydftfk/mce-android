@@ -43,6 +43,12 @@ object DraftStore {
     fun init(context: Context) {
         appContext = context.applicationContext
         drafts = load()
+        // v0.4.0：草稿含个人信息（正文/标题），改为加密存储；旧明文数据在后台迁移
+        Thread {
+            runCatching {
+                if (prefs()?.getString(KEY, null)?.let { CryptoBox.isEncrypted(it) } == false) persist(drafts)
+            }
+        }.apply { isDaemon = true }.start()
     }
 
     fun get(id: Long): Draft? = drafts.firstOrNull { it.id == id }
@@ -70,7 +76,7 @@ object DraftStore {
     private fun prefs() = appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     private fun load(): List<Draft> {
-        val raw = prefs()?.getString(KEY, null) ?: return emptyList()
+        val raw = CryptoBox.decrypt(prefs()?.getString(KEY, null)) ?: return emptyList()
         return runCatching {
             val arr = JSONArray(raw)
             (0 until arr.length()).mapNotNull { i ->
@@ -113,7 +119,7 @@ object DraftStore {
                         .put("savedAt", d.savedAt),
                 )
             }
-            prefs()?.edit()?.putString(KEY, arr.toString())?.apply()
+            prefs()?.edit()?.putString(KEY, CryptoBox.encrypt(arr.toString()))?.apply()
         }
     }
 }

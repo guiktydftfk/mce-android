@@ -55,6 +55,13 @@ object FeedCache {
         persistAsync()
     }
 
+    /** v0.4.0：内存紧张时只释放内存里的列表（磁盘缓存保留，下次仍能秒开） */
+    @Synchronized
+    fun trimMemory() {
+        memory.clear()
+        // 保留 loaded=true，避免下次 get 再读一遍磁盘；内存里没有就自然回落到网络
+    }
+
     /** 退出登录时清空，避免串号 */
     @Synchronized
     fun clear() {

@@ -26,6 +26,8 @@ object ThreadDetailParser {
     private val uidRegex = Regex("""uid=(\d+)""")
     private val pageNumRegex = Regex("""[?&]page=(\d+)""")
     private val replyCountRegex = Regex("""(\d+)\s*(?:\u56de\u590d|\u5e16\u5b50|\u697c)""")
+    /** v0.4.0：原先在样式解析循环里每次 new Regex，提到常量（详情页每段样式都会走到） */
+    private val boldWeightRegex = Regex("""font-weight\s*:\s*[6-9]00""")
     private val trailingSpaceNewlineRegex = Regex("""[ \t]+\n""")
     private val multiNewlineRegex = Regex("""\n{3,}""")
 
@@ -289,7 +291,7 @@ object ThreadDetailParser {
                     CssColor.parse(m.groupValues[1])?.let { s = s.copy(color = it) }
                 }
                 if (styleAttr.contains("font-weight", true) &&
-                    (styleAttr.contains("bold", true) || Regex("""font-weight\s*:\s*[6-9]00""").containsMatchIn(styleAttr))
+                    (styleAttr.contains("bold", true) || boldWeightRegex.containsMatchIn(styleAttr))
                 ) {
                     s = s.copy(bold = true)
                 }

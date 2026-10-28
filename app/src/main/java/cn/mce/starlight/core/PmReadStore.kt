@@ -20,6 +20,8 @@ object PmReadStore {
 
     fun init(context: Context) {
         appContext = context.applicationContext
+        // v0.4.0：私信已读签名含聊天内容，改为加密存储；旧明文后台迁移
+        Thread { runCatching { migrateToEncrypted() } }.apply { isDaemon = true }.start()
     }
 
     /** 会话签名：最后一条消息的预览（新消息到达时会变）；预览为空时退回时间文本 */
@@ -29,12 +31,12 @@ object PmReadStore {
     /** 打开会话时调用：记住该会话当前的签名，表示「这些消息我已看过」 */
     fun markRead(touid: Int, signature: String) {
         if (touid <= 0 || signature.isBlank()) return
-        prefs()?.edit()?.putString(KEY_PREFIX + touid, signature)?.apply()
+        prefs()?.edit()?.putString(KEY_PREFIX + touid, CryptoBox.encrypt(signature))?.apply()
     }
 
     fun isRead(touid: Int, signature: String): Boolean {
         if (touid <= 0 || signature.isBlank()) return false
-        return prefs()?.getString(KEY_PREFIX + touid, null) == signature
+        return CryptoBox.decrypt(prefs()?.getString(KEY_PREFIX + touid, null)) == signature
     }
 
     /** 把本地已读叠加到服务端列表：本地已读的会话，未读数归零 */
@@ -46,6 +48,15 @@ object PmReadStore {
     /** 退出登录时清空，避免串号 */
     fun clear() {
         prefs()?.edit()?.clear()?.apply()
+    }
+
+    private fun migrateToEncrypted() {
+        val p = prefs() ?: return
+        val plain = p.all.filterValues { it is String && !CryptoBox.isEncrypted(it as String) }
+        if (plain.isEmpty()) return
+        val editor = p.edit()
+        plain.forEach { (key, value) -> editor.putString(key, CryptoBox.encrypt(value as String)) }
+        editor.apply()
     }
 
     private fun prefs() =

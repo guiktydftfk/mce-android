@@ -80,10 +80,23 @@ fun ScanScreen(
         AndroidView(
             factory = { ctx ->
                 WebView(ctx).apply {
+                    // v0.4.0 安全加固：只跑本地内联页面，禁用文件/内容访问与混合内容，禁止弹窗/地理位置/外部跳转
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
-                    settings.allowFileAccess = true
-                    settings.allowContentAccess = true
+                    settings.allowFileAccess = false
+                    settings.allowContentAccess = false
+                    settings.javaScriptCanOpenWindowsAutomatically = false
+                    settings.setGeolocationEnabled(false)
+                    settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                    webViewClient = object : android.webkit.WebViewClient() {
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: android.webkit.WebResourceRequest?,
+                        ): Boolean {
+                            // 本地识别页不允许跳转到任何外部页面（防 JS 接口被第三方页面利用）
+                            return true
+                        }
+                    }
                     webChromeClient = object : WebChromeClient() {
                         override fun onShowFileChooser(
                             webView: WebView?,

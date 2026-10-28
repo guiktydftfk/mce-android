@@ -119,8 +119,8 @@ object MessageCenter {
             }
 
             val prefs = prefs()
-            val savedPmSig = prefs?.getString(KEY_PM_SIG, null)
-            val savedNoticeSig = prefs?.getString(KEY_NOTICE_SIG, null)
+            val savedPmSig = CryptoBox.decrypt(prefs?.getString(KEY_PM_SIG, null))
+            val savedNoticeSig = CryptoBox.decrypt(prefs?.getString(KEY_NOTICE_SIG, null))
 
             // 私信：拉取失败时不做「新消息」判定，避免误报
             val pmIsNew = curPmBaseline != null &&
@@ -160,8 +160,8 @@ object MessageCenter {
     private fun persistSignatures() {
         val p = prefs() ?: return
         val editor = p.edit()
-        latestPmSig?.let { editor.putString(KEY_PM_SIG, it) }
-        latestNoticeSig?.let { editor.putString(KEY_NOTICE_SIG, it) }
+        latestPmSig?.let { editor.putString(KEY_PM_SIG, CryptoBox.encrypt(it)) }
+        latestNoticeSig?.let { editor.putString(KEY_NOTICE_SIG, CryptoBox.encrypt(it)) }
         editor.apply()
     }
 

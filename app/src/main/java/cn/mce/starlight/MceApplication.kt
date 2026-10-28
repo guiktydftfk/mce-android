@@ -17,6 +17,9 @@ import okhttp3.OkHttpClient
  */
 class MceApplication : Application(), ImageLoaderFactory {
 
+    /** v0.4.0：保留 ImageLoader 引用，系统内存告急时主动释放图片内存缓存 */
+    private var imageLoaderRef: ImageLoader? = null
+
     override fun onCreate() {
         super.onCreate()
         // 只做必要的同步初始化；ThumbCache 的 200 条记录解析已改为懒加载（见 ThumbCache.ensureLoaded）
@@ -64,18 +67,42 @@ class MceApplication : Application(), ImageLoaderFactory {
             .followSslRedirects(true)
             .build()
 
-        return ImageLoader.Builder(this)
+        val loader = ImageLoader.Builder(this)
             .okHttpClient(client)
             .crossfade(true)
             .memoryCache {
-                coil.memory.MemoryCache.Builder(this).maxSizePercent(0.25).build()
+                coil.memory.MemoryCache.Builder(this).maxSizePercent(0.18).build()
             }
             .diskCache {
                 coil.disk.DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(100L * 1024 * 1024)
+                    .maxSizeBytes(80L * 1024 * 1024)
                     .build()
             }
             .build()
+        imageLoaderRef = loader
+        return loader
+    }
+
+    /**
+     * v0.4.0：内存/资源占用优化——
+     * 系统内存告急时释放图片内存缓存与列表内存缓存（磁盘缓存保留，界面不闪白）。
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_RUNNING_LOW) {
+            imageLoaderRef?.memoryCache?.trimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
+        }
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            cn.mce.starlight.core.FeedCache.trimMemory()
+            cn.mce.starlight.data.ThreadImageCache.trimMemory()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        imageLoaderRef?.memoryCache?.trimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
+        cn.mce.starlight.core.FeedCache.trimMemory()
+        cn.mce.starlight.data.ThreadImageCache.trimMemory()
     }
 }

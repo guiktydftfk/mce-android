@@ -24,6 +24,9 @@ object CookieJar {
 
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        // v0.4.0：登录 Cookie 属于个人信息，落盘前用 Keystore AES-GCM 加密；
+        // 旧版明文数据在后台线程静默迁移，不阻塞首帧。
+        Thread { runCatching { migrateToEncrypted() } }.apply { isDaemon = true }.start()
     }
 
     private fun store(): SharedPreferences? = prefs
@@ -49,7 +52,9 @@ object CookieJar {
         val p = store() ?: return emptyMap()
         return p.all.entries
             .filter { it.value is String }
-            .associate { it.key to (it.value as String) }
+            // v0.4.0：存储值是密文，读取时解密；旧明文由 CryptoBox 原样返回
+            .mapNotNull { entry -> CryptoBox.decrypt(entry.value as String)?.let { entry.key to it } }
+            .toMap()
     }
 
     /** 是否已登录（Discuz 下发的 auth 类 Cookie） */
@@ -68,7 +73,7 @@ object CookieJar {
             val name = first.substringBefore('=', "").trim()
             val value = first.substringAfter('=', "").trim()
             if (name.isNotEmpty()) {
-                if (value.isEmpty() || value == "deleted") editor.remove(name) else editor.putString(name, value)
+                if (value.isEmpty() || value == "deleted") editor.remove(name) else editor.putString(name, CryptoBox.encrypt(value))
             }
         }
         editor.apply()
@@ -77,7 +82,7 @@ object CookieJar {
 
     @Synchronized
     fun save(name: String, value: String) {
-        store()?.edit()?.putString(name, value)?.apply()
+        store()?.edit()?.putString(name, CryptoBox.encrypt(value))?.apply()
         invalidateHeaderCache()
     }
 
@@ -101,6 +106,17 @@ object CookieJar {
         if (keys.isEmpty()) return
         val editor = p.edit()
         keys.forEach { editor.remove(it) }
+        editor.apply()
+        invalidateHeaderCache()
+    }
+
+    /** 把历史遗留的明文 Cookie 迁移成密文（后台执行，失败不影响使用） */
+    private fun migrateToEncrypted() {
+        val p = store() ?: return
+        val plain = p.all.filterValues { it is String && !CryptoBox.isEncrypted(it as String) }
+        if (plain.isEmpty()) return
+        val editor = p.edit()
+        plain.forEach { (key, value) -> editor.putString(key, CryptoBox.encrypt(value as String)) }
         editor.apply()
         invalidateHeaderCache()
     }
