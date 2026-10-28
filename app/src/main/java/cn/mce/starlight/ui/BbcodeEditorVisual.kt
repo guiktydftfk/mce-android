@@ -15,21 +15,26 @@ import androidx.compose.ui.text.withStyle
 /**
  * v0.4.0：编辑框「所见即所得」——
  *
- * 文本本身仍是 BBCode（不改存储、不改发布内容），但编辑时把
- * `[b]…[/b]`、`[i]…[/i]`、`[u]…[/u]`、`[color=#xxxxxx]…[/color]`、`[url]…[/url]`
- * 包裹的文字**直接按效果显示**，标签本身用灰色提示。
+ * 文本本身仍是 BBCode（不改存储、不改发布内容），但编辑时**把 BBCode 标签整段隐藏**，
+ * 只显示文字效果：`[b]粗[/b]` 在框里就是「粗」（加粗），颜色块直接着色，链接带下划线。
  *
- * 这样选中文字点「加粗/斜体/下划线/颜色」后，内容框里立刻能看到效果，
- * 不必再去「发帖预览」确认。
- *
- * 文本长度保持不变（[OffsetMapping.Identity]），光标/选区/输入法行为都不受影响。
+ * 因为隐藏标签会改变可见文本长度，这里实现了原文↔显示文本的 [OffsetMapping]：
+ * 光标/选区/输入法仍然操作原文偏移，删除/输入行为与普通文本框一致。
  */
 class BbcodeVisualTransformation : VisualTransformation {
 
     override fun filter(text: AnnotatedString): TransformedText {
         val raw = text.text
         if (!raw.contains('[')) return TransformedText(text, OffsetMapping.Identity)
+        val tags = tagRegex.findAll(raw).map { it.range.first to it.range.last + 1 }.toList()
+        if (tags.isEmpty()) return TransformedText(text, OffsetMapping.Identity)
 
+        val display = buildDisplay(raw, tags)
+        return TransformedText(display, TagOffsetMapping(tags, raw.length, display.length))
+    }
+
+    /** 去掉标签后的显示文本 + 内文样式 */
+    private fun buildDisplay(raw: String, tags: List<Pair<Int, Int>>): AnnotatedString {
         var bold = 0
         var italic = 0
         var underline = 0
@@ -46,28 +51,30 @@ class BbcodeVisualTransformation : VisualTransformation {
             )
         }
 
-        val builder = buildAnnotatedString {
+        return buildAnnotatedString {
             var position = 0
-            for (match in tagRegex.findAll(raw)) {
-                if (match.range.first > position) {
-                    val chunk = raw.substring(position, match.range.first)
+            tags.forEach { (tagStart, tagEnd) ->
+                if (tagStart > position) {
+                    val chunk = raw.substring(position, tagStart)
                     val style = currentStyle()
                     if (style == null) append(chunk) else withStyle(style) { append(chunk) }
                 }
-                // 标签本身灰色弱化显示
-                withStyle(tagStyle) { append(match.value) }
-                val closing = match.groupValues[1] == "/"
-                val tag = match.groupValues[2].lowercase()
-                val arg = match.groupValues[3].trim().removePrefix("=").trim()
-                when (tag) {
-                    "b" -> bold = if (closing) (bold - 1).coerceAtLeast(0) else bold + 1
-                    "i" -> italic = if (closing) (italic - 1).coerceAtLeast(0) else italic + 1
-                    "u" -> underline = if (closing) (underline - 1).coerceAtLeast(0) else underline + 1
-                    "color" -> color = if (closing) null else parseColor(arg)
-                    "url" -> url = !closing
-                    else -> Unit
+                val tagText = raw.substring(tagStart, tagEnd)
+                val closing = tagText.startsWith("[/")
+                val match = tagRegex.matchEntire(tagText)
+                if (match != null) {
+                    val tag = match.groupValues[2].lowercase()
+                    val arg = match.groupValues[3].trim().removePrefix("=").trim()
+                    when (tag) {
+                        "b" -> bold = if (closing) (bold - 1).coerceAtLeast(0) else bold + 1
+                        "i" -> italic = if (closing) (italic - 1).coerceAtLeast(0) else italic + 1
+                        "u" -> underline = if (closing) (underline - 1).coerceAtLeast(0) else underline + 1
+                        "color" -> color = if (closing) null else parseColor(arg)
+                        "url" -> url = !closing
+                        else -> Unit
+                    }
                 }
-                position = match.range.last + 1
+                position = tagEnd
             }
             if (position < raw.length) {
                 val chunk = raw.substring(position)
@@ -75,7 +82,6 @@ class BbcodeVisualTransformation : VisualTransformation {
                 if (style == null) append(chunk) else withStyle(style) { append(chunk) }
             }
         }
-        return TransformedText(builder, OffsetMapping.Identity)
     }
 
     private fun parseColor(raw: String): Color? {
@@ -84,10 +90,49 @@ class BbcodeVisualTransformation : VisualTransformation {
         return runCatching { Color(android.graphics.Color.parseColor(v)) }.getOrNull()
     }
 
+    /**
+     * 原文（含标签）↔ 显示文本（去标签）的偏移映射。
+     *
+     * 规则（与系统文本框常用做法一致）：
+     *  - 原文中落在标签内部的偏移 → 映射到标签起点之前的显示位置（光标不会停在隐藏区域里）；
+     *  - 显示文本中恰好处于「被删标签」边界时 → 映射到标签之后的原文位置（点击/输入都落在正确文字处）。
+     */
+    private class TagOffsetMapping(
+        private val tags: List<Pair<Int, Int>>,
+        private val originalLength: Int,
+        private val displayLength: Int,
+    ) : OffsetMapping {
+
+        override fun originalToTransformed(offset: Int): Int {
+            val target = offset.coerceIn(0, originalLength)
+            var removed = 0
+            for ((tagStart, tagEnd) in tags) {
+                when {
+                    target >= tagEnd -> removed += tagEnd - tagStart
+                    target > tagStart -> return (tagStart - removed).coerceIn(0, displayLength)
+                    else -> break
+                }
+            }
+            return (target - removed).coerceIn(0, displayLength)
+        }
+
+        override fun transformedToOriginal(offset: Int): Int {
+            val target = offset.coerceIn(0, displayLength)
+            var removed = 0
+            for ((tagStart, tagEnd) in tags) {
+                val visibleTagStart = tagStart - removed
+                when {
+                    target > visibleTagStart -> removed += tagEnd - tagStart
+                    // 恰好落在被隐藏标签的位置：光标放到标签之后，避免"卡在隐藏区域"
+                    target == visibleTagStart -> return tagEnd.coerceIn(0, originalLength)
+                    else -> break
+                }
+            }
+            return (target + removed).coerceIn(0, originalLength)
+        }
+    }
+
     private companion object {
         val tagRegex = Regex("""\[(/?)([a-zA-Z]+)([^\]]*)]""")
-
-        /** 标签提示样式：灰色弱化，不改变字号，避免排版跳动 */
-        val tagStyle = SpanStyle(color = Color(0xFF7A828C))
     }
 }
