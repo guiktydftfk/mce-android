@@ -98,7 +98,14 @@ fun MagicScreen(
                 null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 else -> if (data.isEmpty() || data.all { it.items.isEmpty() }) {
                     Box(Modifier.fillMaxSize(), Alignment.Center) {
-                        Text("暂无道具数据", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                        when (tab) {
+                            1 -> "我还没有道具"
+                            2 -> "暂无道具使用记录"
+                            else -> "暂无道具数据"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                     }
                 } else {
                     LazyVerticalGrid(
@@ -136,8 +143,7 @@ fun MagicScreen(
 private fun MagicCard(item: MagicClient.Item, onClick: () -> Unit) {
     Column(
         Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .iosGlass(14)
             .clickable(onClick = onClick)
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -50,8 +50,7 @@ fun FeedCard(
         modifier
             .fillMaxWidth()
             .padding(horizontal = 10.dp, vertical = 5.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
+            .iosGlass(16),
     ) {
         Column(
             Modifier

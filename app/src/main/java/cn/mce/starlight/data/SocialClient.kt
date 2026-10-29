@@ -60,7 +60,41 @@ object SocialClient {
                 val progress = Regex("""(\d+\s*/\s*\d+|\d+\s*%)""").find(text)?.value?.trim()
                 Medal(name, desc, absolutize(src), unlocked = !locked, progress = progress)
             }.distinctBy { it.name }
+                .let { mobile -> mobile + loadMedalsDesktop().filter { d -> mobile.none { it.name == d.name } } }
         }.getOrDefault(emptyList())
+    }
+
+    /** v0.4.1：桌面版勋章中心（含未获得的全部勋章） */
+    private fun loadMedalsDesktop(): List<Medal> {
+        val urls = listOf(
+            "$BASE/home.php?mod=space&do=medal&mobile=no",
+            "$BASE/home.php?mod=medal&mobile=no",
+        )
+        for (u in urls) {
+            val html = runCatching {
+                GenericPageClient.get(u, userAgent = Net.DESKTOP_UA, isolateCookies = true)
+            }.getOrNull() ?: continue
+            val doc = Jsoup.parse(html, u)
+            val boxes = doc.select("li:has(img), div:has(img)")
+            val list = boxes.mapNotNull { box ->
+                val img = box.selectFirst("img[src]") ?: return@mapNotNull null
+                val src = img.attr("src")
+                if (!src.contains("medal") && !src.contains("static/image/common/")) return@mapNotNull null
+                val name = img.attr("alt").trim().ifBlank {
+                    box.selectFirst("h3, h4, dt, .xs2, strong")?.text()?.trim().orEmpty()
+                }
+                if (name.isBlank() || name.length > 20) return@mapNotNull null
+                val text = box.text()
+                val locked = text.contains("未获得") || text.contains("未领取") || text.contains("未点亮") ||
+                    text.contains("去申请") || text.contains("已过期")
+                val progress = Regex("""(\d+\s*/\s*\d+|\d+\s*%)""").find(text)?.value?.trim()
+                val desc = box.selectFirst("p, dd, .xg1")?.text()?.trim()
+                    ?.takeIf { it.isNotBlank() && it != name && it.length <= 60 }
+                Medal(name, desc, Net.absolutize(src), unlocked = !locked, progress = progress)
+            }.distinctBy { it.name }
+            if (list.isNotEmpty()) return list
+        }
+        return emptyList()
     }
 
     /** 好友列表：多入口兜底（不同模板路径不同） */
@@ -75,9 +109,47 @@ object SocialClient {
             val url = "$BASE/$path"
             val pageHtml = runCatching { GenericPageClient.get(url) }.getOrNull() ?: continue
             val list = runCatching { parseFriendsHtml(pageHtml, url) }.getOrDefault(emptyList())
-            if (list.isNotEmpty()) return@withContext list
+            if (list.isNotEmpty()) {
+                if (list.all { it.online == null }) {
+                    val onlineMap = runCatching { loadOnlineFromDesktop() }.getOrDefault(emptyMap())
+                    if (onlineMap.isNotEmpty()) {
+                        return@withContext list.map { f -> f.copy(online = onlineMap[f.uid]) }
+                    }
+                }
+                return@withContext list
+            }
         }
         emptyList()
+    }
+
+    /** v0.4.1：桌面版好友页（带在线/离线状态） */
+    private fun loadOnlineFromDesktop(): Map<Int, Boolean> {
+        val urls = listOf(
+            "$BASE/home.php?mod=space&do=friend&view=me&mobile=no",
+            "$BASE/home.php?mod=space&do=friend&mobile=no",
+        )
+        for (u in urls) {
+            val html = runCatching {
+                GenericPageClient.get(u, userAgent = Net.DESKTOP_UA, isolateCookies = true)
+            }.getOrNull() ?: continue
+            val doc = Jsoup.parse(html, u)
+            val result = mutableMapOf<Int, Boolean>()
+            doc.select("li:has(img), dl:has(img)").forEach { box ->
+                val link = box.selectFirst("a[href*=uid=]") ?: box.selectFirst("a[href*=space]")
+                val uid = link?.attr("href")?.let { uidRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() }
+                    ?: return@forEach
+                val text = box.text()
+                val online = when {
+                    box.selectFirst(".online, em.online, .user_online, i[class*=online]") != null -> true
+                    text.contains("在线") -> true
+                    text.contains("离线") -> false
+                    else -> null
+                }
+                online?.let { result[uid] = it }
+            }
+            if (result.isNotEmpty()) return result
+        }
+        return emptyMap()
     }
 
     /**

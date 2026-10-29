@@ -138,8 +138,7 @@ private fun MedallionCard(medal: SocialClient.Medal, onClick: () -> Unit) {
     val dim = if (medal.unlocked) 1f else 0.38f
     Column(
         Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .iosGlass(14)
             .clickable(onClick = onClick)
             .padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -34,56 +34,56 @@ object MagicClient {
             val url = if (path.startsWith("http")) path else "$BASE/$path"
             val html = GenericPageClient.get(url)
             val doc = Jsoup.parse(html, url)
+            val mode = when {
+                path.contains("action=log") -> "log"
+                path.contains("action=my") -> "my"
+                else -> "shop"
+            }
 
-            val sections = mutableListOf<Section>()
-            // 1) 优先按“含图标的卡片”分组
-            val containers = doc.select("li:has(img), div.magic_card, li.magic_item, div.magic_item")
-            var currentTitle: String? = null
-            val buffer = mutableListOf<Item>()
-            var lastItem: Item? = null
+            // 页面里混有顶部快捷菜单（发新帖/抢沙发/去签到…），必须按“道具特征”过滤
+            val banned = listOf(
+                "发新帖", "抢沙发", "来打Call", "去签到", "查积分", "签到", "积分",
+                "排行榜", "搜索", "消息", "提醒", "退出", "首页", "版块", "发现", "我的",
+                "道具商店", "我的道具", "道具记录", "道具中心",
+            )
+            val qtyRegex = Regex("""(数量|剩余|库存|有效期)\s*[:：]?\s*([^\s|]{1,16})""")
+            val timeRegex = Regex("""\d{4}-\d{1,2}-\d{1,2}|\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}|昨天|前天|小时前|分钟前""")
 
-            containers.forEach { box ->
+            val boxes = doc.select("li, div.magic_card, div.magic_item, div.card")
+            val items = mutableListOf<Item>()
+            boxes.forEach { box ->
                 val img = box.selectFirst("img[src]")
                 val text = box.text().trim()
-                if (text.length < 2 || text.length > 120) return@forEach
+                if (text.length < 2 || text.length > 160) return@forEach
                 val name = (img?.attr("alt")?.trim()?.takeIf { it.isNotBlank() }
-                    ?: box.selectFirst("h3, h4, dt, .name, .title")?.text()?.trim()
-                    ?: text.lineSequence().firstOrNull()?.trim().orEmpty())
+                    ?: box.selectFirst("h3, h4, dt, .name, .title, strong")?.text()?.trim()
+                    ?: box.selectFirst("a[href]")?.text()?.trim().orEmpty())
                 if (name.isBlank() || name.length > 24) return@forEach
+                if (banned.any { name == it || name.contains(it) }) return@forEach
                 val price = priceRegex.find(text)?.value?.trim()
+                val qty = qtyRegex.find(text)?.let { it.value.trim() }
+                val time = timeRegex.find(text)?.value
+                val keep = when (mode) {
+                    "shop" -> price != null
+                    "my" -> qty != null || text.contains("我的")
+                    else -> time != null
+                }
+                if (!keep) return@forEach
                 val link = box.selectFirst("a[href]")?.attr("href")
                 val item = Item(
                     name = name,
                     image = img?.attr("src")?.takeIf { it.isNotBlank() }?.let { Net.absolutize(it) },
-                    price = price,
-                    desc = text.takeIf { it != name && it.length <= 60 && price == null },
+                    price = when (mode) {
+                        "shop" -> price
+                        "my" -> qty ?: price
+                        else -> time
+                    },
+                    desc = text.takeIf { it != name && it.length <= 80 && it != price },
                     url = link?.let { Net.absolutize(it) },
                 )
-                // 条目里出现 "我的道具/商店/记录" 之类的分区标题时切换 section
-                val heading = box.selectFirst("h1, h2, h3")?.text()?.trim()
-                if (!heading.isNullOrBlank() && heading != name && heading.length <= 8) {
-                    if (buffer.isNotEmpty()) {
-                        sections += Section(currentTitle, buffer.toList())
-                        buffer.clear()
-                    }
-                    currentTitle = heading
-                }
-                if (lastItem == null || lastItem?.name != item.name) buffer += item
-                lastItem = item
+                if (items.none { it.name == item.name }) items += item
             }
-            if (buffer.isNotEmpty()) sections += Section(currentTitle, buffer.toList())
-
-            // 2) 兜底：按链接抓带 magic 的条目
-            if (sections.isEmpty()) {
-                val fallback = doc.select("a[href*=magic]").mapNotNull { a ->
-                    val name = a.text().trim()
-                    if (name.length < 2 || name.length > 20) return@mapNotNull null
-                    if (name.contains("道具") && name.length <= 4) return@mapNotNull null
-                    Item(name, null, null, null, Net.absolutize(a.attr("href")))
-                }.distinctBy { it.name }
-                if (fallback.isNotEmpty()) sections += Section(null, fallback)
-            }
-            sections
+            if (items.isEmpty()) emptyList() else listOf(Section(null, items))
         }.getOrDefault(emptyList())
     }
 }
