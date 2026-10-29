@@ -90,6 +90,23 @@ data class ThreadDetail(
     val poll: PollData? = null,
     /** v0.4.1：网页端管理组可见的管理操作（普通用户为空，界面不显示入口） */
     val modActions: List<ModAction> = emptyList(),
+    /** v0.4.2：评分/打赏（电脑版帖子页 dl.rate 区块，手机模板不渲染） */
+    val ratings: ThreadRatings? = null,
+)
+
+/** 帖子评分/打赏汇总 */
+data class ThreadRatings(
+    val count: Int,
+    val total: String,
+    val entries: List<RatingEntry>,
+)
+
+data class RatingEntry(
+    val uid: Int?,
+    val name: String,
+    val avatarUrl: String?,
+    val amount: String,
+    val reason: String?,
 )
 
 data class ModAction(val label: String, val url: String)

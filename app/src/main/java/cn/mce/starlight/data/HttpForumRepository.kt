@@ -57,7 +57,10 @@ class HttpForumRepository(
             val detail = ThreadDetailParser.parse(fetch(url), url, tid, page)
             // v0.4.1：版主管理条只在网页端「电脑版」完整渲染（手机模板经常没有）；
             // 已知当前账号是管理组时补抓一次电脑版页面解析管理操作，普通用户不会多发请求。
-            if (detail.modActions.isEmpty() && cn.mce.starlight.core.SessionStore.staff != null) {
+            // v0.4.2：评分/打赏与版主管理条都只在「电脑版」页面渲染（手机模板没有），
+            // 登录后在第 1 页补抓一次电脑版页面，一次请求同时解析两者。
+            val needDesktop = page == 1 && cn.mce.starlight.core.SessionStore.isLoggedIn
+            if (needDesktop) {
                 runCatching {
                     val desktopUrl = "$baseHost/forum.php?mod=viewthread&tid=$tid&mobile=no"
                     val desktopHtml = GenericPageClient.get(
@@ -66,8 +69,16 @@ class HttpForumRepository(
                         isolateCookies = true,
                         retryOnFailure = false,
                     )
-                    ThreadDetailParser.parseModActionsFromHtml(desktopHtml, desktopUrl)
-                }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { detail.copy(modActions = it) } ?: detail
+                    val mods = if (cn.mce.starlight.core.SessionStore.staff != null) {
+                        ThreadDetailParser.parseModActionsFromHtml(desktopHtml, desktopUrl)
+                    } else {
+                        emptyList()
+                    }
+                    detail.copy(
+                        modActions = mods.ifEmpty { detail.modActions },
+                        ratings = ThreadDetailParser.parseRatingsFromHtml(desktopHtml, desktopUrl),
+                    )
+                }.getOrNull() ?: detail
             } else {
                 detail
             }

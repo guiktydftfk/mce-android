@@ -115,6 +115,79 @@ object ThreadDetailParser {
     fun parseModActionsFromHtml(html: String, baseUrl: String): List<ModAction> =
         runCatching { parseModActions(Jsoup.parse(html, baseUrl)) }.getOrDefault(emptyList())
 
+    /**
+     * v0.4.2：解析「电脑版」帖子页的评分/打赏区块（手机模板没有）：
+     *   <dl id="ratelog_PID" class="rate"><dd><table class="ratl">
+     *     <tr><th><a href="...viewratings...">参与人数 <span class="xi1">8</span></a></th>
+     *         <th>赞赏值 <i><span class="xi1">+16</span></i></th><th>…理由</th></tr>
+     *     <tbody class="ratl_l"><tr id="rate_PID_UID">
+     *       <td><a href="home.php?mod=space&uid=3531"><img class="user_avatar"></a><a …>田田园</a></td>
+     *       <td class="xi1"> + 2</td><td class="xg1">理由</td></tr>
+     */
+    fun parseRatingsFromHtml(html: String, baseUrl: String): ThreadRatings? =
+        runCatching { parseRatings(Jsoup.parse(html, baseUrl), baseUrl) }.getOrNull()
+
+    fun parseRatings(doc: Document, baseUrl: String = Net.BASE): ThreadRatings? {
+        val blocks = doc.select("dl.rate, dl[id^=ratelog_]")
+        if (blocks.isEmpty()) return null
+        var declaredCount = 0
+        var total = ""
+        val entries = mutableListOf<RatingEntry>()
+        blocks.forEach { block ->
+            val table = block.selectFirst("table.ratl") ?: return@forEach
+            table.selectFirst("a[href*=viewratings] span, a[title=查看全部评分] span")
+                ?.text()?.trim()?.toIntOrNull()?.let { declaredCount += it }
+            if (total.isEmpty()) {
+                table.selectFirst("th:contains(赞赏值) i span, th:contains(赞赏值) span")
+                    ?.text()?.trim()?.let { total = it }
+            }
+            table.select("tbody.ratl_l tr, tr[id^=rate_]").forEach { tr ->
+                val nameLink = tr.select("a[href*=uid=]").lastOrNull() ?: return@forEach
+                val uid = uidRegex.find(nameLink.attr("href"))?.groupValues?.get(1)?.toIntOrNull()
+                val name = nameLink.text().trim()
+                if (name.isBlank()) return@forEach
+                val avatar = tr.selectFirst("img.user_avatar, img[src*=avatar.php]")
+                    ?.attr("src")?.takeIf { it.isNotBlank() }?.let { Net.absolutize(it) }
+                val amountRaw = tr.selectFirst("td.xi1")?.text()?.trim()
+                    ?: tr.select("td").firstOrNull { it.text().contains(Regex("""[+\-]\s*\d""")) }?.text()?.trim()
+                val amount = (amountRaw ?: "").replace(Regex("""\s+"""), "")
+                val reason = tr.selectFirst("td.xg1")?.text()?.trim()?.takeIf { it.isNotBlank() }
+                entries += RatingEntry(uid, name, avatar, amount, reason)
+            }
+        }
+        if (entries.isEmpty()) return null
+        // 同一用户多次打赏：合并金额
+        val merged = LinkedHashMap<Int?, RatingEntry>()
+        entries.forEach { e ->
+            val old = merged[e.uid]
+            if (old == null) {
+                merged[e.uid] = e
+            } else {
+                val sum = (numOf(old.amount) + numOf(e.amount))
+                merged[e.uid] = old.copy(
+                    amount = (if (sum > 0) "+" else "") + fmt(sum),
+                    reason = old.reason ?: e.reason,
+                )
+            }
+        }
+        val list = merged.values.toList()
+        val totalValue = if (total.isNotBlank()) total else {
+            val sum = list.sumOf { numOf(it.amount) }
+            (if (sum >= 0) "+" else "") + fmt(sum)
+        }
+        return ThreadRatings(
+            count = if (declaredCount > 0) declaredCount else list.size,
+            total = totalValue,
+            entries = list,
+        )
+    }
+
+    private fun numOf(text: String): Double =
+        Regex("""[+\-]?\s*(\d+(?:\.\d+)?)""").find(text)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+
+    private fun fmt(value: Double): String =
+        if (value == value.toLong().toDouble()) value.toLong().toString() else String.format(java.util.Locale.US, "%.1f", value)
+
     private fun parseModActions(doc: Document): List<ModAction> {
             // 与网页端版主管理条对齐：删除主题/升降/置顶/直播/高亮/精华/图章/关闭/移动/分类/复制/合并/分割/修复/警告/屏蔽/用户标签
             val keywords = listOf(

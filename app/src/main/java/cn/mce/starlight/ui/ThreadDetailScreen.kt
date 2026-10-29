@@ -147,7 +147,12 @@ fun ThreadDetailScreen(
                 val existing = (state as? DetailState.Content)?.detail
                 val merged = if (existing != null && targetPage > 1) {
                     val seen = existing.posts.mapTo(HashSet()) { it.pid }
-                    d.copy(posts = existing.posts + d.posts.filterNot { it.pid in seen })
+                    // v0.4.2：同样保留详情级字段（评分/管理条）
+                    existing.copy(
+                        posts = existing.posts + d.posts.filterNot { it.pid in seen },
+                        page = d.page,
+                        hasNextPage = d.hasNextPage,
+                    )
                 } else {
                     d
                 }
@@ -185,7 +190,14 @@ fun ThreadDetailScreen(
                             state = DetailState.Content(cur.copy(hasNextPage = false))
                             return
                         }
-                        state = DetailState.Content(d.copy(posts = cur.posts + fresh))
+                        // v0.4.2：保留详情级字段（评分/管理条/fid…）——旧写法从「下一页」对象 copy 会丢掉这些字段
+                        state = DetailState.Content(
+                            cur.copy(
+                                posts = cur.posts + fresh,
+                                page = d.page,
+                                hasNextPage = d.hasNextPage,
+                            ),
+                        )
                     } else {
                         // 没有更多楼层：把当前页标记为最后一页即可
                         state = DetailState.Content(cur.copy(hasNextPage = false))
@@ -324,6 +336,13 @@ fun ThreadDetailScreen(
                             "共 $floorCount 楼 · $replyCount 条回复",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    // v0.4.2：评分 / 打赏卡片（数据来自电脑版页面补抓）
+                    s.detail.ratings?.let { ratings ->
+                        RatingsCard(
+                            ratings = ratings,
+                            onOpenUser = { uid, name -> onOpenUser(uid, name) },
                         )
                     }
                     // v0.4.1：版主管理条（与网页端一致：删除主题/升降/置顶/直播/高亮/精华/图章/关闭/移动/分类/复制/合并/分割/修复/警告/屏蔽/用户标签）
