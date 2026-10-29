@@ -358,9 +358,21 @@ fun MceApp() {
                 { dest = Dest.Feed; stack = emptyList(); closeDrawer() },
                 { dest = Dest.Profile; stack = emptyList(); closeDrawer() },
                 { dest = Dest.SignIn; stack = emptyList(); closeDrawer() },
+                // v0.4.1：打 Call —— 打开「为星打Call」活动任务帖（签到下面）
+                {
+                    dest = Dest.Feed
+                    stack = listOf(Route.Thread(14893, "为星打Call"))
+                    closeDrawer()
+                },
                 { dest = Dest.Feed; stack = listOf(Route.Compose(null)); closeDrawer() },
                 { dest = Dest.Feed; stack = listOf(Route.DraftBox); closeDrawer() },
                 { dest = Dest.Tasks; stack = emptyList(); closeDrawer() },
+                // v0.4.1：常用表单汇总（论坛汇总帖 tid=11219）—— 放在任务中心下面
+                {
+                    dest = Dest.Feed
+                    stack = listOf(Route.Thread(11219, "常用表单汇总"))
+                    closeDrawer()
+                },
                 { dest = Dest.Search; stack = emptyList(); closeDrawer() },
                 { dest = Dest.Ranklist; stack = emptyList(); closeDrawer() },
                 { dest = Dest.Notice; stack = emptyList(); closeDrawer() },
@@ -475,6 +487,8 @@ fun MceApp() {
                             DrawerEntry(1, "我的", dest == Dest.Profile)
                             // v0.3.7：签到入口提到「我的」下方（用户要求调整菜单顺序）
                             DrawerEntry(2, "签到", dest == Dest.SignIn)
+                            // v0.4.1：打 Call 入口（签到下面）
+                            DrawerEntry(3, "打Call", false)
 
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
                             Text(
@@ -508,17 +522,19 @@ fun MceApp() {
 
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
 
-                            DrawerEntry(3, "发帖", false)
+                            DrawerEntry(4, "发帖", false)
                             DrawerEntry(
-                                4,
+                                5,
                                 "草稿箱" + if (cn.mce.starlight.core.DraftStore.drafts.isEmpty()) "" else "（${cn.mce.starlight.core.DraftStore.drafts.size}）",
                                 false,
                             )
-                            DrawerEntry(5, "任务中心", dest == Dest.Tasks)
-                            DrawerEntry(6, "搜索", dest == Dest.Search)
-                            DrawerEntry(7, "排行榜", dest == Dest.Ranklist)
-                            DrawerEntry(8, "消息提醒", dest == Dest.Notice)
-                            DrawerEntry(9, "设置", dest == Dest.Settings)
+                            DrawerEntry(6, "任务中心", dest == Dest.Tasks)
+                            // v0.4.1：常用表单汇总（任务中心下面）
+                            DrawerEntry(7, "常用表单汇总", false)
+                            DrawerEntry(8, "搜索", dest == Dest.Search)
+                            DrawerEntry(9, "排行榜", dest == Dest.Ranklist)
+                            DrawerEntry(10, "消息提醒", dest == Dest.Notice)
+                            DrawerEntry(11, "设置", dest == Dest.Settings)
                         }
                         // v0.4.1：拖动时由这个浮层绘制「重点框」，直接跟手移动（条目自身不再画高亮）
                         if (drawerDragActive && drawerDragIndex >= 0) {
