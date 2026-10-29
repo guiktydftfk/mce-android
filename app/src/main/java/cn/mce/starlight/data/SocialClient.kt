@@ -41,32 +41,42 @@ object SocialClient {
             val center = loadMedalCenter()
             val merged = LinkedHashMap<String, Medal>()
             earned.forEach { merged[it.name] = it }
+            val ownedNames = earned.mapTo(HashSet()) { it.name }
             center.forEach { c ->
                 val e = merged[c.name]
                 merged[c.name] = if (e != null) {
-                    e.copy(unlocked = c.unlocked || e.unlocked, claimable = c.claimable, progress = e.progress ?: c.progress, desc = e.desc ?: c.desc)
+                    // 已拥有 → 一律点亮（即便勋章中心还挂着“领取”按钮）
+                    e.copy(unlocked = true, claimable = false, progress = null, desc = e.desc ?: c.desc)
                 } else {
-                    c
+                    c.copy(unlocked = c.unlocked || c.name in ownedNames, claimable = c.claimable && c.name !in ownedNames)
                 }
             }
             merged.values.toList()
         }.getOrDefault(emptyList())
     }
 
-    /** 我的勋章页 = 已获得列表（手机版） */
+    /**
+     * 我拥有的勋章 —— 取自「个人资料页」的荣誉勋章区块：
+     *   <li><span>荣誉勋章</span><a class="medal_list"><img alt="星宝勋章"><img alt="暑期训练营"></a></li>
+     * （手机模板的 home.php?mod=space&do=medal 实测会回落到资料页，所以直接解析资料页最稳）
+     */
     private fun loadEarnedMedals(): List<Medal> {
-        val url = "$BASE/home.php?mod=space&do=medal"
-        val html = GenericPageClient.get(url)
-        val doc = Jsoup.parse(html, url)
-        return doc.select("li:has(img[src*=medal]), li:has(img[src*=static/image/common/])")
-            .mapNotNull { li ->
-                val img = li.selectFirst("img[src]") ?: return@mapNotNull null
-                val name = img.attr("alt").trim().ifBlank {
-                    li.selectFirst("p.xw1, h3, dt")?.text()?.trim().orEmpty()
-                }
-                if (name.isBlank() || name.length > 20) return@mapNotNull null
-                Medal(name, null, absolutize(img.attr("src")), unlocked = true)
-            }.distinctBy { it.name }
+        val urls = listOf(
+            "$BASE/home.php?mod=space&do=profile",
+            "$BASE/home.php?mod=space&do=medal",
+        )
+        for (u in urls) {
+            val html = runCatching { GenericPageClient.get(u) }.getOrNull() ?: continue
+            val doc = Jsoup.parse(html, u)
+            val list = doc.select("a.medal_list img[src], img[src*=勋章]")
+                .mapNotNull { img ->
+                    val name = img.attr("alt").trim()
+                    if (name.isBlank() || name.length > 20) return@mapNotNull null
+                    Medal(name, null, absolutize(img.attr("src")), unlocked = true)
+                }.distinctBy { it.name }
+            if (list.isNotEmpty()) return list
+        }
+        return emptyList()
     }
 
     /**
