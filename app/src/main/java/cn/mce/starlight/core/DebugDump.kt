@@ -16,6 +16,9 @@ object DebugDump {
     /** 需要抓页面排查时临时改 true 再本地构建 */
     var enabled: Boolean = false
 
+    /** v0.4.1：临时排查用 —— 额外把页面写到外部 files 目录，release 包也能 adb pull */
+    private var externalDir: File? = null
+
     /** 保留多少天内的调试文件（启动清理用） */
     private const val KEEP_DAYS = 7L
 
@@ -24,6 +27,7 @@ object DebugDump {
     fun init(context: Context) {
         val filesDir = context.applicationContext.filesDir
         dir = filesDir
+        externalDir = context.applicationContext.getExternalFilesDir("debug")
         // 清理放后台线程：不在首帧前的主线程做目录遍历/删除
         runCatching {
             Thread {
@@ -36,6 +40,12 @@ object DebugDump {
         if (!enabled) return
         runCatching {
             File(dir ?: return, "debug_$name.html").writeText(content)
+            externalDir?.let { ext ->
+                runCatching {
+                    if (!ext.exists()) ext.mkdirs()
+                    File(ext, "debug_$name.html").writeText(content)
+                }
+            }
         }
     }
 

@@ -19,6 +19,8 @@ object SocialClient {
         val image: String?,
         val unlocked: Boolean = true,
         val progress: String? = null,
+        /** v0.4.1：条件已满足、可点「领取」（勋章中心里显示「领取」链接） */
+        val claimable: Boolean = false,
     )
 
     /** v0.4.1：好友增加在线状态（true=在线 / false=离线 / null=未知） */
@@ -33,35 +35,78 @@ object SocialClient {
     /** 勋章墙：只保留带勋章图标的条目 */
     suspend fun loadMedals(): List<Medal> = withContext(Dispatchers.IO) {
         runCatching {
-            val url = "$BASE/home.php?mod=space&do=medal"
-            val html = GenericPageClient.get(url)
-            val doc = Jsoup.parse(html, url)
+            // 已获得（我的勋章页）
+            val earned = loadEarnedMedals()
+            // 全量（勋章中心，含未获得 / 可领取）
+            val center = loadMedalCenter()
+            val merged = LinkedHashMap<String, Medal>()
+            earned.forEach { merged[it.name] = it }
+            center.forEach { c ->
+                val e = merged[c.name]
+                merged[c.name] = if (e != null) {
+                    e.copy(unlocked = c.unlocked || e.unlocked, claimable = c.claimable, progress = e.progress ?: c.progress, desc = e.desc ?: c.desc)
+                } else {
+                    c
+                }
+            }
+            merged.values.toList()
+        }.getOrDefault(emptyList())
+    }
 
-            // v0.3.3 批 3：旧实现 `doc.select("li, div")` 遍历整页并集（嵌套盒重复命中、近似 O(节点×深度)），
-            // 现在用 :has() 一次筛出"含勋章图标的容器"，再按名称去重。
-            val boxes = doc.select(
-                "li:has(img[src*=medal]), div:has(img[src*=medal]), " +
-                    "li:has(img[src*=static/image/common/]), " +
-                    "div:has(img[src*=static/image/common/])",
-            )
-            boxes.mapNotNull { box ->
-                val img = box.selectFirst("img[src]") ?: return@mapNotNull null
-                val src = img.attr("src")
-                if (!src.contains("medal") && !src.contains("static/image/common/")) return@mapNotNull null
+    /** 我的勋章页 = 已获得列表（手机版） */
+    private fun loadEarnedMedals(): List<Medal> {
+        val url = "$BASE/home.php?mod=space&do=medal"
+        val html = GenericPageClient.get(url)
+        val doc = Jsoup.parse(html, url)
+        return doc.select("li:has(img[src*=medal]), li:has(img[src*=static/image/common/])")
+            .mapNotNull { li ->
+                val img = li.selectFirst("img[src]") ?: return@mapNotNull null
                 val name = img.attr("alt").trim().ifBlank {
-                    box.selectFirst("h3, h4, .xs2, dt")?.text()?.trim().orEmpty()
+                    li.selectFirst("p.xw1, h3, dt")?.text()?.trim().orEmpty()
                 }
                 if (name.isBlank() || name.length > 20) return@mapNotNull null
-                val text = box.text()
-                val locked = text.contains("未获得") || text.contains("未解锁") ||
-                    text.contains("去申请") || box.classNames().any { it.contains("lock", true) }
-                val desc = box.selectFirst("p, dd, .xg1")?.text()?.trim()
-                    ?.takeIf { it.isNotBlank() && it != name && it.length <= 60 }
-                val progress = Regex("""(\d+\s*/\s*\d+|\d+\s*%)""").find(text)?.value?.trim()
-                Medal(name, desc, absolutize(src), unlocked = !locked, progress = progress)
+                Medal(name, null, absolutize(img.attr("src")), unlocked = true)
             }.distinctBy { it.name }
-                .let { mobile -> mobile + loadMedalsDesktop().filter { d -> mobile.none { it.name == d.name } } }
-        }.getOrDefault(emptyList())
+    }
+
+    /**
+     * 勋章中心（桌面版 home.php?mod=medal&mobile=no）：
+     *   <li><div id="medal_4" class="mg_img"><img alt="超级版主"></div>
+     *       <p class="xw1">超级版主</p><p> 已领取|领取|&nbsp; </p></li>
+     * 空 <p> = 未获得；有「领取」链接 = 条件已满足待领取；「已领取」= 已点亮。
+     */
+    private fun loadMedalCenter(): List<Medal> {
+        val url = "$BASE/home.php?mod=medal&mobile=no"
+        val html = runCatching {
+            GenericPageClient.get(url, userAgent = Net.DESKTOP_UA, isolateCookies = true)
+        }.getOrNull() ?: return emptyList()
+        val doc = Jsoup.parse(html, url)
+        return doc.select("li:has(div.mg_img), li:has(div[id^=medal_])").mapNotNull { li ->
+            val img = li.selectFirst("div.mg_img img, img[src*=medal]") ?: return@mapNotNull null
+            val name = li.selectFirst("p.xw1")?.text()?.trim()?.takeIf { it.isNotBlank() }
+                ?: img.attr("alt").trim()
+            if (name.isBlank() || name.length > 20) return@mapNotNull null
+            val statusText = li.select("p").map { it.text().trim() }.lastOrNull { it.length <= 8 && it != name }.orEmpty()
+            val unlocked = statusText.contains("已领取") || statusText.contains("已获得")
+            val claimable = !unlocked && li.selectFirst("a[href*=action=confirm]") != null
+            val kind = li.selectFirst("div.tip p.mtn")?.text()?.trim()
+            val desc = li.selectFirst("div.tip p:not(.mtn)")?.text()?.trim()
+                ?.takeIf { it.isNotBlank() && it != name && it.length <= 60 }
+            val progress = when {
+                unlocked -> null
+                claimable -> "可领取"
+                kind != null -> kind
+                else -> null
+            }
+            Medal(
+                name = name,
+                desc = desc,
+                image = absolutize(img.attr("src")),
+                unlocked = unlocked,
+                progress = progress,
+                claimable = claimable,
+            )
+        }.distinctBy { it.name }
     }
 
     /** v0.4.1：桌面版勋章中心（含未获得的全部勋章） */
@@ -70,10 +115,11 @@ object SocialClient {
             "$BASE/home.php?mod=space&do=medal&mobile=no",
             "$BASE/home.php?mod=medal&mobile=no",
         )
-        for (u in urls) {
+        for ((idx, u) in urls.withIndex()) {
             val html = runCatching {
                 GenericPageClient.get(u, userAgent = Net.DESKTOP_UA, isolateCookies = true)
             }.getOrNull() ?: continue
+            cn.mce.starlight.core.DebugDump.dump("medals_desktop_$idx", html)
             val doc = Jsoup.parse(html, u)
             val boxes = doc.select("li:has(img), div:has(img)")
             val list = boxes.mapNotNull { box ->
@@ -108,48 +154,38 @@ object SocialClient {
         for (path in candidates) {
             val url = "$BASE/$path"
             val pageHtml = runCatching { GenericPageClient.get(url) }.getOrNull() ?: continue
+            cn.mce.starlight.core.DebugDump.dump("friends_mobile", pageHtml)
             val list = runCatching { parseFriendsHtml(pageHtml, url) }.getOrDefault(emptyList())
             if (list.isNotEmpty()) {
-                if (list.all { it.online == null }) {
-                    val onlineMap = runCatching { loadOnlineFromDesktop() }.getOrDefault(emptyMap())
-                    if (onlineMap.isNotEmpty()) {
-                        return@withContext list.map { f -> f.copy(online = onlineMap[f.uid]) }
-                    }
-                }
-                return@withContext list
+                // v0.4.1：好友列表不带在线状态 —— 用「在线好友」页判断（不在其中 = 离线）
+                val onlineUids = runCatching { loadOnlineFriendUids() }.getOrDefault(emptySet())
+                return@withContext list.map { f -> f.copy(online = f.uid in onlineUids) }
             }
         }
         emptyList()
     }
 
-    /** v0.4.1：桌面版好友页（带在线/离线状态） */
-    private fun loadOnlineFromDesktop(): Map<Int, Boolean> {
+    /**
+     * v0.4.1：在线好友 = 单独页面（好友列表本身不显示在线状态）。
+     *   home.php?mod=space&do=friend&view=online&type=friend
+     * 解析该页出现的 uid 集合；总好友列表里不在集合中的即视为离线。
+     */
+    private fun loadOnlineFriendUids(): Set<Int> {
         val urls = listOf(
-            "$BASE/home.php?mod=space&do=friend&view=me&mobile=no",
-            "$BASE/home.php?mod=space&do=friend&mobile=no",
+            "$BASE/home.php?mod=space&do=friend&view=online&type=friend",
+            "$BASE/home.php?mod=space&do=friend&view=online&type=friend&mobile=no",
         )
         for (u in urls) {
             val html = runCatching {
-                GenericPageClient.get(u, userAgent = Net.DESKTOP_UA, isolateCookies = true)
+                GenericPageClient.get(u, userAgent = if (u.contains("mobile=no")) Net.DESKTOP_UA else null, isolateCookies = true)
             }.getOrNull() ?: continue
             val doc = Jsoup.parse(html, u)
-            val result = mutableMapOf<Int, Boolean>()
-            doc.select("li:has(img), dl:has(img)").forEach { box ->
-                val link = box.selectFirst("a[href*=uid=]") ?: box.selectFirst("a[href*=space]")
-                val uid = link?.attr("href")?.let { uidRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() }
-                    ?: return@forEach
-                val text = box.text()
-                val online = when {
-                    box.selectFirst(".online, em.online, .user_online, i[class*=online]") != null -> true
-                    text.contains("在线") -> true
-                    text.contains("离线") -> false
-                    else -> null
-                }
-                online?.let { result[uid] = it }
-            }
-            if (result.isNotEmpty()) return result
+            val uids = doc.select("a[href*=uid=]").mapNotNull { a ->
+                uidRegex.find(a.attr("href"))?.groupValues?.get(1)?.toIntOrNull()
+            }.toSet()
+            if (uids.isNotEmpty()) return uids
         }
-        return emptyMap()
+        return emptySet()
     }
 
     /**

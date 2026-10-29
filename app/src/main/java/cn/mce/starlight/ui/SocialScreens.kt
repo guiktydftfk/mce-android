@@ -103,7 +103,7 @@ fun MedalsScreen(
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text(
-                                if (medal.unlocked) "已点亮" else "未点亮",
+                                if (medal.unlocked) "已点亮" else if (medal.claimable) "可领取（条件已满足）" else "未点亮",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = if (medal.unlocked) androidx.compose.ui.graphics.Color(0xFF3CC66A)
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -168,6 +168,8 @@ private fun MedallionCard(medal: SocialClient.Medal, onClick: () -> Unit) {
         )
         if (medal.unlocked) {
             Text("已点亮", style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color(0xFF3CC66A))
+        } else if (medal.claimable) {
+            Text("可领取", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
         } else {
             Text(
                 medal.progress?.let { "进度 $it" } ?: "未点亮",
