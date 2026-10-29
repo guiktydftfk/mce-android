@@ -193,6 +193,9 @@ fun MceApp() {
 
     val context = LocalContext.current
     var lastBackAt by remember { mutableLongStateOf(0L) }
+    // v0.4.1：启动后台检查到更新时延后弹窗；以及本次启动进入首页的次数
+    var deferredUpdate by remember { mutableStateOf<UpdateClient.Release?>(null) }
+    var feedEnterCount by remember { mutableIntStateOf(0) }
     var updateRelease by remember { mutableStateOf<UpdateClient.Release?>(null) }
     var updateDownloading by remember { mutableStateOf(false) }
     var updateProgress by remember { mutableIntStateOf(0) }
@@ -253,7 +256,7 @@ fun MceApp() {
         }
     }
 
-    fun checkUpdate(silent: Boolean) {
+    fun checkUpdate(silent: Boolean, deferDialog: Boolean = false) {
         scope.launch {
             val result = UpdateClient.checkDetailed(context)
             SettingsStore.markUpdateChecked()
@@ -272,7 +275,13 @@ fun MceApp() {
                         // 该紧急版本已自动处理过：不再重复下载 / 弹安装器
                     } else if (SettingsStore.isUpdateSnoozed()) {
                         // 用户暂停了更新：普通更新在暂停期内不打扰（紧急推送已在上面优先处理）
+                    } else if (deferDialog) {
+                        // v0.4.1：启动后台检查到更新 → 先不弹，记下版本号；
+                        // 等用户「第二次进入首页」或「下次打开软件」时再弹
+                        deferredUpdate = release
+                        SettingsStore.setPendingUpdateCode(release.versionCode)
                     } else {
+                        SettingsStore.clearPendingUpdate()
                         updateRelease = release
                     }
                 }
@@ -293,34 +302,37 @@ fun MceApp() {
     }
 
     LaunchedEffect(Unit) {
-        // 启动三项网络请求并行（旧实现串行：登录探测 → 签到提醒 → 检查更新，
-        // 最坏要把三条请求排完才结束，启动初期 4~8 个请求排队抢带宽）。
-        coroutineScope {
-            // 只有「确定未登录」才弹登录框；网络异常(null)保持静默，避免误判踢人
-            launch {
-                val probe = SessionStore.probeLoginState()
-                if (probe == false) showLogin = true
+        // v0.4.1：启动请求串行化 —— ① 登录探测 → ② 板块/首页数据（HomeFeed 组合时自行加载）
+        // → ③ 签到提醒（未开启则跳过）→ ④ 消息刷新 → ⑤ 后台检查更新（弹窗延后）
+        val probe = SessionStore.probeLoginState()
+        if (probe == false) showLogin = true
+        // 让首页先开始拉取板块数据
+        kotlinx.coroutines.delay(200)
+        if (SettingsStore.signinReminderEnabled &&
+            java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) >=
+            SettingsStore.signinReminderHour
+        ) {
+            runCatching { cn.mce.starlight.data.SigninClient.loadStateOnly() }.getOrNull()?.let { s ->
+                if (!s.alreadySigned) showSigninReminder = true
             }
-            // 签到提醒：已过提醒时间且今日未签到 → 启动时提示（只查状态，不拉排行榜）
-            launch {
-                if (SettingsStore.signinReminderEnabled &&
-                    java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) >=
-                    SettingsStore.signinReminderHour
-                ) {
-                    runCatching { cn.mce.starlight.data.SigninClient.loadStateOnly() }.getOrNull()?.let { s ->
-                        if (!s.alreadySigned) showSigninReminder = true
-                    }
+        }
+        runCatching { cn.mce.starlight.core.MessageCenter.refresh(fromLaunch = true) }
+        kotlinx.coroutines.delay(3000)
+        // 上次启动已发现更新 → 本次直接弹；否则本次只后台检查，等用户第二次回到首页再弹
+        val hadPending = SettingsStore.pendingUpdateCode > 0
+        checkUpdate(silent = true, deferDialog = !hadPending)
+    }
+
+    // v0.4.1：第二次进入首页时弹出延后的更新提示（再次打开软件则由 hadPending 直接弹）
+    LaunchedEffect(dest, stack.size) {
+        if (dest == Dest.Feed && stack.isEmpty()) {
+            feedEnterCount += 1
+            if (feedEnterCount >= 2) {
+                deferredUpdate?.let { release ->
+                    deferredUpdate = null
+                    SettingsStore.clearPendingUpdate()
+                    updateRelease = release
                 }
-            }
-            // 启动后自动检查更新（暂停更新期间跳过）
-            launch {
-                // v0.3.8：暂停更新不再挡住「检查」本身（否则紧急推送永远送不到），普通更新在 checkUpdate 内按暂停态过滤
-                checkUpdate(silent = true)
-            }
-            // v0.3.9：打开应用时的消息检查 —— 只弹一次（本次启动内 launchBannerShown 保证不重复）；
-            // 之后的回前台/新消息检查走下面 DisposableEffect 的 refresh()，只有真正的新消息才弹
-            launch {
-                runCatching { cn.mce.starlight.core.MessageCenter.refresh(fromLaunch = true) }
             }
         }
     }

@@ -84,16 +84,24 @@ class HttpForumRepository(
         if (cached != null && System.currentTimeMillis() - cached.first < 300_000L) {
             return@withContext cached.second
         }
-        val fids = Boards.all.map { it.fid }.filter { it > 0 }.distinct()
-        val semaphore = Semaphore(6)
+        // v0.4.1：按分组优先级顺序拉取：全国交流 → 项目和活动 → 城市板块 → 星光大厅（最后）
+        // 组内仍并发（并发 6），组与组之间串行，保证优先级高的板块先返回。
         val all = coroutineScope {
-            fids.map { fid ->
-                async {
-                    semaphore.withPermit {
-                        runCatching { loadThreads(fid, 1).threads }.getOrDefault(emptyList())
+            val collected = mutableListOf<ThreadSummary>()
+            val semaphore = Semaphore(6)
+            Boards.groups.forEach { (_, boards) ->
+                val fids = boards.map { it.fid }.filter { it > 0 }.distinct()
+                if (fids.isEmpty()) return@forEach
+                val partial = fids.map { fid ->
+                    async {
+                        semaphore.withPermit {
+                            runCatching { loadThreads(fid, 1).threads }.getOrDefault(emptyList())
+                        }
                     }
-                }
-            }.awaitAll().flatten()
+                }.awaitAll().flatten()
+                collected += partial
+            }
+            collected
         }
         val merged = all.distinctBy { it.id }
             .sortedWith(

@@ -46,6 +46,8 @@ object SettingsStore {
     private const val KEY_FEED_MIN_CHARS = "feed_min_chars"
     private const val KEY_LOW_DATA = "low_data_mode"
     private const val KEY_URGENT_CODE = "urgent_handled_code"
+    /** v0.4.1：后台检查到更新时先记下版本号，等「再次打开软件」或「第二次回到首页」再弹窗 */
+    private const val KEY_PENDING_UPDATE = "pending_update_code"
 
     private var appContext: Context? = null
 
@@ -127,6 +129,7 @@ object SettingsStore {
         updateSnoozeUntil = prefs.getLong(KEY_SNOOZE_UNTIL, 0L)
         lastUpdateCheckAt = prefs.getLong(KEY_LAST_CHECK, 0L)
         downloadedApkPath = prefs.getString(KEY_DOWNLOADED_APK, null)
+        pendingUpdateCode = prefs.getInt(KEY_PENDING_UPDATE, 0)
         fontScale = prefs.getFloat(KEY_FONT_SCALE, 1f)
         // 0.3.6：界面大小与字体大小合并为单一「字体大小」，清掉旧键
         if (prefs.contains(KEY_UI_SCALE)) prefs.edit().remove(KEY_UI_SCALE)?.apply()
@@ -185,6 +188,20 @@ object SettingsStore {
         val left = updateSnoozeUntil - System.currentTimeMillis()
         if (left <= 0) return 0
         return ((left + 86_399_999L) / 86_400_000L).toInt()
+    }
+
+    /** 后台检查到更新但暂不弹窗时的版本号（0 = 无） */
+    var pendingUpdateCode: Int = 0
+        private set
+
+    fun setPendingUpdateCode(code: Int) {
+        pendingUpdateCode = code
+        prefs()?.edit()?.putInt(KEY_PENDING_UPDATE, code)?.apply()
+    }
+
+    fun clearPendingUpdate() {
+        pendingUpdateCode = 0
+        prefs()?.edit()?.remove(KEY_PENDING_UPDATE)?.apply()
     }
 
     fun markUpdateChecked() {
