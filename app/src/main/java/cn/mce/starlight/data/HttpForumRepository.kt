@@ -19,6 +19,15 @@ class HttpForumRepository(
 
     companion object {
         const val MOBILE_UA = Net.MOBILE_UA
+
+        /** v0.4.1：全板块最新主题缓存（companion 共享，启动预热线程与首页实例共用） */
+        @Volatile
+        private var latestAllCache: Pair<Long, List<ThreadSummary>>? = null
+
+        /** 启动预热：后台拉一次全板块最新页填缓存，首页刷新直接命中 */
+        suspend fun prewarmLatestAllBoards() {
+            runCatching { HttpForumRepository().loadLatestAllBoards() }
+        }
     }
 
     override suspend fun loadBoards(): List<ForumBoard> = Boards.all
@@ -72,7 +81,7 @@ class HttpForumRepository(
      */
     suspend fun loadLatestAllBoards(): List<ThreadSummary> = withContext(Dispatchers.IO) {
         val cached = latestAllCache
-        if (cached != null && System.currentTimeMillis() - cached.first < 120_000L) {
+        if (cached != null && System.currentTimeMillis() - cached.first < 300_000L) {
             return@withContext cached.second
         }
         val fids = Boards.all.map { it.fid }.filter { it > 0 }.distinct()
@@ -94,9 +103,6 @@ class HttpForumRepository(
         merged
     }
 
-    /** v0.4.1：全板块最新主题的内存缓存（时间戳 + 列表） */
-    @Volatile
-    private var latestAllCache: Pair<Long, List<ThreadSummary>>? = null
     private fun fetch(url: String): String {
         val html = GenericPageClient.get(url)
         if (GenericPageClient.isBlockedPage(html)) {

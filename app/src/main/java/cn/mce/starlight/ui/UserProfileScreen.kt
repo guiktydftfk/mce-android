@@ -173,6 +173,76 @@ fun UserProfileScreen(
                         }
                     }
 
+                    // v0.4.1：我的资料 —— 头衔 / 签名 / 邮箱状态
+                    if (p.customTitle != null || p.signature != null || p.emailStatus != null) {
+                        item {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                p.customTitle?.let { titleText ->
+                                    Row {
+                                        Text("自定义头衔", style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.width(80.dp))
+                                        Text(titleText, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                                p.signature?.let { sig ->
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text("个人签名", style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(sig, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                                p.emailStatus?.let { email ->
+                                    Row {
+                                        Text("邮箱状态", style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.width(80.dp))
+                                        Text(email, style = MaterialTheme.typography.bodySmall,
+                                            color = if (email.contains("验证")) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // v0.4.1：活跃概况
+                    if (p.active.isNotEmpty()) {
+                        item {
+                            Text(
+                                "活跃概况",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        item {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(9.dp),
+                            ) {
+                                p.active.forEach { (label, value) ->
+                                    Row {
+                                        Text(label, style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.width(96.dp))
+                                        Text(value, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // 资料
                     if (p.fields.isNotEmpty()) {
                         item {
@@ -201,8 +271,9 @@ fun UserProfileScreen(
                         }
                     }
 
-                    // 操作
-                    item {
+                    // 操作（v0.4.1：自己的「我的资料」不显示打招呼/发消息/加好友）
+                    if (!p.isSelf) {
+                        item {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             TextButton(onClick = {
                                 onOpenPage(
@@ -222,6 +293,7 @@ fun UserProfileScreen(
                                     "加好友",
                                 )
                             }) { Text("加好友") }
+                        }
                         }
                     }
 

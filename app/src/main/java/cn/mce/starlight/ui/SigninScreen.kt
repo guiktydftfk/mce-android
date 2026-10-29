@@ -192,7 +192,8 @@ fun SigninScreen(
                         )
                         state.level?.let {
                             Text(
-                                "签到等级 Lv $it",
+                                // v0.4.1：等级旁边显示签到奖励星光值
+                    "签到等级 Lv $it" + (state.reward?.let { r -> " · 签到奖励 +$r 星光值" } ?: ""),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

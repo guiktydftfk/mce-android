@@ -40,6 +40,10 @@ class MceApplication : Application(), ImageLoaderFactory {
             runCatching { cn.mce.starlight.core.FeedCache.prewarm() }
             // v0.4.1：把 Coil ImageLoader（OkHttp 构建 + 磁盘缓存）也放到后台线程初始化，首图不再卡主线程
             runCatching { coil.Coil.imageLoader(this) }
+            // v0.4.1：后台预热「全板块最新」缓存，首页刷新直接命中（不再等 30+ 个板块请求）
+            kotlinx.coroutines.runBlocking {
+                runCatching { cn.mce.starlight.data.HttpForumRepository.prewarmLatestAllBoards() }
+            }
         }.apply {
             isDaemon = true
             priority = Thread.MIN_PRIORITY

@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,8 +12,23 @@ object SocialClient {
 
     private val uidRegex = Regex("""uid=(\d+)""")
 
-    data class Medal(val name: String, val desc: String?, val image: String?)
-    data class Friend(val uid: Int, val name: String, val avatar: String?, val extra: String?)
+    /** v0.4.1：勋章墙 —— 补全未解锁勋章 + 进度文案 */
+    data class Medal(
+        val name: String,
+        val desc: String?,
+        val image: String?,
+        val unlocked: Boolean = true,
+        val progress: String? = null,
+    )
+
+    /** v0.4.1：好友增加在线状态（true=在线 / false=离线 / null=未知） */
+    data class Friend(
+        val uid: Int,
+        val name: String,
+        val avatar: String?,
+        val extra: String?,
+        val online: Boolean? = null,
+    )
 
     /** 勋章墙：只保留带勋章图标的条目 */
     suspend fun loadMedals(): List<Medal> = withContext(Dispatchers.IO) {
@@ -37,9 +52,13 @@ object SocialClient {
                     box.selectFirst("h3, h4, .xs2, dt")?.text()?.trim().orEmpty()
                 }
                 if (name.isBlank() || name.length > 20) return@mapNotNull null
+                val text = box.text()
+                val locked = text.contains("未获得") || text.contains("未解锁") ||
+                    text.contains("去申请") || box.classNames().any { it.contains("lock", true) }
                 val desc = box.selectFirst("p, dd, .xg1")?.text()?.trim()
                     ?.takeIf { it.isNotBlank() && it != name && it.length <= 60 }
-                Medal(name, desc, absolutize(src))
+                val progress = Regex("""(\d+\s*/\s*\d+|\d+\s*%)""").find(text)?.value?.trim()
+                Medal(name, desc, absolutize(src), unlocked = !locked, progress = progress)
             }.distinctBy { it.name }
         }.getOrDefault(emptyList())
     }
@@ -91,7 +110,15 @@ object SocialClient {
                 .ifBlank { li.selectFirst("h1, h2")?.text()?.trim().orEmpty() }
             if (name.isBlank() || name.length > 24) return@mapNotNull null
             val extra = li.selectFirst("p")?.text()?.trim()?.takeIf { it.isNotBlank() }
-            Friend(uid, name, absolutize(avatarImg.attr("src")), extra)
+            // v0.4.1：在线状态（em.online / .online / 文本「在线」「离线」）
+            val textAll = li.text()
+            val online = when {
+                li.selectFirst(".online, em.online, .user_online, i[class*=online]") != null -> true
+                textAll.contains("在线") -> true
+                textAll.contains("离线") -> false
+                else -> null
+            }
+            Friend(uid, name, absolutize(avatarImg.attr("src")), extra, online)
         }.distinctBy { it.uid }
     }
     private fun absolutize(src: String): String = Net.absolutize(src)

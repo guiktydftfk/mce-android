@@ -20,7 +20,14 @@ object PersonalClient {
     private val dateRegex = Regex("""\d{4}-\d{1,2}-\d{1,2}[^\s<]{0,10}""")
     private val shortTextRegex = Regex("""[^<]{4,30}""")
 
-    data class ReplyItem(val tid: Int, val title: String, val content: String, val time: String?)
+    data class ReplyItem(
+        val tid: Int,
+        val title: String,
+        val content: String,
+        val time: String?,
+        /** v0.4.1：所在版块（网页端条目里带 forumdisplay 链接） */
+        val forum: String? = null,
+    )
     data class FavoriteItem(val tid: Int, val title: String, val forumName: String?)
     /** 私信会话条目（v0.3.4） */
     data class PmItem(
@@ -60,7 +67,11 @@ object PersonalClient {
                 ?: return@mapNotNull null
             val content = li.selectFirst("p.my_reply, p")?.text()?.trim().orEmpty()
             val time = dateRegex.find(li.text())?.value
-            ReplyItem(tid, link.text().trim(), content, time)
+            // v0.4.1：版块名（用字面量 contains，避免正则里 ? 的转义坑）
+            val forum = li.select("a[href]")
+                .firstOrNull { it.attr("href").contains("forumdisplay") && it.text().trim().length in 2..12 }
+                ?.text()?.trim()
+            ReplyItem(tid, link.text().trim(), content, time, forum)
         }
     }
 

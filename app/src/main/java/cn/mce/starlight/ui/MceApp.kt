@@ -53,6 +53,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.layout.boundsInRoot
@@ -93,6 +95,8 @@ sealed interface Route {
     data class Pm(val touid: Int, val name: String) : Route
     data object Scan : Route
     data class GenericList(val title: String, val path: String) : Route
+    /** v0.4.1：道具中心专用页 */
+    data object Magic : Route
 }
 
 /** 抽屉一级目的地 */
@@ -150,6 +154,29 @@ fun MceApp() {
     var drawerDragIndex by remember { mutableStateOf(-1) }
     val drawerItemBounds = remember { mutableStateMapOf<Int, ClosedFloatingPointRange<Float>>() }
     var stack by remember { mutableStateOf(listOf<Route>()) }
+    // v0.4.1：类 iOS 页面滑动转场（进新页从右滑入 / 返回轻滑），配合左边缘右滑返回
+    val pageSlide = remember { androidx.compose.animation.core.Animatable(0f) }
+    val pageAlpha = remember { androidx.compose.animation.core.Animatable(1f) }
+    var lastStackDepth by remember { mutableIntStateOf(stack.size) }
+    LaunchedEffect(stack.size) {
+        val depth = stack.size
+        if (depth > lastStackDepth) {
+            pageSlide.snapTo(72f)
+            pageAlpha.snapTo(0.4f)
+            kotlinx.coroutines.coroutineScope {
+                launch { pageSlide.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.86f, stiffness = 480f)) }
+                launch { pageAlpha.animateTo(1f, androidx.compose.animation.core.tween(180)) }
+            }
+        } else if (depth < lastStackDepth) {
+            pageSlide.snapTo(-56f)
+            pageAlpha.snapTo(0.5f)
+            kotlinx.coroutines.coroutineScope {
+                launch { pageSlide.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.9f, stiffness = 520f)) }
+                launch { pageAlpha.animateTo(1f, androidx.compose.animation.core.tween(150)) }
+            }
+        }
+        lastStackDepth = depth
+    }
     var dataVersion by remember { mutableIntStateOf(0) }
     // v0.4.1：从帖子返回首页时回到顶部
     var feedTopTick by remember { mutableIntStateOf(0) }
@@ -547,7 +574,29 @@ fun MceApp() {
         } else {
             Modifier
         }
-        Box(Modifier.fillMaxSize().then(contentBlur)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .then(contentBlur)
+                // v0.4.1：页面滑动转场 + 左边缘右滑返回（类 iOS）
+                .graphicsLayer {
+                    translationX = pageSlide.value
+                    alpha = pageAlpha.value
+                }
+                .pointerInput(stack.isNotEmpty()) {
+                    if (stack.isEmpty()) return@pointerInput
+                    var total = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { total = 0f },
+                        onDragEnd = { if (total > 96f) pop() },
+                    ) { change, dragAmount ->
+                        if (dragAmount > 0) {
+                            total += dragAmount
+                            change.consume()
+                        }
+                    }
+                },
+        ) {
         BackHandler(enabled = stack.isNotEmpty() || dest != Dest.Feed) {
             if (stack.isNotEmpty()) pop() else dest = Dest.Feed
         }
@@ -655,6 +704,11 @@ fun MceApp() {
                 onOpenUser = { uid, title -> push(Route.User(uid, title)) },
             )
 
+            is Route.Magic -> MagicScreen(
+                onMenu = ::openDrawer,
+                onOpenPage = { url, title -> push(Route.Page(url, title)) },
+            )
+
             is Route.GenericList -> GenericListScreen(
                 title = current.title,
                 path = current.path,
@@ -720,7 +774,7 @@ fun MceApp() {
                             url.contains("spacecp") && url.contains("ac=profile") -> push(Route.ProfileEdit)
                             url.contains("do=medal") -> push(Route.Medals)
                             url.contains("do=friend") -> push(Route.Friends)
-                            url.contains("mod=magic") -> push(Route.GenericList("道具中心", "home.php?mod=magic"))
+                            url.contains("mod=magic") -> push(Route.Magic)
                             else -> push(Route.Page(url, url))
                         }
                     },

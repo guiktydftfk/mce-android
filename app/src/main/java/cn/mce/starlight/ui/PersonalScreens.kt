@@ -164,9 +164,29 @@ fun MyRepliesScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3,
                                 overflow = TextOverflow.Ellipsis)
                         }
-                        item.time?.let {
-                            Text(it, style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        // v0.4.1：补全信息 —— 版块 + 回复时间
+                        androidx.compose.foundation.layout.Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            item.forum?.let { forum ->
+                                Text(
+                                    forum,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            item.time?.let {
+                                Text(
+                                    "回复于 " + it,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }

@@ -115,7 +115,13 @@ fun FeedCard(
         // v0.3.9 低数据流量模式：开启后整卡不渲染配图（列表层同时不再抓取缩略图）。
         if (!SettingsStore.lowDataMode && !thumbUrl.isNullOrBlank()) {
             AsyncImage(
-                model = thumbUrl,
+                // v0.4.1：按展示尺寸解码（不再整图解码）+ 关闭淡入，首页图更快出
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(thumbUrl)
+                    .size(720)
+                    .crossfade(false)
+                    .memoryCacheKey(thumbUrl)
+                    .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

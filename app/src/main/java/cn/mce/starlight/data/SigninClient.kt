@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,6 +31,8 @@ object SigninClient {
     private val firstIntRegex = Regex("""(\d+)""")
     private val formhashFromQiandaoRegex = Regex("""operation=qiandao[^"']*?formhash=([a-z0-9]+)""")
     private val levelRegex = Regex("""Lv\s*(\d+)""")
+    // v0.4.1：签到奖励（星光值）：上次奖励 1.5 / 今日奖励 2 / 签到奖励 3
+    private val signRewardRegex = Regex("""(?:上次奖励|今日奖励|签到奖励|本次奖励)\s*[:：]?\s*([\d.]+)""")
 
     /** 带标签的数字："今日排名 25" / "今日排名：第 25" 等；label 只有 3 个固定值，做缓存 */
     private val labelRegexCache = mutableMapOf<String, List<Regex>>()
@@ -60,6 +62,8 @@ object SigninClient {
         val continuous: String? = null,
         val total: String? = null,
         val level: String? = null,
+        /** v0.4.1：签到奖励（签到页「上次奖励 / 今日奖励」），显示在签到等级旁 */
+        val reward: String? = null,
         val alreadySigned: Boolean = false,
         val formhash: String? = null,
         val ranks: List<RankEntry> = emptyList(),
@@ -110,6 +114,8 @@ object SigninClient {
             ?: Net.formhashOf(html)
 
         val level = levelRegex.find(pageText)?.groupValues?.get(1)
+        // v0.4.1：签到奖励（星光值）
+        val signReward = signRewardRegex.find(pageText)?.groupValues?.get(1)
 
         val firstPage = if (withRanks) {
             runCatching { loadRankPage(rankType, 1) }.getOrDefault(RankPage(emptyList(), false))
@@ -122,6 +128,7 @@ object SigninClient {
             continuous = stat("\u8fde\u7eed\u7b7e\u5230"),
             total = stat("\u7d2f\u8ba1\u7b7e\u5230"),
             level = level,
+            reward = signReward,
             alreadySigned = alreadySigned,
             formhash = formhash,
             ranks = firstPage.entries,
