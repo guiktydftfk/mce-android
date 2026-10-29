@@ -40,9 +40,15 @@ class MceApplication : Application(), ImageLoaderFactory {
             runCatching { cn.mce.starlight.core.FeedCache.prewarm() }
             // v0.4.1：把 Coil ImageLoader（OkHttp 构建 + 磁盘缓存）也放到后台线程初始化，首图不再卡主线程
             runCatching { coil.Coil.imageLoader(this) }
-            // v0.4.1：后台预热「全板块最新」缓存，首页刷新直接命中（不再等 30+ 个板块请求）
-            kotlinx.coroutines.runBlocking {
-                runCatching { cn.mce.starlight.data.HttpForumRepository.prewarmLatestAllBoards() }
+            // v0.4.1：全板块预热延迟到启动 3 秒后再做 —— 启动瞬间有登录探测/签到提醒/更新检查/消息刷新
+            // 等请求在跑，若此时再并行打 30+ 个板块页会抢带宽，首屏内容明显变慢（弱网尤甚）。
+            runCatching {
+                Thread.sleep(3000)
+                if (!cn.mce.starlight.core.SettingsStore.lowDataMode) {
+                    kotlinx.coroutines.runBlocking {
+                        runCatching { cn.mce.starlight.data.HttpForumRepository.prewarmLatestAllBoards() }
+                    }
+                }
             }
         }.apply {
             isDaemon = true
