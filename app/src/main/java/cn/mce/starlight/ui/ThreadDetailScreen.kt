@@ -361,12 +361,7 @@ fun ThreadDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                "版主操作",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(end = 4.dp),
-                            )
+
                             s.detail.modActions.forEach { action ->
                                 TextButton(
                                     onClick = {
@@ -424,6 +419,7 @@ fun ThreadDetailScreen(
                             toast = "正在回复 ${post.author}（${post.floorLabel}）"
                         },
                         onOpenUser = { onOpenUser(post.uid ?: 0, post.author ?: "") },
+                        onImageClick = { url -> viewerUrl = url },
                         onRate = {
                             scope.launch {
                                 val r = RateClient.loadForm(tid, post.pid)
@@ -981,6 +977,8 @@ private fun PostItem(
     onReply: () -> Unit,
     onRate: () -> Unit,
     onOpenUser: () -> Unit,
+    // v0.4.2：点击正文图片 → 全屏大图
+    onImageClick: (String) -> Unit = {},
 ) {
     // v0.4.1：类酷安观感——每个楼层一张卡片（圆角 + 浅底色），与页面背景区分开
     Box(
@@ -1072,7 +1070,8 @@ private fun PostItem(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 380.dp)
-                            .clip(RoundedCornerShape(12.dp)),
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onImageClick(block.url) },
                     )
                 }
             }

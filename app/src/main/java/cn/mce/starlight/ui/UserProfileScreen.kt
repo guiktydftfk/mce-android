@@ -159,10 +159,11 @@ fun UserProfileScreen(
                                     // v0.4.2：主题数可点击 → 直接看 TA 的主题列表
                                     val clickableMod = if (label == "主题") {
                                         Modifier.clickable {
+                                            // v0.4.2：手机模板不带 from=space 才正常返回主题列表
                                             val path = if (p.isSelf) {
                                                 "home.php?mod=space&do=thread&view=me"
                                             } else {
-                                                "home.php?mod=space&uid=${p.uid}&do=thread&view=me&from=space"
+                                                "home.php?mod=space&uid=${p.uid}&do=thread&view=me"
                                             }
                                             onOpenPage(path, if (p.isSelf) "我的主题" else "${p.name} 的主题")
                                         }

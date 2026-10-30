@@ -190,22 +190,23 @@ object ThreadDetailParser {
 
     private fun parseModActions(doc: Document): List<ModAction> {
             // 与网页端版主管理条对齐：删除主题/升降/置顶/直播/高亮/精华/图章/关闭/移动/分类/复制/合并/分割/修复/警告/屏蔽/用户标签
-            val keywords = listOf(
-                "管理", "编辑", "删除", "置顶", "精华", "关闭", "打开", "警告",
-                "移动", "复制", "合并", "分割", "修复", "审核", "高亮", "提升",
-                "下沉", "推荐", "锁定", "解除", "主题", "帖子",
-                "升降", "直播", "图章", "屏蔽", "用户标签", "分类", "标签",
+            // v0.4.2：改成「白名单精确匹配」——
+            // 旧实现用关键词 contains（含「管理」「帖子」），会把导航里的
+            // 「社区论坛管理」「帖子」等链接也当成管理操作（界面出现一堆无效按钮）。
+            val allowed = setOf(
+                "删除主题", "升降", "置顶", "直播", "高亮", "精华", "图章", "关闭", "打开",
+                "移动", "分类", "复制", "合并", "分割", "修复", "警告", "屏蔽", "用户标签",
+                "编辑", "删除", "锁定", "解除", "审核", "提升", "下沉", "推荐", "置顶主题",
+                "关闭主题", "打开主题", "解除置顶", "加入精华", "取消精华",
             )
             return doc.select("a[href]").mapNotNull { a ->
                 val href = a.attr("href").replace("&amp;", "&")
-                val label = a.text().trim()
-                // 只有「管理操作」类链接才算：普通用户页面没有 topicadmin/modcp 链接
-                val looksLikeMod = href.contains("topicadmin") || href.contains("mod=modcp") ||
-                    href.contains("moderate=1") || href.contains("action=moderate")
-                if (!looksLikeMod || label.isEmpty() || label.length > 12) return@mapNotNull null
-                if (keywords.none { label.contains(it) }) return@mapNotNull null
+                val label = a.text().trim().replace(Regex("""\s+"""), "")
+                // 只有网页端版主管理条（topicadmin）里的链接才算
+                if (!href.contains("topicadmin")) return@mapNotNull null
+                if (label !in allowed) return@mapNotNull null
                 ModAction(label = label, url = absolutize(href))
-            }.distinctBy { it.label to it.url }.take(24)
+            }.distinctBy { it.label }.take(24)
     }
 
     private fun parsePoll(doc: Document): PollData? {
