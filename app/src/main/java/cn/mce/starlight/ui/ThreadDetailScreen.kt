@@ -4,6 +4,9 @@ import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.widthIn
@@ -129,6 +132,8 @@ fun ThreadDetailScreen(
     var smileySetIndex by remember { mutableIntStateOf(0) }
     // v0.4.1：版主操作合并为「管理」，展开后横向滑动查看全部动作
     var showModPanel by remember { mutableStateOf(false) }
+    // v0.4.2：帖子图片点开看大图
+    var viewerUrl by remember { mutableStateOf<String?>(null) }
     var showMention by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -443,6 +448,10 @@ fun ThreadDetailScreen(
         }
 
         ImmersiveTopBar(title = title, modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
+        // v0.4.2：图片大图查看器
+        viewerUrl?.let { url ->
+            ImageViewerDialog(url = url) { viewerUrl = null }
+        }
 
         // v0.3.10：赞赏（打赏楼主）从顶部按钮移到右下角悬浮按钮，拇指更容易点到
         detail?.let { d ->
@@ -1220,6 +1229,61 @@ private fun PostTableBlock(table: ContentBlock.Table) {
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * v0.4.2：帖子图片大图查看器（全屏 + 双指缩放/拖动 + 点击关闭）。
+ */
+@Composable
+private fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+        ),
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.96f))
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(1f, 4f)
+                        offset = if (scale <= 1.01f) {
+                            androidx.compose.ui.geometry.Offset.Zero
+                        } else {
+                            offset + pan
+                        }
+                    }
+                }
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
+                    },
+            )
+            Text(
+                "点按任意处关闭 · 双指缩放",
+                style = MaterialTheme.typography.labelSmall,
+                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 40.dp),
+            )
         }
     }
 }

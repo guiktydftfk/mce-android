@@ -380,7 +380,7 @@ fun SettingsScreen(
             SectionTitle("更新")
             Spacer(Modifier.height(8.dp))
             Text(
-                "检查更新",
+                "点击检查更新",
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier
                     .fillMaxWidth()

@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.data.RatingEntry
@@ -122,22 +123,30 @@ fun RatingsCard(
                                 if ((entry.uid ?: 0) > 0) onOpenUser(entry.uid!!, entry.name)
                             },
                     )
+                    // v0.4.2：分值固定在中间列（等宽 + 居中）
                     Text(
                         entry.amount.ifBlank { "+0" },
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.width(56.dp),
                     )
-                    entry.reason?.let { reason ->
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            reason,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
+                    // v0.4.2：留言放最右
+                    Box(
+                        Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterEnd,
+                    ) {
+                        entry.reason?.let { reason ->
+                            Text(
+                                reason,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.End,
+                            )
+                        }
                     }
                 }
             }

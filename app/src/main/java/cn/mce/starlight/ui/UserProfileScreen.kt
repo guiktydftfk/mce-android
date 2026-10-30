@@ -156,7 +156,23 @@ fun UserProfileScreen(
                                 }.ifEmpty { p.stats.entries.take(3).map { it.key to it.value } }
                                 ordered.forEach { (label, value) ->
                                     val shown = cn.mce.starlight.data.ProfileCommon.displayStatName(label)
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    // v0.4.2：主题数可点击 → 直接看 TA 的主题列表
+                                    val clickableMod = if (label == "主题") {
+                                        Modifier.clickable {
+                                            val path = if (p.isSelf) {
+                                                "home.php?mod=space&do=thread&view=me"
+                                            } else {
+                                                "home.php?mod=space&uid=${p.uid}&do=thread&view=me&from=space"
+                                            }
+                                            onOpenPage(path, if (p.isSelf) "我的主题" else "${p.name} 的主题")
+                                        }
+                                    } else {
+                                        Modifier
+                                    }
+                                    Column(
+                                        modifier = clickableMod,
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
                                         Text(
                                             value,
                                             style = MaterialTheme.typography.titleMedium,
