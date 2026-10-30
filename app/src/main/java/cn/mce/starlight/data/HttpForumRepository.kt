@@ -69,11 +69,11 @@ class HttpForumRepository(
                         isolateCookies = true,
                         retryOnFailure = false,
                     )
-                    val mods = if (cn.mce.starlight.core.SessionStore.staff != null) {
-                        ThreadDetailParser.parseModActionsFromHtml(desktopHtml, desktopUrl)
-                    } else {
-                        emptyList()
-                    }
+                    // v0.4.2：不再依赖「先打开过我的页拿到 staff 标记」——
+                    // 管理组页面本来就有 topicadmin 链接、普通用户页面没有，
+                    // 直接解析即可：有链接 → 显示「管理」，没有 → 隐藏。
+                    // （之前用 SessionStore.staff 当开关，冷启动直接进帖子的管理组会看不到管理按钮）
+                    val mods = ThreadDetailParser.parseModActionsFromHtml(desktopHtml, desktopUrl)
                     detail.copy(
                         modActions = mods.ifEmpty { detail.modActions },
                         ratings = ThreadDetailParser.parseRatingsFromHtml(desktopHtml, desktopUrl),
