@@ -87,7 +87,9 @@ object ThreadDetailParser {
             poll = parsePoll(doc),
             // v0.4.1：同步网页端管理组权限——只有页面上真存在管理链接时才给入口
             modActions = parseModActions(doc),
-        )
+        ).also { parsed ->
+            cn.mce.starlight.core.DiagStats.recordParse("帖子", "${parsed.posts.size} 楼 / 评分 ${parsed.ratings?.entries?.size ?: 0} 人")
+        }
     }
 
     // v0.3.3：帖子内投票解析

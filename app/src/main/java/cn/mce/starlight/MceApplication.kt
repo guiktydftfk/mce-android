@@ -2,6 +2,8 @@ package cn.mce.starlight
 
 import android.app.Application
 import cn.mce.starlight.core.CookieJar
+import cn.mce.starlight.core.DiagLog
+import cn.mce.starlight.core.DiagStats
 import cn.mce.starlight.core.DebugDump
 import cn.mce.starlight.core.WebCookies
 import cn.mce.starlight.core.SettingsStore
@@ -22,7 +24,19 @@ class MceApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        val onCreateStartedAt = System.currentTimeMillis()
         // 只做必要的同步初始化；ThumbCache 的 200 条记录解析已改为懒加载（见 ThumbCache.ensureLoaded）
+        // v0.4.3：诊断（设备标识 / 错误日志 / 启动计时 / 崩溃记录）
+        DiagStats.markProcessStart()
+        DiagLog.init(this)
+        cn.mce.starlight.core.DeviceIdentity.init(this)
+        runCatching {
+            val previous = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+                runCatching { DiagLog.saveCrash(error) }
+                previous?.uncaughtException(thread, error)
+            }
+        }
         SettingsStore.init(this)
         CookieJar.init(this)
         cn.mce.starlight.data.ThumbCache.init(this)

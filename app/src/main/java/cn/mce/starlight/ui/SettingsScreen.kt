@@ -63,6 +63,8 @@ fun SettingsScreen(
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var message by remember { mutableStateOf<String?>(null) }
     var diagTid by remember { mutableStateOf("") }
+    // v0.4.3：最近生成的自检报告预览（仅展示，不做导出）
+    var diagPreview by remember { mutableStateOf<String?>(null) }
     var diagBusy by remember { mutableStateOf(false) }
 
     val pickBackground = rememberLauncherForActivityResult(
@@ -465,12 +467,47 @@ fun SettingsScreen(
                         val report = Diagnostics.build(context, diagTid.toIntOrNull())
                         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         cm.setPrimaryClip(ClipData.newPlainText("MCE 自检报告", report))
+                    diagPreview = report
                         diagBusy = false
                         message = if (diagTid.isBlank()) "自检报告已复制到剪贴板"
                         else "自检报告（含图片自检）已复制到剪贴板"
                     }
                 },
             ) { Text(if (diagBusy) "生成中…" else "生成并复制自检报告") }
+            // v0.4.3：报告预览（含设备标识 / 网络 / 解析 / 错误统计）
+            diagPreview?.let { preview ->
+                Spacer(Modifier.height(10.dp))
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(240.dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                ) {
+                    androidx.compose.foundation.layout.Column(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(10.dp),
+                    ) {
+                        Text(
+                            "报告预览（已复制到剪贴板）",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        androidx.compose.foundation.text.selection.SelectionContainer {
+                            Text(
+                                preview,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState()),
+                            )
+                        }
+                    }
+                }
+            }
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
 

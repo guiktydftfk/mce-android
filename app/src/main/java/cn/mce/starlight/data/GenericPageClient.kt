@@ -165,14 +165,27 @@ object GenericPageClient {
          */
         retryOnFailure: Boolean = true,
     ): String {
-        fun once() = follow(
-            url,
-            "GET",
-            cookieOverride ?: WebCookies.cookieHeader(url),
-            null,
-            userAgent,
-            isolateCookies,
-        )
+        fun once(): String {
+            val startedAt = System.currentTimeMillis()
+            return try {
+                val html = follow(
+                    url,
+                    "GET",
+                    cookieOverride ?: WebCookies.cookieHeader(url),
+                    null,
+                    userAgent,
+                    isolateCookies,
+                )
+                cn.mce.starlight.core.DiagStats.recordNetwork("GET", url, 200, System.currentTimeMillis() - startedAt)
+                html
+            } catch (e: IOException) {
+                cn.mce.starlight.core.DiagStats.recordNetwork(
+                    "GET", url, 0, System.currentTimeMillis() - startedAt, e.javaClass.simpleName,
+                )
+                cn.mce.starlight.core.DiagLog.record("net:GET", e)
+                throw e
+            }
+        }
         if (!retryOnFailure) return once()
         return try {
             once()
@@ -258,8 +271,20 @@ object GenericPageClient {
         body: String,
         cookie: String?,
         userAgent: String? = null,
-    ): String =
-        follow(url, "POST", cookie ?: WebCookies.cookieHeader(url), body, userAgent)
+    ): String {
+        val startedAt = System.currentTimeMillis()
+        return try {
+            val html = follow(url, "POST", cookie ?: WebCookies.cookieHeader(url), body, userAgent)
+            cn.mce.starlight.core.DiagStats.recordNetwork("POST", url, 200, System.currentTimeMillis() - startedAt)
+            html
+        } catch (e: java.io.IOException) {
+            cn.mce.starlight.core.DiagStats.recordNetwork(
+                "POST", url, 0, System.currentTimeMillis() - startedAt, e.javaClass.simpleName,
+            )
+            cn.mce.starlight.core.DiagLog.record("net:POST", e)
+            throw e
+        }
+    }
     /** 保存响应 Cookie：只写入自建 CookieJar（v0.3.3 批 2 已删除 CookieManager 镜像/flush） */
     private fun storeCookies(url: String, conn: HttpURLConnection) {
         runCatching {

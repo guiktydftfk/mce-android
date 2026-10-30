@@ -67,6 +67,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.R
+import cn.mce.starlight.core.DiagStats
 import cn.mce.starlight.core.SessionStore
 import cn.mce.starlight.core.SettingsStore
 import cn.mce.starlight.data.AuthClient
@@ -193,6 +194,7 @@ fun MceApp() {
 
     val context = LocalContext.current
     var lastBackAt by remember { mutableLongStateOf(0L) }
+    androidx.compose.runtime.SideEffect { cn.mce.starlight.core.DiagStats.recordStartup("首帧", cn.mce.starlight.core.DiagStats.processElapsedMs()) }
     // v0.4.1：启动后台检查到更新时延后弹窗；以及本次启动进入首页的次数
     var deferredUpdate by remember { mutableStateOf<UpdateClient.Release?>(null) }
     var feedEnterCount by remember { mutableIntStateOf(0) }
@@ -304,7 +306,9 @@ fun MceApp() {
     LaunchedEffect(Unit) {
         // v0.4.1：启动请求串行化 —— ① 登录探测 → ② 板块/首页数据（HomeFeed 组合时自行加载）
         // → ③ 签到提醒（未开启则跳过）→ ④ 消息刷新 → ⑤ 后台检查更新（弹窗延后）
+        val probeStart = System.currentTimeMillis()
         val probe = SessionStore.probeLoginState()
+        DiagStats.recordStartup("登录探测", System.currentTimeMillis() - probeStart)
         if (probe == false) showLogin = true
         // 让首页先开始拉取板块数据
         kotlinx.coroutines.delay(200)
@@ -316,7 +320,9 @@ fun MceApp() {
                 if (!s.alreadySigned) showSigninReminder = true
             }
         }
+        val msgStart = System.currentTimeMillis()
         runCatching { cn.mce.starlight.core.MessageCenter.refresh(fromLaunch = true) }
+        DiagStats.recordStartup("消息刷新", System.currentTimeMillis() - msgStart)
         kotlinx.coroutines.delay(3000)
         // 上次启动已发现更新 → 本次直接弹；否则本次只后台检查，等用户第二次回到首页再弹
         val hadPending = SettingsStore.pendingUpdateCode > 0
@@ -324,6 +330,21 @@ fun MceApp() {
     }
 
     // v0.4.1：第二次进入首页时弹出延后的更新提示（再次打开软件则由 hadPending 直接弹）
+    // v0.4.3：记录当前页面（自检报告用）
+    LaunchedEffect(dest, stack.size, stack.lastOrNull()) {
+        val top = stack.lastOrNull()
+        DiagStats.setCurrentPage(
+            when {
+                top != null -> top.javaClass.simpleName + when (top) {
+                    is Route.Thread -> "#" + top.tid
+                    is Route.Board -> " fid=" + top.fid
+                    else -> ""
+                }
+                else -> dest.name
+            },
+        )
+    }
+
     LaunchedEffect(dest, stack.size) {
         if (dest == Dest.Feed && stack.isEmpty()) {
             feedEnterCount += 1
