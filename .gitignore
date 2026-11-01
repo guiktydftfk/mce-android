@@ -1,4 +1,4 @@
-﻿.gradle/
+.gradle/
 build/
 local.properties
 *.iml
@@ -15,3 +15,6 @@ dist/
 *.apk
 # 本地验证证据（截图/抓包 HTML），不入库
 probe/
+# 本地保留最近 4 个版本 APK，不进仓库（仅当前版本 force add）
+MCE-starlight-v*.apk
+release/MCE-starlight-v*.apk
