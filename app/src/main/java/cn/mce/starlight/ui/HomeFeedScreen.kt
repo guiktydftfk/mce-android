@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
 import cn.mce.starlight.core.SettingsStore
 import cn.mce.starlight.data.HttpForumRepository
@@ -68,6 +69,8 @@ fun HomeFeedScreen(
         min <= 0 || threadCharCount(thread) >= min
     }
     val cacheKey = "guide_$view"
+    // v0.4.3：首屏的非关键后台任务（全板块预热）用独立 scope，不阻塞列表加载
+    val bgScope = androidx.compose.runtime.rememberCoroutineScope()
     // v0.4.1：缓存由 Application 后台预热；未就绪时先走网络加载，不在主线程解析 JSON
     val cached = remember(view, reloadKey) {
         if (cn.mce.starlight.core.FeedCache.isReady()) {
@@ -95,19 +98,31 @@ fun HomeFeedScreen(
             },
             loader = { page ->
                 if (page == 1 && view == "newthread") {
-                    // v0.4.1：导读 + 我的最近主题 + 全板块最新**三路并行**，刷新等待 = 最慢的一路
-                    val (base, mine, allBoards) = coroutineScope {
+                    // v0.4.3：首屏**不再等待全板块合并** —— 导读 + 我的主题并行即可返回；
+                    // 全板块缓存没热时只能「跳过本次合并 + 后台预热」，避免冷启动等 34 个板块请求。
+                    val startedAt = System.currentTimeMillis()
+                    val (base, mine) = coroutineScope {
                         val guideAsync = async { repo.loadGuide(view, page) }
                         val mineAsync = async {
                             runCatching { repo.loadGuide("my", 1) }.getOrNull()
                         }
-                        val allAsync = async {
-                            runCatching { repo.loadLatestAllBoards() }.getOrDefault(emptyList())
-                        }
-                        Triple(guideAsync.await(), mineAsync.await(), allAsync.await())
+                        guideAsync.await() to mineAsync.await()
                     }
+                    val allBoards = repo.latestAllBoardsIfCached()
+                    if (allBoards == null) {
+                        // 后台预热（不阻塞首屏）；下次下拉刷新就能合并全板块
+                        bgScope.launch {
+                            runCatching { cn.mce.starlight.data.HttpForumRepository.prewarmLatestAllBoards() }
+                        }
+                    }
+                    cn.mce.starlight.core.DiagStats.recordStartup(
+                        "首页首屏", System.currentTimeMillis() - startedAt,
+                    )
+                    cn.mce.starlight.core.DiagStats.recordParse(
+                        "首页", "${base.threads.size} 帖（全板块合并=" + if (allBoards == null) "后台预热" else "命中缓存" + "）",
+                    )
                     val known = base.threads.mapTo(HashSet()) { it.id }
-                    val extras = (allBoards + mine?.threads.orEmpty())
+                    val extras = (allBoards.orEmpty() + mine?.threads.orEmpty())
                         .filter { it.id !in known }
                         .distinctBy { it.id }
                         .sortedByDescending {

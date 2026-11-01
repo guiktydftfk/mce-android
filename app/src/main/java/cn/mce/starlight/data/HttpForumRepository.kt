@@ -90,6 +90,19 @@ class HttpForumRepository(
      * - 并发 6，避免一次打满论坛导致限流；
      * - 结果带 120 秒内存缓存：首次刷新并行拉全板块，后续刷新直接命中缓存（明显更快）。
      */
+    /**
+     * v0.4.3：只取「已就绪的全板块缓存」，**绝不等待网络**。
+     * 首页首屏用它：缓存没热就跳过全板块合并（返回 null），让首屏只等导读；
+     * 同时调用方可以后台触发 [prewarmLatestAllBoards] 补缓存，下次刷新再合并。
+     *
+     * 背景：0.4.2 把全板块改成「按分组串行」后，冷缓存时首页第一页要等 34 个板块
+     * 分 4 组串行拉完（弱网 5s+），用户感知就是「打开应用一直在加载」。
+     */
+    fun latestAllBoardsIfCached(): List<ThreadSummary>? {
+        val cached = latestAllCache
+        return if (cached != null && System.currentTimeMillis() - cached.first < 300_000L) cached.second else null
+    }
+
     suspend fun loadLatestAllBoards(): List<ThreadSummary> = withContext(Dispatchers.IO) {
         val cached = latestAllCache
         if (cached != null && System.currentTimeMillis() - cached.first < 300_000L) {
