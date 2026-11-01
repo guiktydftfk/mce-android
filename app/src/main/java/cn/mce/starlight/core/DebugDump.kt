@@ -14,7 +14,7 @@ import java.io.File
  */
 object DebugDump {
     /** 需要抓页面排查时临时改 true 再本地构建 */
-    var enabled: Boolean = true // TEMP: 抓搜索接口返回结构，抓完改回 false
+    var enabled: Boolean = false
 
     /** v0.4.1：临时排查用 —— 额外把页面写到外部 files 目录，release 包也能 adb pull */
     private var externalDir: File? = null
