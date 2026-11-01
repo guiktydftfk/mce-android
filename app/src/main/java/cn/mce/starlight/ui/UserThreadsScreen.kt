@@ -34,7 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cn.mce.starlight.data.SearchClient
+import cn.mce.starlight.data.UserThreadsClient
 import kotlinx.coroutines.launch
 
 /**
@@ -45,12 +45,13 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun UserThreadsScreen(
+    uid: Int,
     name: String,
     onMenu: () -> Unit,
     onOpenThread: (Int, String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    var items by remember { mutableStateOf<List<SearchClient.Hit>>(emptyList()) }
+    var items by remember { mutableStateOf<List<UserThreadsClient.Item>>(emptyList()) }
     var page by remember { mutableStateOf(0) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -60,7 +61,7 @@ fun UserThreadsScreen(
         if (loading) return
         loading = true
         error = null
-        runCatching { SearchClient.searchThreadsByAuthor(name, next) }
+        runCatching { UserThreadsClient.load(uid, next) }
             .onSuccess { list ->
                 page = next
                 val known = items.mapTo(HashSet()) { it.tid }

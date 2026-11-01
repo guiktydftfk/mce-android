@@ -742,6 +742,7 @@ fun MceApp() {
             )
 
             is Route.UserThreads -> UserThreadsScreen(
+                uid = current.uid ?: 0,
                 name = current.name,
                 onMenu = ::openDrawer,
                 onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
