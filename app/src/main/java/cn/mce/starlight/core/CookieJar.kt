@@ -57,11 +57,23 @@ object CookieJar {
     }
     fun all(): Map<String, String> {
         val p = store() ?: return emptyMap()
-        return p.all.entries
-            .filter { it.value is String }
-            // v0.4.0：存储值是密文，读取时解密；旧明文由 CryptoBox 原样返回
-            .mapNotNull { entry -> CryptoBox.decrypt(entry.value as String)?.let { entry.key to it } }
-            .toMap()
+        val entries = p.all.entries.filter { it.value is String }
+        // v0.4.0：存储值是密文，读取时解密；旧明文由 CryptoBox 原样返回
+        val decrypted = entries.mapNotNull { entry ->
+            CryptoBox.decrypt(entry.value as String)?.let { entry.key to it }
+        }.toMap()
+        if (decrypted.isNotEmpty()) return decrypted
+        // v0.4.3：全部解密失败（Keystore 瞬时不可用 / 迁移进行中）时不要返回空，
+        // 否则会被当成「未登录」（用户看到的「更新后掉登录」就是这么来的）。
+        // 退回仍为明文的旧值，并触发一次迁移重试。
+        val plain = entries.mapNotNull { entry ->
+            val v = entry.value as String
+            if (!CryptoBox.isEncrypted(v)) entry.key to v else null
+        }.toMap()
+        if (plain.isEmpty()) {
+            Thread { runCatching { migrateToEncrypted() } }.apply { isDaemon = true }.start()
+        }
+        return plain
     }
 
     /** 是否已登录（Discuz 下发的 auth 类 Cookie） */

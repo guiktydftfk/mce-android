@@ -36,7 +36,53 @@ object PmReadStore {
 
     fun isRead(touid: Int, signature: String): Boolean {
         if (touid <= 0 || signature.isBlank()) return false
-        return CryptoBox.decrypt(prefs()?.getString(KEY_PREFIX + touid, null)) == signature
+        val stored = CryptoBox.decrypt(prefs()?.getString(KEY_PREFIX + touid, null))
+        return matches(stored, signature)
+    }
+
+    /**
+     * v0.4.3：容错匹配 —— 列表页的 preview 有时是聊天正文的**截断**（带「...」/「…」），
+     * 直接相等会判成未读，于是出现「读过的私信下次启动又提醒」。
+     */
+    private fun matches(stored: String?, current: String): Boolean {
+        if (stored.isNullOrBlank()) return false
+        val a = normalize(stored)
+        val b = normalize(current)
+        if (a == b) return true
+        val ellipsis = listOf("...", "…")
+        ellipsis.forEach { mark ->
+            if (b.endsWith(mark)) {
+                val trimmed = b.removeSuffix(mark).trim()
+                if (trimmed.length >= 4 && a.startsWith(trimmed)) return true
+            }
+            if (a.endsWith(mark)) {
+                val trimmed = a.removeSuffix(mark).trim()
+                if (trimmed.length >= 4 && b.startsWith(trimmed)) return true
+            }
+        }
+        return false
+    }
+
+    private fun normalize(text: String): String =
+        text.trim().replace(Regex("""\s+"""), " ").trim()
+
+    /** 当前本地已读记录条数（自检报告用） */
+    fun count(): Int = prefs()?.all?.size ?: 0
+
+    /**
+     * v0.4.3：「全部标为已读」——把当前列表里所有未读会话的签名记下来。
+     * 用于服务端顽固未读（论坛模板已读处理不可靠时的手动兜底）。
+     */
+    fun markAllRead(items: List<PersonalClient.PmItem>): Int {
+        var marked = 0
+        items.filter { it.unread > 0 }.forEach { item ->
+            val sig = signature(item)
+            if (sig.isNotBlank()) {
+                markRead(item.touid, sig)
+                marked++
+            }
+        }
+        return marked
     }
 
     /** 把本地已读叠加到服务端列表：本地已读的会话，未读数归零 */

@@ -338,6 +338,30 @@ fun NoticesScreen(
                 }
             }
 
+            // v0.4.3：服务端顽固未读时的手动兜底
+            if (tab == 1 && MessageCenter.unreadPm > 0) {
+                Text(
+                    "全部标为已读",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(start = 14.dp, top = 2.dp)
+                        .clickable {
+                            scope.launch {
+                                runCatching { PersonalClient.loadPm(1) }
+                                    .onSuccess { items ->
+                                        cn.mce.starlight.core.PmReadStore.markAllRead(items)
+                                        val effective = cn.mce.starlight.core.PmReadStore.overlay(items)
+                                        pmState = PState.Content(effective)
+                                        MessageCenter.applyPmItems(effective)
+                                        MessageCenter.dismissBanner()
+                                    }
+                                    .onFailure { }
+                            }
+                        },
+                )
+            }
+
             if (tab == 0) {
                 when (val s = noticeState) {
                     is PState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }

@@ -165,9 +165,15 @@ object SearchClient {
             "ascdesc" to "desc",
             "page" to page.toString(),
         )
-        val hits = runCatching { parseThreads(post(fields, mobile = true)) }.getOrDefault(emptyList())
+        val mobileHtml = runCatching { post(fields, mobile = true) }.getOrNull()
+        cn.mce.starlight.core.DebugDump.dump("search_author_mobile_p$page", mobileHtml.orEmpty())
+        val hits = runCatching { parseThreads(mobileHtml.orEmpty()) }.getOrDefault(emptyList())
         if (hits.isNotEmpty()) hits
-        else runCatching { parseThreads(post(fields, mobile = false)) }.getOrDefault(emptyList())
+        else {
+            val desktopHtml = runCatching { post(fields, mobile = false) }.getOrNull()
+            cn.mce.starlight.core.DebugDump.dump("search_author_desktop_p$page", desktopHtml.orEmpty())
+            runCatching { parseThreads(desktopHtml.orEmpty()) }.getOrDefault(emptyList())
+        }
     }
 
     private fun parseThreads(html: String): List<Hit> {
