@@ -12,9 +12,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,10 +39,10 @@ import cn.mce.starlight.data.UserThreadsClient
 import kotlinx.coroutines.launch
 
 /**
- * v0.4.3：「TA 的全部主题」。
+ * v0.4.3：「TA 的主题」列表 —— 与首页信息流一致的卡片样式。
  *
- * 站点的「他人主题列表」页对客户端返回提示信息页（不可用），因此改走**网页端按作者搜索接口**
- * （`search.php` + `searchuser=昵称`），可以分页拿到该用户的全部主题。
+ * 数据：电脑版空间主题页（见 [UserThreadsClient]），只解析主题表格，
+ * 卡片展示：版块标签 / 最后发帖人 / 时间 / 标题 / 回复·查看 数。
  */
 @Composable
 fun UserThreadsScreen(
@@ -66,35 +67,21 @@ fun UserThreadsScreen(
                 page = next
                 val known = items.mapTo(HashSet()) { it.tid }
                 items = items + list.filterNot { it.tid in known }
-                if (list.isEmpty() && next == 1) error = "没有查到这个用户的主题（或搜索被限制）"
+                if (list.isEmpty() && next == 1) error = "没有查到主题"
             }
-            .onFailure { error = it.message ?: "搜索失败" }
+            .onFailure { error = it.message ?: "加载失败" }
         loading = false
     }
 
-    LaunchedEffect(name) { if (items.isEmpty()) load(1) }
+    LaunchedEffect(uid) { if (items.isEmpty()) load(1) }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
-            contentPadding = PaddingValues(top = topInset + 64.dp, bottom = 110.dp, start = 14.dp, end = 14.dp),
+            contentPadding = PaddingValues(top = topInset + 60.dp, bottom = 110.dp, start = 10.dp, end = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            itemsIndexed(items, key = { index, item -> "${item.tid}#$index" }) { _, hit ->
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .iosGlass(12)
-                        .clickable { onOpenThread(hit.tid, hit.title) }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                ) {
-                    Text(
-                        hit.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+            itemsIndexed(items, key = { index, item -> "${item.tid}#$index" }) { _, item ->
+                UserThreadCard(item) { onOpenThread(item.tid, item.title) }
             }
             item {
                 Box(Modifier.fillMaxWidth(), Alignment.Center) {
@@ -109,14 +96,12 @@ fun UserThreadsScreen(
             }
             error?.let { msg ->
                 item {
-                    Column(Modifier.fillMaxWidth().padding(8.dp)) {
-                        Text(msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                        Text(
-                            "可改用网页版搜索：搜索 → 高级搜索 → 作者",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Text(
+                        msg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(8.dp),
+                    )
                 }
             }
         }
@@ -125,5 +110,74 @@ fun UserThreadsScreen(
             modifier = Modifier.align(Alignment.TopStart),
             onMenu = onMenu,
         )
+    }
+}
+
+@Composable
+private fun UserThreadCard(item: UserThreadsClient.Item, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .iosGlass(16)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            item.board?.let { board ->
+                Text(
+                    "#$board",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            item.lastPoster?.let { poster ->
+                Text(
+                    poster,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            item.time?.let { time ->
+                Text(
+                    time,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+        Text(
+            item.title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            item.replies?.let { replies ->
+                Text(
+                    "回复 $replies",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(10.dp))
+            }
+            item.views?.let { views ->
+                Text(
+                    "查看 $views",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
