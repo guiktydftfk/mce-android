@@ -81,7 +81,15 @@ object MessageCenter {
      * 把「刚拉到的私信列表」写回未读真源（v0.3.7）：
      * 消息页加载/刷新列表后立即调用 → 页签角标与列表行永远同源。
      */
+    /** v0.4.3：缓存最近一次私信列表，供会话页取「与服务端一致的签名」标记已读 */
+    private var lastPmItems: List<PersonalClient.PmItem> = emptyList()
+
+    /** 会话页用：取该会话在列表里的签名（和 PmReadStore.overlay 判定用的完全一致） */
+    fun readSignatureFor(touid: Int): String? =
+        lastPmItems.firstOrNull { it.touid == touid }?.let { PmReadStore.signature(it) }
+
     fun applyPmItems(items: List<PersonalClient.PmItem>) {
+        lastPmItems = items
         // v0.4.1：先套用「本地已读账本」——论坛模板读完私信仍返回未读，
         // 不套用的话角标不消失、还会被当成新消息弹提示。
         val effective = PmReadStore.overlay(items)

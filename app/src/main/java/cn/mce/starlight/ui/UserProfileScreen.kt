@@ -57,6 +57,8 @@ fun UserProfileScreen(
     onMenu: () -> Unit,
     onOpenThread: (Int, String) -> Unit,
     onOpenPage: (String, String) -> Unit,
+    /** v0.4.3：点「主题」→ TA 的全部主题（按作者搜索） */
+    onOpenUserThreads: (Int, String) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
     var state by remember(uid) { mutableStateOf<UState>(UState.Loading) }
@@ -159,13 +161,12 @@ fun UserProfileScreen(
                                     // v0.4.2：主题数可点击 → 直接看 TA 的主题列表
                                     val clickableMod = if (label == "主题") {
                                         Modifier.clickable {
-                                            // v0.4.2：手机模板不带 from=space 才正常返回主题列表
-                                            val path = if (p.isSelf) {
-                                                "home.php?mod=space&do=thread&view=me"
+                                            // v0.4.3：他人主题页不可用 → 走「按作者搜索」的 APP 内列表
+                                            if (p.isSelf) {
+                                                onOpenPage("home.php?mod=space&do=thread&view=me", "我的主题")
                                             } else {
-                                                "home.php?mod=space&uid=${p.uid}&do=thread&view=me"
+                                                onOpenUserThreads(p.uid, p.name)
                                             }
-                                            onOpenPage(path, if (p.isSelf) "我的主题" else "${p.name} 的主题")
                                         }
                                     } else {
                                         Modifier

@@ -91,6 +91,8 @@ sealed interface Route {
     data object Medals : Route
     data object Friends : Route
     data class User(val uid: Int?, val name: String) : Route
+    /** v0.4.3：TA 的全部主题（按作者搜索接口） */
+    data class UserThreads(val uid: Int?, val name: String) : Route
     data object DraftBox : Route
     data object FriendQr : Route
     data class Pm(val touid: Int, val name: String) : Route
@@ -739,7 +741,14 @@ fun MceApp() {
                 onComposeNew = { push(Route.Compose(null)) },
             )
 
+            is Route.UserThreads -> UserThreadsScreen(
+                name = current.name,
+                onMenu = ::openDrawer,
+                onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+            )
+
             is Route.User -> UserProfileScreen(
+                onOpenUserThreads = { uid, name -> push(Route.UserThreads(uid, name)) },
                 uid = current.uid,
                 onMenu = ::openDrawer,
                 onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },

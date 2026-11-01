@@ -79,8 +79,12 @@ fun PmChatScreen(
                 chat = it
                 error = null
                 // v0.4.1：打开会话即记「已读签名」（论坛侧读完仍返回未读），并刷新未读角标
+                // v0.4.3：优先用「私信列表里的签名」——与 PmReadStore.overlay 判定完全一致，
+                // 避免用聊天正文推导出的签名和列表 preview 不一致 → 下次启动又被标未读/弹提醒。
+                val listSig = runCatching { cn.mce.starlight.core.MessageCenter.readSignatureFor(touid) }.getOrNull()
                 val last = it.messages.lastOrNull()
-                val sig = (last?.text?.trim().orEmpty().ifBlank { last?.time?.trim().orEmpty() }).take(120)
+                val chatSig = (last?.text?.trim().orEmpty().ifBlank { last?.time?.trim().orEmpty() }).take(120)
+                val sig = listSig?.takeIf { s -> s.isNotBlank() } ?: chatSig
                 if (touid > 0 && sig.isNotBlank()) {
                     cn.mce.starlight.core.PmReadStore.markRead(touid, sig)
                     scope.launch {
