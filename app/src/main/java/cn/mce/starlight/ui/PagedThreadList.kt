@@ -100,6 +100,8 @@ fun PagedThreadList(
     scrollToTopKey: Int = 0,
     /** v0.4.1：外部传入的滚动状态（首页用，从帖子返回时保持位置） */
     externalListState: androidx.compose.foundation.lazy.LazyListState? = null,
+    /** v0.4.3：滚动位置按 key 缓存，返回上一页时恢复位置 */
+    listStateKey: String? = null,
 ) {
     val scope = rememberCoroutineScope()
     val st = remember(resetKey) {
@@ -110,7 +112,9 @@ fun PagedThreadList(
     }
     val ownListState = remember(resetKey) { LazyListState() }
     // v0.4.1：外部状态优先——返回首页时保留滚动位置
-    val listState = externalListState ?: ownListState
+    val listState = externalListState
+        ?: listStateKey?.let { cn.mce.starlight.core.ListStateCache.get(it) }
+        ?: ownListState
 
     // v0.4.1：从帖子返回列表时回到顶部（旧实现只有刷新才回顶）
     LaunchedEffect(scrollToTopKey) {

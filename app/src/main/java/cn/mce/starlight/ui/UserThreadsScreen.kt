@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cn.mce.starlight.data.UserThreadsClient
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
@@ -52,22 +55,31 @@ fun UserThreadsScreen(
     onOpenThread: (Int, String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    var items by remember { mutableStateOf<List<UserThreadsClient.Item>>(emptyList()) }
-    var page by remember { mutableStateOf(0) }
+    // v0.4.3：返回时恢复列表与滚动位置（打开帖子会销毁本页）
+    val cached = remember(uid) { cn.mce.starlight.core.UserThreadsCache.get(uid) }
+    var items by remember { mutableStateOf(cached?.items ?: emptyList()) }
+    var page by remember { mutableStateOf(cached?.page ?: 0) }
     var loading by remember { mutableStateOf(false) }
+    var endReached by remember { mutableStateOf(cached?.endReached ?: false) }
     var error by remember { mutableStateOf<String?>(null) }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val listState = cn.mce.starlight.core.ListStateCache.get("user_threads_$uid")
 
     suspend fun load(next: Int) {
-        if (loading) return
+        if (loading || endReached) return
         loading = true
         error = null
         runCatching { UserThreadsClient.load(uid, next) }
             .onSuccess { list ->
                 page = next
                 val known = items.mapTo(HashSet()) { it.tid }
-                items = items + list.filterNot { it.tid in known }
-                if (list.isEmpty() && next == 1) error = "没有查到主题"
+                val fresh = list.filterNot { it.tid in known }
+                items = items + fresh
+                // 没有新内容（或本页不足一屏）→ 视为到底
+                if (fresh.isEmpty()) {
+                    endReached = true
+                    if (next == 1) error = "没有查到主题"
+                }
             }
             .onFailure { error = it.message ?: "加载失败" }
         loading = false
@@ -75,8 +87,28 @@ fun UserThreadsScreen(
 
     LaunchedEffect(uid) { if (items.isEmpty()) load(1) }
 
+    LaunchedEffect(items, page, endReached) {
+        cn.mce.starlight.core.UserThreadsCache.put(uid, items, page, endReached)
+    }
+
+    // v0.4.3：瀑布流式自动加载 —— 滚到接近底部就自动拉下一页，无需点「加载更多」
+    LaunchedEffect(listState, items.size) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            last to info.totalItemsCount
+        }
+            .distinctUntilChanged()
+            .collect { (last, total) ->
+                if (total > 0 && last >= total - 5 && !loading && !endReached) {
+                    load(page + 1)
+                }
+            }
+    }
+
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
+            state = listState,
             contentPadding = PaddingValues(top = topInset + 60.dp, bottom = 110.dp, start = 10.dp, end = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -85,12 +117,23 @@ fun UserThreadsScreen(
             }
             item {
                 Box(Modifier.fillMaxWidth(), Alignment.Center) {
-                    if (loading) {
-                        CircularProgressIndicator(Modifier.padding(12.dp))
-                    } else {
-                        TextButton(onClick = { scope.launch { load(page + 1) } }) {
-                            Text(if (page <= 1) "加载更多" else "继续加载（第 ${page + 1} 页）")
+                    when {
+                        loading -> CircularProgressIndicator(Modifier.padding(12.dp))
+                        endReached -> Text(
+                            "没有更多了",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(12.dp),
+                        )
+                        error != null -> TextButton(onClick = { scope.launch { load(page + 1) } }) {
+                            Text("加载失败，点击重试")
                         }
+                        else -> Text(
+                            "上滑加载更多…",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(12.dp),
+                        )
                     }
                 }
             }

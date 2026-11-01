@@ -67,6 +67,7 @@ fun ThreadListScreen(
             initialItems = cached?.threads.orEmpty(),
             initialHasNext = cached?.hasNext ?: true,
             onFirstPage = { page -> cn.mce.starlight.core.FeedCache.put(cacheKey, page) },
+            listStateKey = cacheKey,
             onOpenThread = onOpenThread,
         )
 
