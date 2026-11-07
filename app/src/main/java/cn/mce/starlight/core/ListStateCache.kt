@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.core
+package cn.mce.starlight.core
 
 import androidx.compose.foundation.lazy.LazyListState
 
@@ -9,6 +9,9 @@ import androidx.compose.foundation.lazy.LazyListState
  * 这里把 LazyListState 按 key 缓存下来，返回时恢复原位置（和首页一致）。
  */
 object ListStateCache {
-    private val map = mutableMapOf<String, LazyListState>()
+    // v0.4.4：容量上限，避免页面越开越多时无限累积
+    private val map = object : LinkedHashMap<String, LazyListState>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, LazyListState>?): Boolean = size > 20
+    }
     fun get(key: String): LazyListState = map.getOrPut(key) { LazyListState() }
 }

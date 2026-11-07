@@ -44,7 +44,7 @@ object PmReadStore {
      * v0.4.3：容错匹配 —— 列表页的 preview 有时是聊天正文的**截断**（带「...」/「…」），
      * 直接相等会判成未读，于是出现「读过的私信下次启动又提醒」。
      */
-    private fun matches(stored: String?, current: String): Boolean {
+    internal fun matches(stored: String?, current: String): Boolean {
         if (stored.isNullOrBlank()) return false
         val a = normalize(stored)
         val b = normalize(current)

@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.core
+package cn.mce.starlight.core
 
 import cn.mce.starlight.data.UserThreadsClient
 
@@ -10,7 +10,10 @@ object UserThreadsCache {
         val endReached: Boolean,
     )
 
-    private val map = mutableMapOf<Int, Snapshot>()
+    // v0.4.4：容量上限，避免长时间使用后无限增长
+    private val map = object : LinkedHashMap<Int, Snapshot>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Snapshot>?): Boolean = size > 20
+    }
 
     fun get(uid: Int): Snapshot? = map[uid]
 

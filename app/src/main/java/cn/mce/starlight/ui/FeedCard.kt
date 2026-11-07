@@ -113,14 +113,18 @@ fun FeedCard(
         // 缩略图：URL 由列表层在滚动停止后统一抓取（见 PagedThreadList），这里只负责渲染。
         // v0.3.9 低数据流量模式：开启后整卡不渲染配图（列表层同时不再抓取缩略图）。
         if (!SettingsStore.lowDataMode && !thumbUrl.isNullOrBlank()) {
-            AsyncImage(
-                // v0.4.1：按展示尺寸解码（不再整图解码）+ 关闭淡入，首页图更快出
-                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+            // v0.4.4：请求对象只在 URL 变化时重建（旧实现每次重组都 new 一个 ImageRequest）
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val thumbRequest = androidx.compose.runtime.remember(thumbUrl, ctx) {
+                coil.request.ImageRequest.Builder(ctx)
                     .data(thumbUrl)
                     .size(720)
                     .crossfade(false)
                     .memoryCacheKey(thumbUrl)
-                    .build(),
+                    .build()
+            }
+            AsyncImage(
+                model = thumbRequest,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

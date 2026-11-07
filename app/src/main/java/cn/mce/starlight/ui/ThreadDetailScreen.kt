@@ -162,12 +162,14 @@ fun ThreadDetailScreen(
                 state = if (merged.posts.isEmpty()) DetailState.Error("没有解析到楼层内容")
                 else DetailState.Content(merged)
             }
-            .onFailure {
+            .onFailure { e ->
+                // v0.4.4：失败原因记入诊断日志（自检报告可见），不再静默吞掉
+                cn.mce.starlight.core.DiagLog.record("thread-load", e)
                 val existing = (state as? DetailState.Content)?.detail
                 if (keepOnError && existing != null) {
-                    toast = (it.message ?: "刷新失败") + "（已保留上次内容）"
+                    toast = (e.message ?: "刷新失败") + "（已保留上次内容）"
                 } else {
-                    state = DetailState.Error(it.message ?: "加载失败")
+                    state = DetailState.Error(e.message ?: "加载失败")
                 }
             }
     }
@@ -182,6 +184,7 @@ fun ThreadDetailScreen(
             val nextPage = page + 1
             val before = cur.posts.size
             runCatching { repo.loadThreadDetail(tid, nextPage) }
+                .onFailure { e -> cn.mce.starlight.core.DiagLog.record("thread-page-$nextPage", e) }
                 .onSuccess { d ->
                     if (d.posts.isNotEmpty()) {
                         // v0.4.0：手机模板对超范围的 page 会重复返回同一页（同批 pid），
@@ -1198,57 +1201,3 @@ private fun PostTableBlock(table: ContentBlock.Table) {
     }
 }
 
-/**
- * v0.4.2：帖子图片大图查看器（全屏 + 双指缩放/拖动 + 点击关闭）。
- */
-@Composable
-private fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
-    var scale by remember { mutableStateOf(1f) }
-    var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
-    androidx.compose.ui.window.Dialog(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(
-            usePlatformDefaultWidth = false,
-        ),
-    ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.96f))
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 4f)
-                        offset = if (scale <= 1.01f) {
-                            androidx.compose.ui.geometry.Offset.Zero
-                        } else {
-                            offset + pan
-                        }
-                    }
-                }
-                .clickable(onClick = onDismiss),
-            contentAlignment = Alignment.Center,
-        ) {
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                        translationX = offset.x
-                        translationY = offset.y
-                    },
-            )
-            Text(
-                "点按任意处关闭 · 双指缩放",
-                style = MaterialTheme.typography.labelSmall,
-                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 40.dp),
-            )
-        }
-    }
-}

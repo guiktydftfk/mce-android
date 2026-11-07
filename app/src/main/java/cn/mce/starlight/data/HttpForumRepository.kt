@@ -50,32 +50,74 @@ class HttpForumRepository(
             MobileForumParser.parse(fetch(url), url, page)
         }
 
+    // v0.4.4：帖子详情页 1 缓存（返回列表再点进同一帖可秒开）
+    private val detailCache = java.util.concurrent.ConcurrentHashMap<Int, Pair<Long, ThreadDetail>>()
+    // v0.4.4：评分缓存（评分变化很少，避免每次进帖都补抓电脑版页面）
+    private val ratingsCache = java.util.concurrent.ConcurrentHashMap<Int, Pair<Long, ThreadRatings?>>()
+
+    private fun cachedDetail(tid: Int): ThreadDetail? {
+        val entry = detailCache[tid] ?: return null
+        if (System.currentTimeMillis() - entry.first > 3 * 60_000L) { detailCache.remove(tid); return null }
+        return entry.second
+    }
+
+    private fun putDetail(tid: Int, detail: ThreadDetail) {
+        if (detailCache.size > 5) detailCache.clear()
+        detailCache[tid] = System.currentTimeMillis() to detail
+    }
+
+    private fun cachedRatings(tid: Int): Pair<Boolean, ThreadRatings?> {
+        val entry = ratingsCache[tid] ?: return false to null
+        if (System.currentTimeMillis() - entry.first > 10 * 60_000L) { ratingsCache.remove(tid); return false to null }
+        return true to entry.second
+    }
+
+    private fun putRatings(tid: Int, ratings: ThreadRatings?) {
+        if (ratingsCache.size > 50) ratingsCache.clear()
+        ratingsCache[tid] = System.currentTimeMillis() to ratings
+    }
+
     override suspend fun loadThreadDetail(tid: Int, page: Int, noCache: Boolean): ThreadDetail =
         withContext(Dispatchers.IO) {
+            if (!noCache && page == 1) cachedDetail(tid)?.let { return@withContext it }
             val cacheBust = if (noCache) "&t=${System.currentTimeMillis()}&mobile=2" else ""
             val url = "$baseHost/forum.php?mod=viewthread&tid=$tid&page=$page$cacheBust"
-            val detail = ThreadDetailParser.parse(fetch(url), url, tid, page)
-                                    // v0.4.2：评分/打赏只在「电脑版」页面渲染（手机模板没有），
-            // 登录后在第 1 页补抓一次电脑版页面，一次请求同时解析两者。
             val needDesktop = page == 1 && cn.mce.starlight.core.SessionStore.isLoggedIn
-            if (needDesktop) {
-                runCatching {
-                    val desktopUrl = "$baseHost/forum.php?mod=viewthread&tid=$tid&mobile=no"
-                    val desktopHtml = GenericPageClient.get(
-                        desktopUrl,
-                        userAgent = Net.DESKTOP_UA,
-                        isolateCookies = true,
-                        retryOnFailure = false,
-                    )
-                    // v0.4.2：不再依赖「先打开过我的页拿到 staff 标记」——
-                                                            // （之前用 SessionStore.staff 当开关，冷启动直接进帖子的管理组会看不到管理按钮）
-                    detail.copy(
-                        ratings = ThreadDetailParser.parseRatingsFromHtml(desktopHtml, desktopUrl),
-                    )
-                }.getOrNull() ?: detail
-            } else {
-                detail
+            if (!needDesktop) {
+                val d = ThreadDetailParser.parse(fetch(url), url, tid, page)
+                if (!noCache && page == 1) putDetail(tid, d)
+                return@withContext d
             }
+            // v0.4.4：手机页与电脑页**并行**抓取（旧实现串行，打开帖子白等一次 RTT）
+            val desktopUrl = "$baseHost/forum.php?mod=viewthread&tid=$tid&mobile=no"
+            val (hit, cachedRating) = if (noCache) false to null else cachedRatings(tid)
+            val result = coroutineScope {
+                val detailAsync = async { ThreadDetailParser.parse(fetch(url), url, tid, page) }
+                val desktopAsync = if (hit) null else async {
+                    runCatching {
+                        GenericPageClient.get(
+                            desktopUrl,
+                            userAgent = Net.DESKTOP_UA,
+                            isolateCookies = true,
+                            retryOnFailure = false,
+                        )
+                    }.onFailure {
+                        cn.mce.starlight.core.DiagLog.record("thread-desktop", it)
+                    }.getOrNull()
+                }
+                val detail = detailAsync.await()
+                val ratings = if (hit) cachedRating else {
+                    val html = desktopAsync?.await()
+                    val parsed = html?.let { runCatching { ThreadDetailParser.parseRatingsFromHtml(it, desktopUrl) }
+                        .onFailure { e -> cn.mce.starlight.core.DiagLog.record("ratings", e) }
+                        .getOrNull() }
+                    putRatings(tid, parsed)
+                    parsed
+                }
+                detail.copy(ratings = ratings)
+            }
+            if (!noCache && page == 1) putDetail(tid, result)
+            result
         }
 
     /**

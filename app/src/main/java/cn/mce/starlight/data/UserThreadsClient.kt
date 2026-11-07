@@ -43,9 +43,13 @@ object UserThreadsClient {
         val html = runCatching {
             GenericPageClient.get(url, userAgent = Net.DESKTOP_UA, isolateCookies = true)
         }.getOrNull() ?: return@withContext emptyList()
-        val doc = Jsoup.parse(html, url)
+        parse(html)
 
-        doc.select("div.tl table tr").mapNotNull { tr ->
+    }
+
+    internal fun parse(html: String): List<Item> {
+        val doc = Jsoup.parse(html, BASE)
+        return doc.select("div.tl table tr").mapNotNull { tr ->
             if (tr.hasClass("th")) return@mapNotNull null
             val titleEl = tr.selectFirst("th a[href*=viewthread]") ?: return@mapNotNull null
             val tid = tidRegex.find(titleEl.attr("href"))?.groupValues?.get(1)?.toIntOrNull()

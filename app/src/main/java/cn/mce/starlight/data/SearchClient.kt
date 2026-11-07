@@ -150,32 +150,6 @@ object SearchClient {
         }.distinctBy { it.uid }.take(100)
     }
 
-    /**
-     * v0.4.3：按作者查主题（网页端搜索接口 searchuser）——用于「TA 的全部主题」。
-     * 站点没有开放「他人主题列表」页（直接访问会返回提示信息页），但搜索接口可以按作者列出全部主题。
-     */
-    suspend fun searchThreadsByAuthor(author: String, page: Int = 1): List<Hit> = withContext(Dispatchers.IO) {
-        if (author.isBlank()) return@withContext emptyList()
-        val fields = listOf(
-            "formhash" to formhash(),
-            "mod" to "forum",
-            "searchsubmit" to "yes",
-            "searchuser" to author,
-            "orderby" to "dateline",
-            "ascdesc" to "desc",
-            "page" to page.toString(),
-        )
-        val mobileHtml = runCatching { post(fields, mobile = true) }.getOrNull()
-        cn.mce.starlight.core.DebugDump.dump("search_author_mobile_p$page", mobileHtml.orEmpty())
-        val hits = runCatching { parseThreads(mobileHtml.orEmpty()) }.getOrDefault(emptyList())
-        if (hits.isNotEmpty()) hits
-        else {
-            val desktopHtml = runCatching { post(fields, mobile = false) }.getOrNull()
-            cn.mce.starlight.core.DebugDump.dump("search_author_desktop_p$page", desktopHtml.orEmpty())
-            runCatching { parseThreads(desktopHtml.orEmpty()) }.getOrDefault(emptyList())
-        }
-    }
-
     private fun parseThreads(html: String): List<Hit> {
         // v0.3.3 批 3：只解析一次 DOM（旧实现先 Jsoup.parse，又调 MobileForumParser.parse 内部再 parse 一遍）
         val doc = Jsoup.parse(html, BASE)
