@@ -130,8 +130,6 @@ fun ThreadDetailScreen(
     var showSmiley by remember { mutableStateOf(false) }
     var smileySets by remember { mutableStateOf(emptyList<SmileyClient.SmileySet>()) }
     var smileySetIndex by remember { mutableIntStateOf(0) }
-    // v0.4.1：版主操作合并为「管理」，展开后横向滑动查看全部动作
-    var showModPanel by remember { mutableStateOf(false) }
     // v0.4.2：帖子图片点开看大图
     var viewerUrl by remember { mutableStateOf<String?>(null) }
     var showMention by remember { mutableStateOf(false) }
@@ -152,7 +150,7 @@ fun ThreadDetailScreen(
                 val existing = (state as? DetailState.Content)?.detail
                 val merged = if (existing != null && targetPage > 1) {
                     val seen = existing.posts.mapTo(HashSet()) { it.pid }
-                    // v0.4.2：同样保留详情级字段（评分/管理条）
+                    // v0.4.2：同样保留详情级字段（评分等）
                     existing.copy(
                         posts = existing.posts + d.posts.filterNot { it.pid in seen },
                         page = d.page,
@@ -195,7 +193,7 @@ fun ThreadDetailScreen(
                             state = DetailState.Content(cur.copy(hasNextPage = false))
                             return
                         }
-                        // v0.4.2：保留详情级字段（评分/管理条/fid…）——旧写法从「下一页」对象 copy 会丢掉这些字段
+                        // v0.4.2：保留详情级字段（评分/fid…）——旧写法从「下一页」对象 copy 会丢掉这些字段
                         state = DetailState.Content(
                             cur.copy(
                                 posts = cur.posts + fresh,
@@ -327,10 +325,6 @@ fun ThreadDetailScreen(
                                 toast = r.message
                             }
                         }) { Text("收藏") }
-                        // v0.4.1：只有网页端确实给出管理链接（管理组）才显示「管理」入口；普通账号隐藏
-                        if (s.detail.modActions.isNotEmpty()) {
-                            TextButton(onClick = { showModPanel = !showModPanel }) { Text("管理") }
-                        }
 
 
                         // v0.3.10：评论数与楼层数分开显示，避免「回复 6」和「共 7 楼」看起来对不上；
@@ -349,34 +343,6 @@ fun ThreadDetailScreen(
                             ratings = ratings,
                             onOpenUser = { uid, name -> onOpenUser(uid, name) },
                         )
-                    }
-                    // v0.4.1：版主管理条（与网页端一致：删除主题/升降/置顶/直播/高亮/精华/图章/关闭/移动/分类/复制/合并/分割/修复/警告/屏蔽/用户标签）
-                    // v0.4.1：展开的管理操作面板（仅管理组可见；选项可左右滑动）
-                    if (showModPanel && s.detail.modActions.isNotEmpty()) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 12.dp, vertical = 2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-
-                            s.detail.modActions.forEach { action ->
-                                TextButton(
-                                    onClick = {
-                                        if (action.url.isBlank()) {
-                                            toast = "「${action.label}」需要版主/管理员权限（当前仅界面测试）"
-                                        } else {
-                                            onOpenPage(action.url, action.label)
-                                        }
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                ) {
-                                    Text(action.label, style = MaterialTheme.typography.labelSmall)
-                                }
-                            }
-                        }
                     }
                     HorizontalDivider(Modifier.padding(top = 8.dp))
                 }

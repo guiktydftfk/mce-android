@@ -55,9 +55,7 @@ class HttpForumRepository(
             val cacheBust = if (noCache) "&t=${System.currentTimeMillis()}&mobile=2" else ""
             val url = "$baseHost/forum.php?mod=viewthread&tid=$tid&page=$page$cacheBust"
             val detail = ThreadDetailParser.parse(fetch(url), url, tid, page)
-            // v0.4.1：版主管理条只在网页端「电脑版」完整渲染（手机模板经常没有）；
-            // 已知当前账号是管理组时补抓一次电脑版页面解析管理操作，普通用户不会多发请求。
-            // v0.4.2：评分/打赏与版主管理条都只在「电脑版」页面渲染（手机模板没有），
+                                    // v0.4.2：评分/打赏只在「电脑版」页面渲染（手机模板没有），
             // 登录后在第 1 页补抓一次电脑版页面，一次请求同时解析两者。
             val needDesktop = page == 1 && cn.mce.starlight.core.SessionStore.isLoggedIn
             if (needDesktop) {
@@ -70,12 +68,8 @@ class HttpForumRepository(
                         retryOnFailure = false,
                     )
                     // v0.4.2：不再依赖「先打开过我的页拿到 staff 标记」——
-                    // 管理组页面本来就有 topicadmin 链接、普通用户页面没有，
-                    // 直接解析即可：有链接 → 显示「管理」，没有 → 隐藏。
-                    // （之前用 SessionStore.staff 当开关，冷启动直接进帖子的管理组会看不到管理按钮）
-                    val mods = ThreadDetailParser.parseModActionsFromHtml(desktopHtml, desktopUrl)
+                                                            // （之前用 SessionStore.staff 当开关，冷启动直接进帖子的管理组会看不到管理按钮）
                     detail.copy(
-                        modActions = mods.ifEmpty { detail.modActions },
                         ratings = ThreadDetailParser.parseRatingsFromHtml(desktopHtml, desktopUrl),
                     )
                 }.getOrNull() ?: detail

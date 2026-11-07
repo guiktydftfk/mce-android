@@ -85,8 +85,6 @@ object ThreadDetailParser {
             formhash = Net.formhashOf(html),
             rewardCount = rewardCount,
             poll = parsePoll(doc),
-            // v0.4.1：同步网页端管理组权限——只有页面上真存在管理链接时才给入口
-            modActions = parseModActions(doc),
         ).also { parsed ->
             cn.mce.starlight.core.DiagStats.recordParse("帖子", "${parsed.posts.size} 楼 / 评分 ${parsed.ratings?.entries?.size ?: 0} 人")
         }
@@ -109,14 +107,6 @@ object ThreadDetailParser {
      *  - 多选上限来自页面脚本 `var max_obj = N`（Discuz 用 0 表示不限）
      *  - 已投票时没有 input、选项带 `.poll_done`，并有 `div.poll_note4`「您已经投过票」
      */
-    /**
-     * 解析网页端「管理组」才可见的管理操作链接（编辑/删除/置顶/精华/关闭…）。
-     * 普通用户页面里没有这些链接 → 返回空列表 → APP 不显示管理入口。
-     */
-    /** v0.4.1：从「电脑版」帖子页解析版主管理条（手机模板常不渲染管理条） */
-    fun parseModActionsFromHtml(html: String, baseUrl: String): List<ModAction> =
-        runCatching { parseModActions(Jsoup.parse(html, baseUrl)) }.getOrDefault(emptyList())
-
     /**
      * v0.4.2：解析「电脑版」帖子页的评分/打赏区块（手机模板没有）：
      *   <dl id="ratelog_PID" class="rate"><dd><table class="ratl">
@@ -190,26 +180,6 @@ object ThreadDetailParser {
     private fun fmt(value: Double): String =
         if (value == value.toLong().toDouble()) value.toLong().toString() else String.format(java.util.Locale.US, "%.1f", value)
 
-    private fun parseModActions(doc: Document): List<ModAction> {
-            // 与网页端版主管理条对齐：删除主题/升降/置顶/直播/高亮/精华/图章/关闭/移动/分类/复制/合并/分割/修复/警告/屏蔽/用户标签
-            // v0.4.2：改成「白名单精确匹配」——
-            // 旧实现用关键词 contains（含「管理」「帖子」），会把导航里的
-            // 「社区论坛管理」「帖子」等链接也当成管理操作（界面出现一堆无效按钮）。
-            val allowed = setOf(
-                "删除主题", "升降", "置顶", "直播", "高亮", "精华", "图章", "关闭", "打开",
-                "移动", "分类", "复制", "合并", "分割", "修复", "警告", "屏蔽", "用户标签",
-                "编辑", "删除", "锁定", "解除", "审核", "提升", "下沉", "推荐", "置顶主题",
-                "关闭主题", "打开主题", "解除置顶", "加入精华", "取消精华",
-            )
-            return doc.select("a[href]").mapNotNull { a ->
-                val href = a.attr("href").replace("&amp;", "&")
-                val label = a.text().trim().replace(Regex("""\s+"""), "")
-                // 只有网页端版主管理条（topicadmin）里的链接才算
-                if (!href.contains("topicadmin")) return@mapNotNull null
-                if (label !in allowed) return@mapNotNull null
-                ModAction(label = label, url = absolutize(href))
-            }.distinctBy { it.label }.take(24)
-    }
 
     private fun parsePoll(doc: Document): PollData? {
         val form = doc.selectFirst("form#poll") ?: doc.selectFirst("form[name=poll]")
