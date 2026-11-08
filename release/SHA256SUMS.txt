@@ -1,29 +1,28 @@
 MCE 星光班 Android 客户端 · 稳定版归档
 =====================================
-版本: 0.4.3 (versionCode 47)
+版本: 0.4.4 (versionCode 48)
 包名: cn.mce.starlight
 签名: 与全部历史版本相同（SHA-256 证书指纹 089ebd7851397257e085e17086203794dbc7ba2e88b245d070107ffa7a78fc8c）
-文件: MCE-starlight-v0.4.3-stable.apk（与 release/MCE-latest.apk 同内容）
+文件: MCE-starlight-v0.4.4-stable.apk（与 release/MCE-latest.apk 同内容）
 SHA256: B51FED628DBC578BE63100D56E191FA9E304BDE2596424D50E535DD900DA9AA5
 最小系统: Android 8.0 (API 26)
 
 历史归档（仅本地保留最近 3 个版本，仓库只保留当前版本）
 --------
+- 0.4.3 (versionCode 47): MCE-starlight-v0.4.3-stable.apk
 - 0.4.2 (versionCode 46): MCE-starlight-v0.4.2-stable.apk
 - 0.4.1 (versionCode 45): MCE-starlight-v0.4.1-stable.apk
-- 0.4.0 (versionCode 44): MCE-starlight-v0.4.0-stable.apk
 
 安装说明
 --------
 - 直接安装即可；已装任意历史版本（0.2.3 / 0.3.x / 0.4.x …）均可覆盖升级，无需卸载
 - 因包名与签名一致，系统视为同一应用，数据（登录态、设置、草稿）保留
 - 校验完整性（Windows PowerShell）:
-  Get-FileHash .\MCE-starlight-v0.4.3-stable.apk -Algorithm SHA256
+  Get-FileHash .\MCE-starlight-v0.4.4-stable.apk -Algorithm SHA256
   结果应为上面的 SHA256
 
 长期可用性
 ----------
 - 本文件已同时归档到：仓库 release/ 与仓库根、dist/、项目工作区根目录、桌面
 - 仓库内的 keystore/debug.keystore 会随代码长期保存，未来版本沿用同一签名，仍可覆盖升级
-- 原生客户端，断网时仍可浏览已加载缓存与本地草稿；联网自动恢复
 - 自动更新清单：release/MCE-latest.apk（版本号只增不减，旧版可用应用内更新升级）
