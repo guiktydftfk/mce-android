@@ -17,6 +17,9 @@
         android:theme="@style/Theme.MCE"
         android:usesCleartextTraffic="false">
 
+        <!-- v0.4.4：允许 shell 对 release 包 profiling，用于生成 Baseline Profile -->
+        <profileable android:shell="true" />
+
         <service
             android:name=".core.UnreadPollJob"
             android:permission="android.permission.BIND_JOB_SERVICE"
