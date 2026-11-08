@@ -1,6 +1,8 @@
 package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,13 +22,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import android.content.ContentValues
+import androidx.core.graphics.drawable.toBitmap
+import android.os.Build
+import android.provider.MediaStore
+import android.widget.Toast
 import coil.compose.AsyncImage
+import coil.request.SuccessResult
+import kotlinx.coroutines.launch
 
 /** v0.4.4：帖子图片全屏查看器（从 ThreadDetailScreen 拆出） */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     androidx.compose.ui.window.Dialog(
@@ -48,7 +62,7 @@ internal fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
                         }
                     }
                 }
-                .clickable(onClick = onDismiss),
+                .combinedClickable(onClick = onDismiss, onLongClick = { saveImage(ctx, url, scope) }),
             contentAlignment = Alignment.Center,
         ) {
             AsyncImage(
@@ -73,5 +87,35 @@ internal fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
                     .padding(bottom = 40.dp),
             )
         }
+    }
+}
+
+/** v0.4.4：长按保存图片到相册（Android 10+ 走 MediaStore，10 以下写入应用图片目录并通知媒体库） */
+private fun saveImage(ctx: android.content.Context, url: String, scope: kotlinx.coroutines.CoroutineScope) {
+    scope.launch {
+        val ok = runCatching {
+            val request = coil.request.ImageRequest.Builder(ctx).data(url).build()
+            val result = coil.Coil.imageLoader(ctx).execute(request)
+            val bitmap = (result as? SuccessResult)?.drawable?.toBitmap() ?: error("图片加载失败")
+            val name = "MCE_${System.currentTimeMillis()}.png"
+            if (Build.VERSION.SDK_INT >= 29) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MCE")
+                }
+                val uri = ctx.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                    ?: error("无法写入相册")
+                ctx.contentResolver.openOutputStream(uri)?.use {
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                } ?: error("写入失败")
+            } else {
+                val dir = ctx.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES) ?: ctx.filesDir
+                val file = java.io.File(dir, name)
+                file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                android.media.MediaScannerConnection.scanFile(ctx, arrayOf(file.absolutePath), arrayOf("image/png"), null)
+            }
+        }.isSuccess
+        Toast.makeText(ctx, if (ok) "已保存到相册（长按图片保存）" else "保存失败，请稍后重试", Toast.LENGTH_SHORT).show()
     }
 }

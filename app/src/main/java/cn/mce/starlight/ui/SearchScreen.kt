@@ -1,6 +1,8 @@
 package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -86,6 +88,7 @@ fun SearchScreen(
     val orderOptions = listOf("lastpost" to "按回复时间", "dateline" to "按发表时间", "replies" to "按回复数")
 
     fun doSearch() {
+        cn.mce.starlight.core.SearchHistory.add(keyword.trim())
         loading = true
         error = null
         notice = null
@@ -171,6 +174,41 @@ fun SearchScreen(
                             .clickable { showAdvanced = !showAdvanced }
                             .padding(horizontal = 8.dp, vertical = 6.dp),
                     )
+                }
+            }
+
+            // v0.4.4：搜索历史（输入为空时显示，点一下直接再搜）
+            if (keyword.isBlank()) {
+                val hist = remember { cn.mce.starlight.core.SearchHistory.items() }
+                if (hist.isNotEmpty()) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        hist.forEach { h ->
+                            Text(
+                                h,
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable { keyword = h; doSearch() }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                            )
+                        }
+                        Text(
+                            "清空",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable { cn.mce.starlight.core.SearchHistory.clear() }
+                                .padding(horizontal = 8.dp, vertical = 5.dp),
+                        )
+                    }
                 }
             }
 

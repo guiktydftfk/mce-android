@@ -105,9 +105,20 @@ fun ThreadDetailScreen(
 ) {
     val scope = rememberCoroutineScope()
     // v0.3.8 流水式阅读：整帖一个列表，用于回帖后滚到最新楼层
-    val detailListState = rememberLazyListState()
+    // v0.4.4：列表/帖子滚动位置跨页面保留（打开帖子再返回、重进同帖都能回到原位置）
+    val detailListState = cn.mce.starlight.core.ListStateCache.get("thread_$tid")
     val repo = remember { HttpForumRepository() }
-    var state by remember { mutableStateOf<DetailState>(DetailState.Loading) }
+    // v0.4.4：上次阅读进度（楼层 + 滚动位置），15 分钟内重进直接恢复
+    val restored = remember(tid) { cn.mce.starlight.core.ThreadProgressCache.get(tid) }
+    var state by remember {
+        mutableStateOf<DetailState>(
+            restored?.detail?.let { DetailState.Content(it) } ?: DetailState.Loading,
+        )
+    }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var opOnly by remember { mutableStateOf(false) }
+    var showJump by remember { mutableStateOf(false) }
+    var jumpText by remember { mutableStateOf("") }
     var replyText by remember { mutableStateOf(TextFieldValue("")) }
     var replyTo by remember { mutableStateOf<Post?>(null) }
     var sending by remember { mutableStateOf(false) }
@@ -123,8 +134,19 @@ fun ThreadDetailScreen(
     var ratePid by remember { mutableStateOf<Int?>(null) }
     /** 当前弹窗是「赞赏楼主」(true) 还是「评分某楼」(false)，只用于成功提示文案 */
     var rateIsReward by remember { mutableStateOf(false) }
-    var page by remember { mutableStateOf(1) }
+    var page by remember { mutableStateOf(restored?.page ?: 1) }
     var pollSubmitting by remember { mutableStateOf(false) }
+
+    // v0.4.4：离开页面时保存阅读进度
+    androidx.compose.runtime.DisposableEffect(tid) {
+        onDispose {
+            (state as? DetailState.Content)?.detail?.let {
+                cn.mce.starlight.core.ThreadProgressCache.put(
+                    tid, it, page, detailListState.firstVisibleItemIndex,
+                )
+            }
+        }
+    }
 
     // v0.3.6：回帖输入框支持表情 + @ 提及
     var showSmiley by remember { mutableStateOf(false) }
@@ -328,6 +350,22 @@ fun ThreadDetailScreen(
                                 toast = r.message
                             }
                         }) { Text("收藏") }
+                        TextButton(onClick = {
+                            val text = "${cn.mce.starlight.data.Net.BASE}/forum.php?mod=viewthread&tid=$tid"
+                            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_TEXT, text)
+                            }
+                            runCatching {
+                                ctx.startActivity(
+                                    android.content.Intent.createChooser(send, "分享帖子"),
+                                )
+                            }
+                        }) { Text("分享") }
+                        TextButton(onClick = { opOnly = !opOnly }) {
+                            Text(if (opOnly) "看全部" else "只看楼主")
+                        }
+                        TextButton(onClick = { showJump = true }) { Text("跳楼") }
 
 
                         // v0.3.10：评论数与楼层数分开显示，避免「回复 6」和「共 7 楼」看起来对不上；
@@ -380,7 +418,8 @@ fun ThreadDetailScreen(
                         HorizontalDivider(Modifier.padding(vertical = 4.dp))
                     }
                 }
-                items(s.detail.posts, key = { it.pid }) { post ->
+                val shownPosts = if (opOnly) s.detail.posts.filter { it.isOp } else s.detail.posts
+                items(shownPosts, key = { it.pid }) { post ->
                     PostItem(
                         post = post,
                         onReply = {
@@ -414,6 +453,34 @@ fun ThreadDetailScreen(
 
         ImmersiveTopBar(title = title, modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
         // v0.4.2：图片大图查看器
+        // v0.4.4：楼层跳转
+        if (showJump) {
+            val total = (state as? DetailState.Content)?.detail?.posts?.size ?: 0
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showJump = false },
+                title = { Text("跳转到楼层") },
+                text = {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = jumpText,
+                        onValueChange = { v -> jumpText = v.filter { it.isDigit() }.take(5) },
+                        singleLine = true,
+                        label = { Text("楼层号（1 起，共 $total 楼）") },
+                    )
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        showJump = false
+                        val n = jumpText.toIntOrNull() ?: 1
+                        scope.launch {
+                            detailListState.scrollToItem((n - 1).coerceIn(0, (total - 1).coerceAtLeast(0)))
+                        }
+                    }) { Text("跳转") }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { showJump = false }) { Text("取消") }
+                },
+            )
+        }
         viewerUrl?.let { url ->
             ImageViewerDialog(url = url) { viewerUrl = null }
         }

@@ -21,7 +21,19 @@ import androidx.compose.runtime.setValue
 enum class DarkMode(val label: String, val key: String) {
     LIGHT("浅色", "LIGHT"),
     DARK("深色", "DARK"),
-    SYSTEM("跟随系统", "SYSTEM");
+    SYSTEM("跟随系统", "SYSTEM"),
+    AUTO_TIME("定时（19:00–7:00 深色）", "AUTO_TIME");
+
+    /** 是否深色：定时模式下 19:00–07:00 视为深色 */
+    fun isDarkNow(systemDark: Boolean): Boolean = when (this) {
+        LIGHT -> false
+        DARK -> true
+        SYSTEM -> systemDark
+        AUTO_TIME -> {
+            val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+            h >= 19 || h < 7
+        }
+    }
 
     companion object {
         fun fromKey(key: String?): DarkMode? = entries.firstOrNull { it.key == key }

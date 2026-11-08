@@ -23,11 +23,7 @@ class MainActivity : ComponentActivity() {
     private fun resolveDark(): Boolean {
         val systemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
-        return when (SettingsStore.darkModeSetting) {
-            DarkMode.LIGHT -> false
-            DarkMode.DARK -> true
-            DarkMode.SYSTEM -> systemDark
-        }
+        return SettingsStore.darkModeSetting.isDarkNow(systemDark)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,11 +43,7 @@ class MainActivity : ComponentActivity() {
             val base = LocalDensity.current
             // v0.3.7：明暗模式三态（浅色 / 深色 / 跟随系统）
             val systemDark = isSystemInDarkTheme()
-            val darkTheme = when (SettingsStore.darkModeSetting) {
-                DarkMode.LIGHT -> false
-                DarkMode.DARK -> true
-                DarkMode.SYSTEM -> systemDark
-            }
+            val darkTheme = SettingsStore.darkModeSetting.isDarkNow(systemDark)
             CompositionLocalProvider(
                 // 只保留「字体大小」一个滑杆（原「界面大小」已并入），不再缩放 dp
                 LocalDensity provides Density(
