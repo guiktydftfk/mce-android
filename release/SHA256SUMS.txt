@@ -4,7 +4,7 @@ MCE 星光班 Android 客户端 · 稳定版归档
 包名: cn.mce.starlight
 签名: 与全部历史版本相同（SHA-256 证书指纹 089ebd7851397257e085e17086203794dbc7ba2e88b245d070107ffa7a78fc8c）
 文件: MCE-starlight-v0.4.3-stable.apk（与 release/MCE-latest.apk 同内容）
-SHA256: FA0242C57B53AC96C1D1F5C05575A3DE79220585D78B8085233B424F5982C889
+SHA256: B51FED628DBC578BE63100D56E191FA9E304BDE2596424D50E535DD900DA9AA5
 最小系统: Android 8.0 (API 26)
 
 历史归档（仅本地保留最近 3 个版本，仓库只保留当前版本）
