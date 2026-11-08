@@ -1,4 +1,8 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package cn.mce.starlight.ui
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 
 import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
@@ -119,6 +123,8 @@ fun ThreadDetailScreen(
     var opOnly by remember { mutableStateOf(false) }
     var showJump by remember { mutableStateOf(false) }
     var jumpText by remember { mutableStateOf("") }
+    // v0.4.4：楼层长按菜单（复制链接 / 举报 / 编辑自己的帖子）
+    var actionPost by remember { mutableStateOf<Post?>(null) }
     var replyText by remember { mutableStateOf(TextFieldValue("")) }
     var replyTo by remember { mutableStateOf<Post?>(null) }
     var sending by remember { mutableStateOf(false) }
@@ -432,6 +438,7 @@ fun ThreadDetailScreen(
                         },
                         onOpenUser = { onOpenUser(post.uid ?: 0, post.author ?: "") },
                         onImageClick = { url -> viewerUrl = url },
+                    onLongPress = { actionPost = post },
                         onRate = {
                             scope.launch {
                                 val r = RateClient.loadForm(tid, post.pid)
@@ -482,6 +489,46 @@ fun ThreadDetailScreen(
                 },
                 dismissButton = {
                     androidx.compose.material3.TextButton(onClick = { showJump = false }) { Text("取消") }
+                },
+            )
+        }
+        // v0.4.4：楼层长按菜单（复制链接 / 举报 / 编辑自己的帖子）
+        actionPost?.let { post ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { actionPost = null },
+                title = { Text("楼层操作") },
+                text = { Text("${post.author} · ${post.floorLabel ?: "楼主"}") },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        actionPost = null
+                        val link = "${cn.mce.starlight.data.Net.BASE}/forum.php?mod=viewthread&tid=$tid&pid=${post.pid}"
+                        runCatching {
+                            val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                                as android.content.ClipboardManager
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText("帖子链接", link))
+                            toast = "链接已复制"
+                        }
+                    }) { Text("复制链接") }
+                },
+                dismissButton = {
+                    androidx.compose.foundation.layout.Row {
+                        androidx.compose.material3.TextButton(onClick = {
+                            actionPost = null
+                            onOpenPage(
+                                "${cn.mce.starlight.data.Net.BASE}/forum.php?mod=misc&action=report&tid=$tid&pid=${post.pid}&mobile=no",
+                                "举报",
+                            )
+                        }) { Text("举报") }
+                        if (post.uid != null && post.uid == cn.mce.starlight.core.SessionStore.uid) {
+                            androidx.compose.material3.TextButton(onClick = {
+                                actionPost = null
+                                onOpenPage(
+                                    "${cn.mce.starlight.data.Net.BASE}/forum.php?mod=post&action=edit&tid=$tid&pid=${post.pid}&mobile=no",
+                                    "编辑",
+                                )
+                            }) { Text("编辑") }
+                        }
+                    }
                 },
             )
         }
@@ -1019,6 +1066,7 @@ private fun PostItem(
     onOpenUser: () -> Unit,
     // v0.4.2：点击正文图片 → 全屏大图
     onImageClick: (String) -> Unit = {},
+    onLongPress: (() -> Unit)? = null,
 ) {
     // v0.4.1：类酷安观感——每个楼层一张卡片（圆角 + 浅底色），与页面背景区分开
     Box(
@@ -1026,7 +1074,11 @@ private fun PostItem(
             .fillMaxWidth()
             .padding(horizontal = 10.dp, vertical = 5.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .then(
+                if (onLongPress == null) Modifier
+                else Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress),
+            ),
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)) {
         // v0.3.8 楼层头部：头像 40dp、楼层徽标 + 时间（单行省略），评分/回复移到楼层底部

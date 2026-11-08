@@ -98,6 +98,8 @@ sealed interface Route {
     data object DraftBox : Route
     /** v0.4.4：最近浏览 */
     data object RecentThreads : Route
+    /** v0.4.4：内置 WebView 页面（举报 / 编辑等网页表单） */
+    data class Web(val url: String, val title: String) : Route
     data object FriendQr : Route
     data class Pm(val touid: Int, val name: String) : Route
     data object Scan : Route
@@ -692,6 +694,12 @@ fun MceApp() {
                 reloadKey = dataVersion,
                 onOpenUser = { uid, name -> push(Route.User(if (uid > 0) uid else null, name)) },
                 onOpenPage = { url, title -> push(Route.Page(url, title)) },
+            )
+
+            is Route.Web -> WebPageScreen(
+                url = current.url,
+                title = current.title,
+                onMenu = ::openDrawer,
             )
 
             is Route.RecentThreads -> RecentThreadsScreen(

@@ -28,6 +28,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // v0.4.4：Android 13+ 申请通知权限（用于未读私信提醒）
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            runCatching {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1001)
+            }
+        }
         val darkNow = resolveDark()
         // v0.4.0：窗口背景与即将渲染的 Compose 主题背景保持一致（深色 #0E0F11 / 浅色 #F7F8FA）。
         // 系统深色（values-night）已覆盖「系统深色」场景，这里再兜住「应用设置深色但系统浅色」的情况。
