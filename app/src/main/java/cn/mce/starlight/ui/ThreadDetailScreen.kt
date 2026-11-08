@@ -255,6 +255,10 @@ fun ThreadDetailScreen(
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val detail = (state as? DetailState.Content)?.detail
     val title = detail?.title ?: fallbackTitle
+    // v0.4.4：记录最近浏览
+    LaunchedEffect(detail?.title) {
+        detail?.title?.takeIf { it.isNotBlank() }?.let { cn.mce.starlight.core.RecentThreads.add(tid, it) }
+    }
 
     // 表情集（SmileyClient 内部有进程级缓存，重复调用不会再走网络）
     LaunchedEffect(showSmiley) {

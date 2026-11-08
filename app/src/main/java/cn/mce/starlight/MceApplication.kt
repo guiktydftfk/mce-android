@@ -39,6 +39,8 @@ class MceApplication : Application(), ImageLoaderFactory {
         }
         SettingsStore.init(this)
         cn.mce.starlight.core.SearchHistory.init(this)
+        cn.mce.starlight.core.BoardFavorites.init(this)
+        cn.mce.starlight.core.RecentThreads.init(this)
         CookieJar.init(this)
         cn.mce.starlight.data.ThumbCache.init(this)
         cn.mce.starlight.core.DraftStore.init(this)

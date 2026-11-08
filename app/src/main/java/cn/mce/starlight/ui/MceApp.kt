@@ -13,7 +13,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -94,6 +96,8 @@ sealed interface Route {
     /** v0.4.3：TA 的全部主题（按作者搜索接口） */
     data class UserThreads(val uid: Int?, val name: String) : Route
     data object DraftBox : Route
+    /** v0.4.4：最近浏览 */
+    data object RecentThreads : Route
     data object FriendQr : Route
     data class Pm(val touid: Int, val name: String) : Route
     data object Scan : Route
@@ -543,10 +547,20 @@ fun MceApp() {
                                     else expandedGroups + groupName
                                 }
                                 if (expanded) {
-                                    groupBoards.forEach { board ->
+                                    groupBoards.sortedByDescending {
+                                        cn.mce.starlight.core.BoardFavorites.isFavorite(it.fid)
+                                    }.forEach { board ->
                                         val selected = dest == Dest.Feed && stack.firstOrNull()
                                             ?.let { it is Route.Board && it.fid == board.fid } == true
-                                        DrawerItem(label = "    " + board.name, selected = selected, sheen = sheen) {
+                                        val starred = cn.mce.starlight.core.BoardFavorites.isFavorite(board.fid)
+                                        DrawerItem(
+                                            label = "    " + (if (starred) "\u2605 " else "") + board.name,
+                                            selected = selected,
+                                            sheen = sheen,
+                                            onLongClick = {
+                                                cn.mce.starlight.core.BoardFavorites.toggle(board.fid)
+                                            },
+                                        ) {
                                             dest = Dest.Feed
                                             stack = listOf(Route.Board(board.fid, board.name))
                                             closeDrawer()
@@ -566,6 +580,12 @@ fun MceApp() {
                             DrawerEntry(6, "任务中心", dest == Dest.Tasks)
                             // v0.4.1：常用表单汇总（任务中心下面）
                             DrawerEntry(7, "常用表单汇总", false)
+                            // v0.4.4：最近浏览（放在常用表单下面）
+                            DrawerItem(label = "最近浏览", selected = false, sheen = sheen) {
+                                dest = Dest.Feed
+                                stack = listOf(Route.RecentThreads)
+                                closeDrawer()
+                            }
                             DrawerEntry(8, "搜索", dest == Dest.Search)
                             DrawerEntry(9, "排行榜", dest == Dest.Ranklist)
                             DrawerEntry(10, "消息提醒", dest == Dest.Notice)
@@ -672,6 +692,11 @@ fun MceApp() {
                 reloadKey = dataVersion,
                 onOpenUser = { uid, name -> push(Route.User(if (uid > 0) uid else null, name)) },
                 onOpenPage = { url, title -> push(Route.Page(url, title)) },
+            )
+
+            is Route.RecentThreads -> RecentThreadsScreen(
+                onMenu = ::openDrawer,
+                onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
             )
 
             is Route.Page -> NativePageScreen(
@@ -987,6 +1012,8 @@ fun MceApp() {
  * [sheen] 只在抽屉打开时由 MceApp 的无限动画驱动（0f 表示不动画）。
  */
 @Composable
+@androidx.annotation.OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 private fun DrawerItem(
     label: String,
     selected: Boolean,
@@ -994,6 +1021,8 @@ private fun DrawerItem(
     modifier: Modifier = Modifier,
     /** v0.4.1：拖动重点框时由浮层统一绘制高亮，条目自身不再画，避免重影 */
     showHighlight: Boolean = selected,
+    /** v0.4.4：长按（侧栏板块用于收藏/取消收藏） */
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     // v0.3.7 修订：尺寸对齐上一版 NavigationDrawerItem（56dp 高、胶囊形、左右各约 12dp 留白），
@@ -1011,7 +1040,10 @@ private fun DrawerItem(
             .height(56.dp)
                 .clip(shape)
                 .then(modifier)
-                .clickable(onClick = onClick),
+                .then(
+                    if (onLongClick == null) Modifier.clickable(onClick = onClick)
+                    else Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
+                ),
     ) {
         if (selectedFraction > 0.01f) {
             // 玻璃质感高亮层：随 sheen 横向流动的渐变 + 1dp 白色边缘
