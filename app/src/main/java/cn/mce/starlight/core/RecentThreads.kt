@@ -4,7 +4,7 @@ import android.content.Context
 
 /** v0.4.4：最近浏览的帖子（最近 30 条，本地保存） */
 object RecentThreads {
-    data class Item(val tid: Int, val title: String, val at: Long)
+    data class Item(val tid: Int, val title: String, val at: Long, val board: String? = null)
 
     private const val PREFS = "mce_recent_threads"
     private const val KEY = "list"
@@ -20,15 +20,15 @@ object RecentThreads {
                 val parts = line.split('|')
                 val tid = parts.getOrNull(0)?.toIntOrNull() ?: return@mapNotNull null
                 val at = parts.getOrNull(2)?.toLongOrNull() ?: 0L
-                Item(tid, parts.getOrNull(1).orEmpty(), at)
+                Item(tid, parts.getOrNull(1).orEmpty(), at, parts.getOrNull(3)?.takeIf { it.isNotBlank() })
             }.toList()
     }
 
-    fun add(tid: Int, title: String) {
+    fun add(tid: Int, title: String, board: String? = null) {
         if (tid <= 0 || title.isBlank()) return
-        val list = (listOf(Item(tid, title, System.currentTimeMillis())) + items().filterNot { it.tid == tid })
+        val list = (listOf(Item(tid, title, System.currentTimeMillis(), board)) + items().filterNot { it.tid == tid })
             .take(MAX)
-        val text = list.joinToString("\n") { "${it.tid}|${it.title.replace("|", "｜")}|${it.at}" }
+        val text = list.joinToString("\n") { "${it.tid}|${it.title.replace("|", "｜")}|${it.at}|${it.board ?: ""}" }
         ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()
             ?.putString(KEY, CryptoBox.encrypt(text))?.apply()
     }
@@ -36,7 +36,7 @@ object RecentThreads {
     /** v0.4.5：删除单条浏览记录 */
     fun remove(tid: Int) {
         val list = items().filterNot { it.tid == tid }
-        val text = list.joinToString("\n") { "${it.tid}|${it.title.replace("|", "｜")}|${it.at}" }
+        val text = list.joinToString("\n") { "${it.tid}|${it.title.replace("|", "｜")}|${it.at}|${it.board ?: ""}" }
         ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()
             ?.putString(KEY, CryptoBox.encrypt(text))?.apply()
     }

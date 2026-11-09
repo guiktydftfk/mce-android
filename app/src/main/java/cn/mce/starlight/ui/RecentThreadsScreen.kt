@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,7 +37,7 @@ fun RecentThreadsScreen(
     onMenu: () -> Unit,
     onOpenThread: (Int, String) -> Unit,
 ) {
-    var items by remember { mutableStateOf(RecentThreads.items()) }
+    var items by remember { mutableStateOf(RecentThreads.items().sortedBy { it.board ?: "" }) }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val fmt = remember { SimpleDateFormat("MM-dd HH:mm", Locale.CHINA) }
 
@@ -56,7 +56,16 @@ fun RecentThreadsScreen(
                     )
                 }
             }
-            items(items, key = { "${it.tid}-${it.at}" }) { item ->
+            itemsIndexed(items, key = { _, it -> "${it.tid}-${it.at}" }) { index, item ->
+                // v0.4.5：按板块分组显示
+                if (index == 0 || items[index - 1].board != item.board) {
+                    Text(
+                        item.board ?: "未分类",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 2.dp),
+                    )
+                }
                 androidx.compose.foundation.layout.Row(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
