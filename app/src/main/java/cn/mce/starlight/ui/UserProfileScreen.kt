@@ -311,6 +311,13 @@ fun UserProfileScreen(
                                     "加好友",
                                 )
                             }) { Text("加好友") }
+                TextButton(onClick = {
+                    // v0.4.5：举报用户
+                    onOpenPage(
+                        "forum.php?mod=misc&action=report&uid=${p.uid}&mobile=no",
+                        "举报用户",
+                    )
+                }) { Text("举报") }
                         }
                         }
                     }
