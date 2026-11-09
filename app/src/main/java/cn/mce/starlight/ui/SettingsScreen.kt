@@ -133,6 +133,8 @@ fun SettingsScreen(
                     }
                 }
 
+            }
+
             // v0.4.5：定时深色时段（放在外观/明暗模式下方）
             Spacer(Modifier.height(6.dp))
             // 定时深色时间段
@@ -154,7 +156,6 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     SettingsStore.updateDarkHours(SettingsStore.darkStartHour, (SettingsStore.darkEndHour + 1) % 24)
                 }) { Text("结束 +1") }
-            }
             }
 
             Spacer(Modifier.height(8.dp))
