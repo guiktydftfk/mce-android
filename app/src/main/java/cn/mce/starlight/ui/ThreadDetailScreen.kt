@@ -127,6 +127,11 @@ fun ThreadDetailScreen(
     var actionPost by remember { mutableStateOf<Post?>(null) }
     // v0.4.5：帖内搜索关键词
     var showSearch by remember { mutableStateOf(false) }
+    // v0.4.6：原生编辑弹窗状态
+    var editPost by remember { mutableStateOf<Post?>(null) }
+    var editSubject by remember { mutableStateOf("") }
+    var editBody by remember { mutableStateOf("") }
+    var editBusy by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
     var replyText by remember { mutableStateOf(TextFieldValue("")) }
     var replyTo by remember { mutableStateOf<Post?>(null) }
