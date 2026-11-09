@@ -98,6 +98,8 @@ sealed interface Route {
     data object DraftBox : Route
     /** v0.4.4：最近浏览 */
     data object RecentThreads : Route
+    /** v0.4.5：收藏板块管理页 */
+    data object BoardFavorites : Route
     /** v0.4.4：内置 WebView 页面（举报 / 编辑等网页表单） */
     data class Web(val url: String, val title: String) : Route
     data object FriendQr : Route
@@ -566,7 +568,7 @@ fun MceApp() {
                                             selected = selected,
                                             sheen = sheen,
                                             onLongClick = {
-                                                cn.mce.starlight.core.BoardFavorites.toggle(board.fid)
+                                                cn.mce.starlight.core.BoardFavorites.toggle(board.fid, board.name)
                                             },
                                         ) {
                                             dest = Dest.Feed
@@ -588,6 +590,12 @@ fun MceApp() {
                             DrawerEntry(6, "任务中心", dest == Dest.Tasks)
                             // v0.4.1：常用表单汇总（任务中心下面）
                             DrawerEntry(7, "常用表单汇总", false)
+                            // v0.4.5：收藏板块管理
+                            DrawerItem(label = "收藏板块", selected = false, sheen = sheen) {
+                                dest = Dest.Feed
+                                stack = listOf(Route.BoardFavorites)
+                                closeDrawer()
+                            }
                             // v0.4.4：最近浏览（放在常用表单下面）
                             DrawerItem(label = "最近浏览", selected = false, sheen = sheen) {
                                 dest = Dest.Feed
@@ -706,6 +714,11 @@ fun MceApp() {
                 url = current.url,
                 title = current.title,
                 onMenu = ::openDrawer,
+            )
+
+            is Route.BoardFavorites -> BoardFavoritesScreen(
+                onMenu = ::openDrawer,
+                onOpenBoard = { fid, name -> push(Route.Board(fid, name)) },
             )
 
             is Route.RecentThreads -> RecentThreadsScreen(
