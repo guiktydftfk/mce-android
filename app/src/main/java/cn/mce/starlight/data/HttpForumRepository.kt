@@ -77,14 +77,26 @@ class HttpForumRepository(
         ratingsCache[tid] = System.currentTimeMillis() to ratings
     }
 
-    override suspend fun loadThreadDetail(tid: Int, page: Int, noCache: Boolean): ThreadDetail =
-        withContext(Dispatchers.IO) {
+    /** v0.4.5：抓帖子页；网络失败时用磁盘缓存兜底（离线可读） */
+    private suspend fun fetchThreadHtml(tid: Int, page: Int, url: String): String =
+        runCatching { fetch(url).also { cn.mce.starlight.core.ThreadHtmlCache.put(tid, page, it) } }
+            .getOrElse { e ->
+                val cached = cn.mce.starlight.core.ThreadHtmlCache.get(tid, page)
+                if (cached != null) {
+                    cn.mce.starlight.core.DiagLog.record("thread-offline", e)
+                    cached
+                } else {
+                    throw e
+                }
+            }
+
+    override suspend fun loadThreadDetail(tid: Int, page: Int, noCache: Boolean): ThreadDetail =        withContext(Dispatchers.IO) {
             if (!noCache && page == 1) cachedDetail(tid)?.let { return@withContext it }
             val cacheBust = if (noCache) "&t=${System.currentTimeMillis()}&mobile=2" else ""
             val url = "$baseHost/forum.php?mod=viewthread&tid=$tid&page=$page$cacheBust"
             val needDesktop = page == 1 && cn.mce.starlight.core.SessionStore.isLoggedIn
             if (!needDesktop) {
-                val d = ThreadDetailParser.parse(fetch(url), url, tid, page)
+                val d = ThreadDetailParser.parse(fetchThreadHtml(tid, page, url), url, tid, page)
                 if (!noCache && page == 1) putDetail(tid, d)
                 return@withContext d
             }
@@ -92,7 +104,7 @@ class HttpForumRepository(
             val desktopUrl = "$baseHost/forum.php?mod=viewthread&tid=$tid&mobile=no"
             val (hit, cachedRating) = if (noCache) false to null else cachedRatings(tid)
             val result = coroutineScope {
-                val detailAsync = async { ThreadDetailParser.parse(fetch(url), url, tid, page) }
+                val detailAsync = async { ThreadDetailParser.parse(fetchThreadHtml(tid, page, url), url, tid, page) }
                 val desktopAsync = if (hit) null else async {
                     runCatching {
                         GenericPageClient.get(
