@@ -21,6 +21,7 @@ class UnreadPollJob : JobService() {
                     val items = runBlocking { cn.mce.starlight.data.PersonalClient.loadPm(1) }
                     val effective = PmReadStore.overlay(items)
                     val unread = effective.sumOf { it.unread.coerceAtLeast(0) }
+                    MceWidgetProvider.updateUnread(ctx, unread)
                     val quiet = SettingsStore.notifyQuietEnabled && notifyQuietNow()
                     if (unread > 0 && SettingsStore.notifyUnreadEnabled && !quiet) {
                         val first = effective.firstOrNull { it.unread > 0 }
