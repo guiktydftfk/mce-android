@@ -28,6 +28,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // v0.4.5：点通知直达私信会话
+        runCatching {
+            val touid = intent?.getIntExtra("mce_open_pm", 0) ?: 0
+            if (touid > 0) {
+                cn.mce.starlight.core.PendingNav.pmTouid = touid
+                intent?.removeExtra("mce_open_pm")
+            }
+        }
         // v0.4.4：Android 13+ 申请通知权限（用于未读私信提醒）
         if (android.os.Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=

@@ -315,6 +315,12 @@ fun MceApp() {
         // v0.4.1：启动请求串行化 —— ① 登录探测 → ② 板块/首页数据（HomeFeed 组合时自行加载）
         // → ③ 签到提醒（未开启则跳过）→ ④ 消息刷新 → ⑤ 后台检查更新（弹窗延后）
         val probeStart = System.currentTimeMillis()
+        // v0.4.5：从通知进入 → 直接打开对应私信会话
+        if (cn.mce.starlight.core.PendingNav.pmTouid > 0) {
+            stack = listOf(Route.Pm(cn.mce.starlight.core.PendingNav.pmTouid, "私信"))
+            dest = Dest.Feed
+            cn.mce.starlight.core.PendingNav.pmTouid = 0
+        }
         val probe = SessionStore.probeLoginState()
         DiagStats.recordStartup("登录探测", System.currentTimeMillis() - probeStart)
         if (probe == false) showLogin = true

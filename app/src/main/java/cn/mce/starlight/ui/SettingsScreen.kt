@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -437,6 +438,63 @@ fun SettingsScreen(
             SigninReminderSection()
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
+
+            SectionTitle("通知")
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("未读私信通知", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "后台每 15 分钟检查一次未读私信并提醒",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = SettingsStore.notifyUnreadEnabled, onCheckedChange = {
+                    SettingsStore.updateNotifyUnread(it)
+                })
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("夜间免打扰（23:00–7:00）", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "开启后夜间不弹未读提醒",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = SettingsStore.notifyQuietEnabled, onCheckedChange = {
+                    SettingsStore.updateNotifyQuiet(it)
+                })
+            }
+            // 定时深色时间段
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("定时深色时段", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "当前：${SettingsStore.darkStartHour}:00 – ${SettingsStore.darkEndHour}:00（明暗模式选「定时」时生效）",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = {
+                    SettingsStore.updateDarkHours((SettingsStore.darkStartHour + 1) % 24, SettingsStore.darkEndHour)
+                }) { Text("开始 +1") }
+                TextButton(onClick = {
+                    SettingsStore.updateDarkHours(SettingsStore.darkStartHour, (SettingsStore.darkEndHour + 1) % 24)
+                }) { Text("结束 +1") }
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             SectionTitle("诊断")
             Spacer(Modifier.height(8.dp))

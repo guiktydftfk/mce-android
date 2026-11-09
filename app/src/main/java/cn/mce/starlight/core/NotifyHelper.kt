@@ -34,9 +34,10 @@ object NotifyHelper {
         return true
     }
 
-    fun notifyUnread(context: Context, count: Int) {
+    fun notifyUnread(context: Context, count: Int, touid: Int? = null) {
         if (count <= 0 || !canNotify(context)) return
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        if (touid != null && touid > 0) launch.putExtra("mce_open_pm", touid)
         val pending = PendingIntent.getActivity(
             context, 0, launch,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,

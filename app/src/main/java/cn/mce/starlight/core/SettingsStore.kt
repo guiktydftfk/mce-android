@@ -31,7 +31,13 @@ enum class DarkMode(val label: String, val key: String) {
         SYSTEM -> systemDark
         AUTO_TIME -> {
             val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-            h >= 19 || h < 7
+            val start = SettingsStore.darkStartHour
+            val end = SettingsStore.darkEndHour
+            when {
+                start == end -> false
+                start < end -> h in start until end
+                else -> h >= start || h < end
+            }
         }
     }
 
@@ -58,6 +64,10 @@ object SettingsStore {
     private const val KEY_FEED_MIN_CHARS = "feed_min_chars"
     private const val KEY_LOW_DATA = "low_data_mode"
     private const val KEY_URGENT_CODE = "urgent_handled_code"
+    private const val KEY_NOTIFY_UNREAD = "notify_unread"
+    private const val KEY_NOTIFY_QUIET = "notify_quiet"
+    private const val KEY_DARK_START = "dark_start_hour"
+    private const val KEY_DARK_END = "dark_end_hour"
     /** v0.4.1：后台检查到更新时先记下版本号，等「再次打开软件」或「第二次回到首页」再弹窗 */
     private const val KEY_PENDING_UPDATE = "pending_update_code"
 
@@ -112,6 +122,11 @@ object SettingsStore {
 
     /** 已自动处理过的紧急更新版本号（同一版本只自动下载/拉起安装一次） */
     var urgentHandledCode by mutableIntStateOf(0)
+    // v0.4.5：未读私信通知 / 免打扰 / 定时深色时段
+    var notifyUnreadEnabled by mutableStateOf(true)
+    var notifyQuietEnabled by mutableStateOf(false)
+    var darkStartHour by mutableIntStateOf(19)
+    var darkEndHour by mutableIntStateOf(7)
         private set
 
     /** 首页是否按字数过滤 */
@@ -150,6 +165,10 @@ object SettingsStore {
         feedMinChars = prefs.getInt(KEY_FEED_MIN_CHARS, 0).coerceIn(0, 200)
         lowDataMode = prefs.getBoolean(KEY_LOW_DATA, false)
         urgentHandledCode = prefs.getInt(KEY_URGENT_CODE, 0)
+        notifyUnreadEnabled = prefs.getBoolean(KEY_NOTIFY_UNREAD, true)
+        notifyQuietEnabled = prefs.getBoolean(KEY_NOTIFY_QUIET, false)
+        darkStartHour = prefs.getInt(KEY_DARK_START, 19).coerceIn(0, 23)
+        darkEndHour = prefs.getInt(KEY_DARK_END, 7).coerceIn(0, 23)
     }
 
     fun updateDarkModeSetting(mode: DarkMode) {
@@ -258,6 +277,24 @@ object SettingsStore {
     fun updateDownloadedApk(path: String?) {
         downloadedApkPath = path
         prefs()?.edit()?.putString(KEY_DOWNLOADED_APK, path)?.apply()
+    }
+
+    // v0.4.5：通知设置
+    fun updateNotifyUnread(enabled: Boolean) {
+        notifyUnreadEnabled = enabled
+        prefs()?.edit()?.putBoolean(KEY_NOTIFY_UNREAD, enabled)?.apply()
+    }
+
+    fun updateNotifyQuiet(enabled: Boolean) {
+        notifyQuietEnabled = enabled
+        prefs()?.edit()?.putBoolean(KEY_NOTIFY_QUIET, enabled)?.apply()
+    }
+
+    /** 定时深色起始/结束小时 */
+    fun updateDarkHours(start: Int, end: Int) {
+        darkStartHour = start.coerceIn(0, 23)
+        darkEndHour = end.coerceIn(0, 23)
+        prefs()?.edit()?.putInt(KEY_DARK_START, darkStartHour)?.putInt(KEY_DARK_END, darkEndHour)?.apply()
     }
 
     private fun prefs() =

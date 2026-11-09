@@ -21,7 +21,13 @@ class UnreadPollJob : JobService() {
                     val items = runBlocking { cn.mce.starlight.data.PersonalClient.loadPm(1) }
                     val effective = PmReadStore.overlay(items)
                     val unread = effective.sumOf { it.unread.coerceAtLeast(0) }
-                    if (unread > 0) NotifyHelper.notifyUnread(ctx, unread) else NotifyHelper.cancel(ctx)
+                    val quiet = SettingsStore.notifyQuietEnabled && notifyQuietNow()
+                    if (unread > 0 && SettingsStore.notifyUnreadEnabled && !quiet) {
+                        val first = effective.firstOrNull { it.unread > 0 }
+                        NotifyHelper.notifyUnread(ctx, unread, first?.touid)
+                    } else {
+                        NotifyHelper.cancel(ctx)
+                    }
                 }
             }
             jobFinished(params, false)
@@ -30,6 +36,11 @@ class UnreadPollJob : JobService() {
     }
 
     override fun onStopJob(params: JobParameters?): Boolean = false
+
+    private fun notifyQuietNow(): Boolean {
+        val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        return h >= 23 || h < 7
+    }
 
     companion object {
         private const val JOB_ID = 4201
