@@ -125,6 +125,9 @@ fun ThreadDetailScreen(
     var jumpText by remember { mutableStateOf("") }
     // v0.4.4：楼层长按菜单（复制链接 / 举报 / 编辑自己的帖子）
     var actionPost by remember { mutableStateOf<Post?>(null) }
+    // v0.4.5：帖内搜索关键词
+    var showSearch by remember { mutableStateOf(false) }
+    var searchText by remember { mutableStateOf("") }
     var replyText by remember { mutableStateOf(TextFieldValue("")) }
     var replyTo by remember { mutableStateOf<Post?>(null) }
     var sending by remember { mutableStateOf(false) }
@@ -376,6 +379,13 @@ fun ThreadDetailScreen(
                             Text(if (opOnly) "看全部" else "只看楼主")
                         }
                         TextButton(onClick = { showJump = true }) { Text("跳楼") }
+                        TextButton(onClick = { showSearch = true }) { Text("搜索") }
+                        TextButton(onClick = {
+                            onOpenPage(
+                                "${cn.mce.starlight.data.Net.BASE}/forum.php?mod=misc&action=report&tid=$tid&mobile=no",
+                                "举报主题",
+                            )
+                        }) { Text("举报") }
 
 
                         // v0.3.10：评论数与楼层数分开显示，避免「回复 6」和「共 7 楼」看起来对不上；
@@ -464,6 +474,44 @@ fun ThreadDetailScreen(
 
         ImmersiveTopBar(title = title, modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
         // v0.4.2：图片大图查看器
+                    // v0.4.5：帖内搜索
+                    if (showSearch) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { showSearch = false },
+                            title = { Text("帖内搜索") },
+                            text = {
+                                androidx.compose.material3.OutlinedTextField(
+                                    value = searchText,
+                                    onValueChange = { searchText = it },
+                                    singleLine = true,
+                                    label = { Text("关键词（正文/作者）") },
+                                )
+                            },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(onClick = {
+                                    showSearch = false
+                                    val kw = searchText.trim()
+                                    if (kw.isNotEmpty()) {
+                                        val posts = (state as? DetailState.Content)?.detail?.posts.orEmpty()
+                                        val pos = posts.indexOfFirst {
+                                            it.contentText.contains(kw, ignoreCase = true) ||
+                                                it.author.contains(kw, ignoreCase = true)
+                                        }
+                                        if (pos >= 0) {
+                                            scope.launch { detailListState.scrollToItem(pos) }
+                                            toast = "找到：${posts[pos].author} ${posts[pos].floorLabel ?: "楼主"}"
+                                        } else {
+                                            toast = "没有找到包含「$kw」的楼层"
+                                        }
+                                    }
+                                }) { Text("查找") }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(onClick = { showSearch = false }) { Text("关闭") }
+                            },
+                        )
+                    }
+
         // v0.4.4：楼层跳转
         if (showJump) {
             val total = (state as? DetailState.Content)?.detail?.posts?.size ?: 0

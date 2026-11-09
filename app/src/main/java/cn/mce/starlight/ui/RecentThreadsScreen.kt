@@ -57,9 +57,13 @@ fun RecentThreadsScreen(
                 }
             }
             items(items, key = { "${it.tid}-${it.at}" }) { item ->
+                androidx.compose.foundation.layout.Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                 Column(
                     Modifier
-                        .fillMaxWidth()
+                        .weight(1f)
                         .iosGlass(14)
                         .clickable { onOpenThread(item.tid, item.title) }
                         .padding(12.dp),
@@ -77,6 +81,18 @@ fun RecentThreadsScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                Text(
+                    "\u00d7",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .clickable {
+                            RecentThreads.remove(item.tid)
+                            items = items.filterNot { it.tid == item.tid }
+                        }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                )
                 }
             }
             if (items.isNotEmpty()) {

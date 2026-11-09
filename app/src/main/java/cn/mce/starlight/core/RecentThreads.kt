@@ -33,6 +33,14 @@ object RecentThreads {
             ?.putString(KEY, CryptoBox.encrypt(text))?.apply()
     }
 
+    /** v0.4.5：删除单条浏览记录 */
+    fun remove(tid: Int) {
+        val list = items().filterNot { it.tid == tid }
+        val text = list.joinToString("\n") { "${it.tid}|${it.title.replace("|", "｜")}|${it.at}" }
+        ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()
+            ?.putString(KEY, CryptoBox.encrypt(text))?.apply()
+    }
+
     fun clear() {
         ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()?.remove(KEY)?.apply()
     }

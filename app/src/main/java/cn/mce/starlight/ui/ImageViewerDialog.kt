@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 internal fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+    var showMenu by remember { mutableStateOf(false) }
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     androidx.compose.ui.window.Dialog(
@@ -62,7 +63,7 @@ internal fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
                         }
                     }
                 }
-                .combinedClickable(onClick = onDismiss, onLongClick = { saveImage(ctx, url, scope) }),
+                .combinedClickable(onClick = onDismiss, onLongClick = { showMenu = true }),
             contentAlignment = Alignment.Center,
         ) {
             AsyncImage(
@@ -79,15 +80,46 @@ internal fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
                     },
             )
             Text(
-                "点按任意处关闭 · 双指缩放",
+                "点按任意处关闭 · 双指缩放 · 长按保存/分享",
                 style = MaterialTheme.typography.labelSmall,
                 color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 40.dp),
             )
+            if (showMenu) {
+                ImageMenuDialog(
+                    url = url,
+                    ctx = ctx,
+                    onSave = { saveImage(ctx, url, scope) },
+                    onDismiss = { showMenu = false },
+                )
+            }
         }
     }
+}
+
+/** v0.4.5：长按菜单（保存到相册 / 分享链接） */
+@Composable
+private fun ImageMenuDialog(url: String, ctx: android.content.Context, onSave: () -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("图片操作") },
+        text = { Text(if (url.length > 60) url.take(60) + "…" else url) },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { onDismiss(); onSave() }) { Text("保存到相册") }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                onDismiss()
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_TEXT, url)
+                }
+                runCatching { ctx.startActivity(android.content.Intent.createChooser(send, "分享图片链接")) }
+            }) { Text("分享链接") }
+        },
+    )
 }
 
 /** v0.4.4：长按保存图片到相册（Android 10+ 走 MediaStore，10 以下写入应用图片目录并通知媒体库） */
