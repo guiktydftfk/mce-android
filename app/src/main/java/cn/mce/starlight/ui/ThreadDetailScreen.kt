@@ -376,7 +376,9 @@ fun ThreadDetailScreen(
                             }
                         }) { Text("分享") }
                         TextButton(onClick = { opOnly = !opOnly }) {
-                            Text(if (opOnly) "看全部" else "只看楼主")
+                            // v0.4.5：只看楼主时显示楼主楼层数
+                            val opCount = s.detail.posts.count { it.isOp }
+                            Text(if (opOnly) "看全部（只看楼主 $opCount 楼）" else "只看楼主")
                         }
                         TextButton(onClick = { showJump = true }) { Text("跳楼") }
                         TextButton(onClick = { showSearch = true }) { Text("搜索") }
