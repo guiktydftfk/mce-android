@@ -126,7 +126,8 @@ private fun ImageMenuDialog(url: String, ctx: android.content.Context, onSave: (
 private fun saveImage(ctx: android.content.Context, url: String, scope: kotlinx.coroutines.CoroutineScope) {
     scope.launch {
         val ok = runCatching {
-            // v0.4.5：按原图尺寸请求（不缩放），保存原图画质`n            val request = coil.request.ImageRequest.Builder(ctx).data(url).size(coil.size.Size.ORIGINAL).build()
+            // v0.4.5：按原图尺寸请求（不缩放），保存原图画质
+            val request = coil.request.ImageRequest.Builder(ctx).data(url).size(coil.size.Size.ORIGINAL).build()
             val result = coil.Coil.imageLoader(ctx).execute(request)
             val bitmap = (result as? SuccessResult)?.drawable?.toBitmap() ?: error("图片加载失败")
             val name = "MCE_${System.currentTimeMillis()}.png"
