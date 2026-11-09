@@ -18,3 +18,5 @@ probe/
 # 本地保留最近 4 个版本 APK，不进仓库（仅当前版本 force add）
 MCE-starlight-v*.apk
 release/MCE-starlight-v*.apk
+# Windows 保留名误生成的空文件
+NUL
