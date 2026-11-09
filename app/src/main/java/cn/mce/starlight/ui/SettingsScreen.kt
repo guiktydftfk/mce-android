@@ -132,6 +132,29 @@ fun SettingsScreen(
                         )
                     }
                 }
+
+            // v0.4.5：定时深色时段（放在外观/明暗模式下方）
+            Spacer(Modifier.height(6.dp))
+            // 定时深色时间段
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("定时深色时段", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "当前：${SettingsStore.darkStartHour}:00 – ${SettingsStore.darkEndHour}:00（明暗模式选「定时」时生效）",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = {
+                    SettingsStore.updateDarkHours((SettingsStore.darkStartHour + 1) % 24, SettingsStore.darkEndHour)
+                }) { Text("开始 +1") }
+                TextButton(onClick = {
+                    SettingsStore.updateDarkHours(SettingsStore.darkStartHour, (SettingsStore.darkEndHour + 1) % 24)
+                }) { Text("结束 +1") }
+            }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -472,26 +495,6 @@ fun SettingsScreen(
                 Switch(checked = SettingsStore.notifyQuietEnabled, onCheckedChange = {
                     SettingsStore.updateNotifyQuiet(it)
                 })
-            }
-            // 定时深色时间段
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("定时深色时段", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        "当前：${SettingsStore.darkStartHour}:00 – ${SettingsStore.darkEndHour}:00（明暗模式选「定时」时生效）",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TextButton(onClick = {
-                    SettingsStore.updateDarkHours((SettingsStore.darkStartHour + 1) % 24, SettingsStore.darkEndHour)
-                }) { Text("开始 +1") }
-                TextButton(onClick = {
-                    SettingsStore.updateDarkHours(SettingsStore.darkStartHour, (SettingsStore.darkEndHour + 1) % 24)
-                }) { Text("结束 +1") }
             }
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
