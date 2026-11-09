@@ -386,4 +386,22 @@ object PostActions {
             Result(ok, msg)
         }.getOrElse { Result(false, it.message) }
     }
+
+    /** v0.4.5：删除自己的帖子/回复（Discuz: forum.php?mod=post&action=delete + formhash） */
+    suspend fun deletePost(tid: Int, pid: Int): Result = withContext(Dispatchers.IO) {
+        runCatching {
+            val page = GenericPageClient.get("$BASE/forum.php?mod=viewthread&tid=$tid")
+            val hash = formhash(page)
+            if (hash.isEmpty()) {
+                return@withContext Result(false, "未获取 formhash（可能未登录）")
+            }
+            val resp = GenericPageClient.httpPost(
+                url = "$BASE/forum.php?mod=post&action=delete&tid=$tid&pid=$pid&formhash=$hash&mobile=2",
+                body = "formhash=$hash&deletesubmit=yes&delete_reason=",
+                cookie = null,
+            )
+            val (ok, msg) = DiscuzResponse.judge(resp, "删除")
+            Result(ok, msg)
+        }.getOrElse { Result(false, it.message) }
+    }
 }

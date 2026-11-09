@@ -577,6 +577,17 @@ fun ThreadDetailScreen(
                                     "编辑",
                                 )
                             }) { Text("编辑") }
+                            androidx.compose.material3.TextButton(onClick = {
+                                actionPost = null
+                                scope.launch {
+                                    val r = cn.mce.starlight.data.PostActions.deletePost(tid, post.pid)
+                                    toast = r.message ?: if (r.ok) "已删除" else "删除失败"
+                                    if (r.ok) {
+                                        page = 1
+                                        load(1, keepOnError = true)
+                                    }
+                                }
+                            }) { Text("删除") }
                         }
                     }
                 },
