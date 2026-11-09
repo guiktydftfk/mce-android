@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -45,6 +45,15 @@ object PostEditClient {
 
     private fun encode(value: String): String =
         java.net.URLEncoder.encode(value, "UTF-8")
+
+    /** 拉取编辑页并解析（供编辑弹窗预填 BBCode） */
+    suspend fun loadForm(tid: Int, pid: Int): EditForm? = withContext(Dispatchers.IO) {
+        runCatching {
+            val url = "${Net.BASE}/forum.php?mod=post&action=edit&tid=$tid&pid=$pid&mobile=no"
+            val page = GenericPageClient.get(url, userAgent = Net.DESKTOP_UA, isolateCookies = true)
+            parse(page)
+        }.getOrNull()
+    }
 
     /** 拉取编辑页 → 解析 → 原样提交 */
     suspend fun submit(tid: Int, pid: Int, subject: String, message: String): PostActions.Result =

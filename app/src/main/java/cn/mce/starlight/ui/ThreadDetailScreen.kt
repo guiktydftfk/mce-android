@@ -593,6 +593,54 @@ fun ThreadDetailScreen(
                 },
             )
         }
+                    // v0.4.6：原生编辑弹窗（预填原始 BBCode，原样提交）
+                    editPost?.let { post ->
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { if (!editBusy) editPost = null },
+                            title = { Text("编辑楼层") },
+                            text = {
+                                androidx.compose.foundation.layout.Column(
+                                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+                                ) {
+                                    androidx.compose.material3.OutlinedTextField(
+                                        value = editSubject,
+                                        onValueChange = { editSubject = it },
+                                        singleLine = true,
+                                        label = { Text("标题") },
+                                    )
+                                    androidx.compose.material3.OutlinedTextField(
+                                        value = editBody,
+                                        onValueChange = { editBody = it },
+                                        label = { Text("正文（保留 BBCode 原样）") },
+                                        minLines = 5,
+                                        maxLines = 10,
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(enabled = !editBusy, onClick = {
+                                    editBusy = true
+                                    scope.launch {
+                                        val r = cn.mce.starlight.data.PostEditClient.submit(
+                                            tid, post.pid, editSubject, editBody,
+                                        )
+                                        editBusy = false
+                                        if (r.ok) {
+                                            editPost = null
+                                            toast = "已保存"
+                                            page = 1
+                                            load(1, keepOnError = true)
+                                        } else {
+                                            toast = r.message ?: "保存失败"
+                                        }
+                                    }
+                                }) { Text(if (editBusy) "保存中…" else "保存") }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(onClick = { editPost = null }) { Text("取消") }
+                            },
+                        )
+                    }
         viewerUrl?.let { url ->
             ImageViewerDialog(url = url) { viewerUrl = null }
         }
