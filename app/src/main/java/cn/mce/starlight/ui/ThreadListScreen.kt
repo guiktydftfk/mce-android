@@ -50,7 +50,12 @@ fun ThreadListScreen(
     onOpenThread: (ThreadSummary) -> Unit,
     onCompose: (() -> Unit)? = null,
 ) {
-    var filter by remember { mutableStateOf<String?>(null) }
+    // v0.4.5：记住上次排序选择
+    var filter by remember {
+        mutableStateOf(
+            cn.mce.starlight.core.SettingsStore.boardFilter.takeIf { it != "all" && it.isNotBlank() },
+        )
+    }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val loadPage: suspend (Int) -> ForumPage = { page -> loader(page, filter) }
     // v0.3.10：版块列表也用缓存（返回时秒开）
@@ -104,7 +109,7 @@ fun ThreadListScreen(
                                     MaterialTheme.colorScheme.surfaceVariant
                                 },
                             )
-                            .clickable { if (filter != value) filter = value }
+                            .clickable { if (filter != value) { filter = value; cn.mce.starlight.core.SettingsStore.updateBoardFilter(value ?: "all") } }
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                     )
                 }

@@ -68,6 +68,7 @@ object SettingsStore {
     private const val KEY_NOTIFY_QUIET = "notify_quiet"
     private const val KEY_DARK_START = "dark_start_hour"
     private const val KEY_DARK_END = "dark_end_hour"
+    private const val KEY_BOARD_FILTER = "board_filter"
     /** v0.4.1：后台检查到更新时先记下版本号，等「再次打开软件」或「第二次回到首页」再弹窗 */
     private const val KEY_PENDING_UPDATE = "pending_update_code"
 
@@ -127,6 +128,8 @@ object SettingsStore {
     var notifyQuietEnabled by mutableStateOf(false)
     var darkStartHour by mutableIntStateOf(19)
     var darkEndHour by mutableIntStateOf(7)
+    /** 板块排序（all/lastpost/heat/digest），持久化记住上次选择 */
+    var boardFilter by mutableStateOf("all")
         private set
 
     /** 首页是否按字数过滤 */
@@ -169,6 +172,7 @@ object SettingsStore {
         notifyQuietEnabled = prefs.getBoolean(KEY_NOTIFY_QUIET, false)
         darkStartHour = prefs.getInt(KEY_DARK_START, 19).coerceIn(0, 23)
         darkEndHour = prefs.getInt(KEY_DARK_END, 7).coerceIn(0, 23)
+        boardFilter = prefs.getString(KEY_BOARD_FILTER, "all") ?: "all"
     }
 
     fun updateDarkModeSetting(mode: DarkMode) {
@@ -295,6 +299,11 @@ object SettingsStore {
         darkStartHour = start.coerceIn(0, 23)
         darkEndHour = end.coerceIn(0, 23)
         prefs()?.edit()?.putInt(KEY_DARK_START, darkStartHour)?.putInt(KEY_DARK_END, darkEndHour)?.apply()
+    }
+
+    fun updateBoardFilter(value: String) {
+        boardFilter = value
+        prefs()?.edit()?.putString(KEY_BOARD_FILTER, value)?.apply()
     }
 
     private fun prefs() =
