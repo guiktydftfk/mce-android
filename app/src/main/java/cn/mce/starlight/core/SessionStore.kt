@@ -89,6 +89,8 @@ object SessionStore {
         uid = null
         // v0.3.10：退出登录清掉首页缓存，避免下个账号看到上个账号的列表
         FeedCache.clear()
+        // v0.4.6：退出登录同时清理帖子离线缓存（避免下个账号看到上个账号的帖子内容）
+        ThreadHtmlCache.clear()
     }
 
     private fun hasLogoutEvidence(html: String): Boolean =

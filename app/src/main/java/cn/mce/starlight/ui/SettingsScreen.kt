@@ -378,7 +378,7 @@ fun SettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text("缓存占用", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "图片 / 首页列表等本地缓存，当前约 " +
+                        "图片 / 首页列表 / 帖子离线缓存，当前约 " +
                             cn.mce.starlight.core.CacheManager.format(cacheBytes),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
