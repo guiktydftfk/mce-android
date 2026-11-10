@@ -571,56 +571,40 @@ fun ThreadDetailScreen(
             )
         }
         // v0.4.4：楼层长按菜单（复制链接 / 举报 / 编辑自己的帖子）
-        actionPost?.let { post ->
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { actionPost = null },
-                title = { Text("楼层操作") },
-                text = { Text("${post.author} · ${post.floorLabel ?: "楼主"}") },
-                confirmButton = {
-                    androidx.compose.material3.TextButton(onClick = {
-                        actionPost = null
-                        val link = "${cn.mce.starlight.data.Net.BASE}/forum.php?mod=viewthread&tid=$tid&pid=${post.pid}"
-                        runCatching {
-                            val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                                as android.content.ClipboardManager
-                            cm.setPrimaryClip(android.content.ClipData.newPlainText("帖子链接", link))
-                            toast = "链接已复制"
-                        }
-                    }) { Text("复制链接") }
-                },
-                dismissButton = {
-                    androidx.compose.foundation.layout.Row {
-                        androidx.compose.material3.TextButton(onClick = {
-                            actionPost = null
-                            onOpenPage(
-                                "${cn.mce.starlight.data.Net.BASE}/forum.php?mod=misc&action=report&tid=$tid&pid=${post.pid}&mobile=no",
-                                "举报",
-                            )
-                        }) { Text("举报") }
-                        if (post.uid != null && post.uid == cn.mce.starlight.core.SessionStore.uid) {
-                            androidx.compose.material3.TextButton(onClick = {
+                    // v0.4.6：楼层操作对话框（抽到 ui/PostActionDialog.kt）
+                    actionPost?.let { post ->
+                        PostActionDialog(
+                            post = post,
+                            tid = tid,
+                            title = title,
+                            onDismiss = { actionPost = null },
+                            onReport = { url, label ->
                                 actionPost = null
-                                onOpenPage(
-                                    "${cn.mce.starlight.data.Net.BASE}/forum.php?mod=post&action=edit&tid=$tid&pid=${post.pid}&mobile=no",
-                                    "编辑",
-                                )
-                            }) { Text("编辑") }
-                            androidx.compose.material3.TextButton(onClick = {
+                                onOpenPage(url, label)
+                            },
+                            onEdit = { p2 ->
                                 actionPost = null
                                 scope.launch {
-                                    val r = cn.mce.starlight.data.PostActions.deletePost(tid, post.pid)
-                                    toast = r.message ?: if (r.ok) "已删除" else "删除失败"
-                                    if (r.ok) {
-                                        page = 1
-                                        load(1, keepOnError = true)
+                                    val f = cn.mce.starlight.data.PostEditClient.loadForm(tid, p2.pid)
+                                    if (f == null) {
+                                        toast = "打开编辑失败（可能未登录或帖子不可编辑）"
+                                    } else {
+                                        editPost = p2
+                                        editSubject = f.subject.ifBlank { title }
+                                        editBody = f.message
                                     }
                                 }
-                            }) { Text("删除") }
-                        }
+                            },
+                            onDelete = { p2 ->
+                                actionPost = null
+                                scope.launch {
+                                    val r = cn.mce.starlight.data.PostActions.deletePost(tid, p2.pid)
+                                    toast = r.message ?: if (r.ok) "已删除" else "删除失败"
+                                    if (r.ok) { page = 1; load(1, keepOnError = true) }
+                                }
+                            },
+                        )
                     }
-                },
-            )
-        }
                     // v0.4.6：原生编辑弹窗（预填原始 BBCode，原样提交）
                     editPost?.let { post ->
                         androidx.compose.material3.AlertDialog(
