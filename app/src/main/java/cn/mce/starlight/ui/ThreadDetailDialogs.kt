@@ -176,3 +176,40 @@ internal fun EditPostDialog(
         },
     )
 }
+/** v0.4.6：收藏分组/备注弹窗（从 ThreadDetailScreen 拆出） */
+@Composable
+internal fun FavoriteNoteDialog(
+    initialGroup: String,
+    initialNote: String,
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit,
+) {
+    var group by remember { mutableStateOf(initialGroup) }
+    var note by remember { mutableStateOf(initialNote) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("收藏分组 / 备注") },
+        text = {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(
+                    value = group,
+                    onValueChange = { group = it },
+                    singleLine = true,
+                    label = { Text("分组（默认：默认分组）") },
+                )
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    singleLine = true,
+                    label = { Text("备注") },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(group, note) }) { Text("保存") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
+}

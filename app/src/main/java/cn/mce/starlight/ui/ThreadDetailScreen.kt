@@ -603,37 +603,18 @@ fun ThreadDetailScreen(
                         )
                     }
                     // v0.4.6：收藏分组/备注
+                    // v0.4.6：收藏分组/备注弹窗已拆到 ui/ThreadDetailDialogs.kt
                     if (showFavDialog) {
-                        androidx.compose.material3.AlertDialog(
-                            onDismissRequest = { showFavDialog = false },
-                            title = { Text("收藏分组 / 备注") },
-                            text = {
-                                androidx.compose.foundation.layout.Column(
-                                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
-                                ) {
-                                    androidx.compose.material3.OutlinedTextField(
-                                        value = favGroup,
-                                        onValueChange = { favGroup = it },
-                                        singleLine = true,
-                                        label = { Text("分组（默认：默认分组）") },
-                                    )
-                                    androidx.compose.material3.OutlinedTextField(
-                                        value = favNote,
-                                        onValueChange = { favNote = it },
-                                        singleLine = true,
-                                        label = { Text("备注") },
-                                    )
-                                }
-                            },
-                            confirmButton = {
-                                androidx.compose.material3.TextButton(onClick = {
-                                    cn.mce.starlight.core.PostFavoriteStore.put(tid, title, favGroup, favNote)
-                                    showFavDialog = false
-                                    toast = "已保存收藏分组/备注"
-                                }) { Text("保存") }
-                            },
-                            dismissButton = {
-                                androidx.compose.material3.TextButton(onClick = { showFavDialog = false }) { Text("取消") }
+                        FavoriteNoteDialog(
+                            initialGroup = favGroup,
+                            initialNote = favNote,
+                            onDismiss = { showFavDialog = false },
+                            onSave = { group, note ->
+                                favGroup = group
+                                favNote = note
+                                cn.mce.starlight.core.PostFavoriteStore.put(tid, title, group, note)
+                                showFavDialog = false
+                                toast = "已保存收藏分组/备注"
                             },
                         )
                     }
