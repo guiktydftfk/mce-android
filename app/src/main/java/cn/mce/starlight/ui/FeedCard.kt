@@ -45,8 +45,13 @@ private fun metaLabel(thread: ThreadSummary): String {
         .trim()
         .trimEnd('/')
         .trim()
-    // v0.4.6：阅读数来源待校准，先隐藏阅读数 UI（只显示时间，回复数在底部）
-    return time
+    // v0.4.6：阅读数只用「后台补抓电脑版列表」得到的值；只显示 >0，避免出现「阅读 0」
+    val views = thread.views
+    return when {
+        views != null && views > 0 && time.isNotBlank() -> "$time / 阅读 $views"
+        views != null && views > 0 -> "阅读 $views"
+        else -> time
+    }
 }
 @Composable
 fun FeedCard(
