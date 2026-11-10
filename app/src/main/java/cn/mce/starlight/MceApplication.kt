@@ -42,6 +42,7 @@ class MceApplication : Application(), ImageLoaderFactory {
         cn.mce.starlight.core.BoardFavorites.init(this)
         cn.mce.starlight.core.RecentThreads.init(this)
         cn.mce.starlight.core.ThreadHtmlCache.init(this)
+        cn.mce.starlight.core.PostFavoriteStore.init(this)
         cn.mce.starlight.core.NotifyHelper.init(this)
         cn.mce.starlight.core.UnreadPollJob.schedule(this)
         CookieJar.init(this)
