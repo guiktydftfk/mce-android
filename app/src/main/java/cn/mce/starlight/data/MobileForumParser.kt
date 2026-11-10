@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -22,7 +22,8 @@ import org.jsoup.nodes.Element
 object MobileForumParser {
 
     private val tidRegex = Regex("""tid=(\d+)""")
-    private val replyRegex = Regex("""(\d+)\s*(?:\u56de\u590d|\u9605\u8bfb)""")
+    // v0.4.6 修复：旧实现同时匹配「N 回复」和「N 阅读」→ 未开放回复/无人回复的帖子会把阅读数当回复数
+    private val replyRegex = Regex("""(?:\u56de\u590d[:：]?\s*(\d+)|(\d+)\s*\u56de\u590d)""")
     private val whitespaceRegex = Regex("""\s+""")
     private val pageRegex = Regex("""page=(\d+)""")
 
@@ -40,6 +41,12 @@ object MobileForumParser {
             page = page,
             hasNextPage = hasNext(doc, page),
         )
+    }
+
+    /** 只解析「回复」数；「阅读」数不算回复数（v0.4.6 修复） */
+    private fun repliesOf(meta: String?): Int? {
+        val m = meta?.let { replyRegex.find(it) } ?: return null
+        return m.groupValues[1].ifBlank { m.groupValues[2] }.toIntOrNull()
     }
 
     private fun parseItem(li: Element): ThreadSummary? {
@@ -63,7 +70,7 @@ object MobileForumParser {
             title = title.trim(),
             author = li.selectFirst("span.th_author")?.text()?.trim()?.takeIf { it.isNotBlank() },
             avatarUrl = avatar,
-            replies = meta?.let { replyRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() },
+            replies = repliesOf(meta),
             metaText = meta,
             typeLabel = li.selectFirst("span.threadtypes")?.text()?.trim()?.takeIf { it.isNotBlank() },
             summary = li.selectFirst("a.th_item p")?.text()?.trim()?.takeIf { it.isNotBlank() },
