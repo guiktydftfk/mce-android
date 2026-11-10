@@ -264,6 +264,18 @@ fun ThreadDetailScreen(
         load(1, keepOnError = hadContent)
         // 流水式阅读：进来后自动把后续页追加到同一列表
         loadRemainingPages()
+        // v0.4.6：内容渲染完成后再拉评分（电脑版页面），避免和图片抢带宽
+        if (cn.mce.starlight.core.SessionStore.isLoggedIn) {
+            val cur = (state as? DetailState.Content)?.detail
+            if (cur != null && cur.ratings == null) {
+                kotlinx.coroutines.delay(400)
+                val r = runCatching { repo.loadRatings(tid) }.getOrNull()
+                if (r != null) {
+                    val now = (state as? DetailState.Content)?.detail
+                    if (now != null) state = DetailState.Content(now.copy(ratings = r))
+                }
+            }
+        }
     }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()

@@ -63,7 +63,7 @@ class MceApplication : Application(), ImageLoaderFactory {
             // v0.4.1：全板块预热延迟到启动 3 秒后再做 —— 启动瞬间有登录探测/签到提醒/更新检查/消息刷新
             // 等请求在跑，若此时再并行打 30+ 个板块页会抢带宽，首屏内容明显变慢（弱网尤甚）。
             runCatching {
-                Thread.sleep(3000)
+                Thread.sleep(8000)
                 if (!cn.mce.starlight.core.SettingsStore.lowDataMode) {
                     kotlinx.coroutines.runBlocking {
                         runCatching { cn.mce.starlight.data.HttpForumRepository.prewarmLatestAllBoards() }
@@ -111,12 +111,12 @@ class MceApplication : Application(), ImageLoaderFactory {
             .okHttpClient(client)
             .crossfade(true)
             .memoryCache {
-                coil.memory.MemoryCache.Builder(this).maxSizePercent(0.18).build()
+                coil.memory.MemoryCache.Builder(this).maxSizePercent(0.25).build()
             }
             .diskCache {
                 coil.disk.DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(80L * 1024 * 1024)
+                    .maxSizeBytes(150L * 1024 * 1024)
                     .build()
             }
             .build()

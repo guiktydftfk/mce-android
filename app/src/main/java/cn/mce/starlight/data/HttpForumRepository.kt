@@ -90,48 +90,37 @@ class HttpForumRepository(
                 }
             }
 
-    override suspend fun loadThreadDetail(tid: Int, page: Int, noCache: Boolean): ThreadDetail =        withContext(Dispatchers.IO) {
+    /** v0.4.6：评分卡片所需的电脑版页面单独加载（延迟到内容渲染后，避免和图片抢带宽） */
+    suspend fun loadRatings(tid: Int, noCache: Boolean = false): ThreadRatings? = withContext(Dispatchers.IO) {
+        val (hit, cached) = if (noCache) false to null else cachedRatings(tid)
+        if (hit) return@withContext cached
+        val desktopUrl = "$baseHost/forum.php?mod=viewthread&tid=$tid&mobile=no"
+        val html = runCatching {
+            GenericPageClient.get(
+                desktopUrl,
+                userAgent = Net.DESKTOP_UA,
+                isolateCookies = true,
+                retryOnFailure = false,
+            )
+        }.onFailure { cn.mce.starlight.core.DiagLog.record("thread-desktop", it) }.getOrNull()
+            ?: return@withContext null
+        val parsed = runCatching { ThreadDetailParser.parseRatingsFromHtml(html, desktopUrl) }
+            .onFailure { e -> cn.mce.starlight.core.DiagLog.record("ratings", e) }
+            .getOrNull()
+        putRatings(tid, parsed)
+        parsed
+    }
+
+    override suspend fun loadThreadDetail(tid: Int, page: Int, noCache: Boolean): ThreadDetail =
+        withContext(Dispatchers.IO) {
             if (!noCache && page == 1) cachedDetail(tid)?.let { return@withContext it }
             val cacheBust = if (noCache) "&t=${System.currentTimeMillis()}&mobile=2" else ""
             val url = "$baseHost/forum.php?mod=viewthread&tid=$tid&page=$page$cacheBust"
-            val needDesktop = page == 1 && cn.mce.starlight.core.SessionStore.isLoggedIn
-            if (!needDesktop) {
-                val d = ThreadDetailParser.parse(fetchThreadHtml(tid, page, url), url, tid, page)
-                if (!noCache && page == 1) putDetail(tid, d)
-                return@withContext d
-            }
-            // v0.4.4：手机页与电脑页**并行**抓取（旧实现串行，打开帖子白等一次 RTT）
-            val desktopUrl = "$baseHost/forum.php?mod=viewthread&tid=$tid&mobile=no"
-            val (hit, cachedRating) = if (noCache) false to null else cachedRatings(tid)
-            val result = coroutineScope {
-                val detailAsync = async { ThreadDetailParser.parse(fetchThreadHtml(tid, page, url), url, tid, page) }
-                val desktopAsync = if (hit) null else async {
-                    runCatching {
-                        GenericPageClient.get(
-                            desktopUrl,
-                            userAgent = Net.DESKTOP_UA,
-                            isolateCookies = true,
-                            retryOnFailure = false,
-                        )
-                    }.onFailure {
-                        cn.mce.starlight.core.DiagLog.record("thread-desktop", it)
-                    }.getOrNull()
-                }
-                val detail = detailAsync.await()
-                val ratings = if (hit) cachedRating else {
-                    val html = desktopAsync?.await()
-                    val parsed = html?.let { runCatching { ThreadDetailParser.parseRatingsFromHtml(it, desktopUrl) }
-                        .onFailure { e -> cn.mce.starlight.core.DiagLog.record("ratings", e) }
-                        .getOrNull() }
-                    putRatings(tid, parsed)
-                    parsed
-                }
-                detail.copy(ratings = ratings)
-            }
-            if (!noCache && page == 1) putDetail(tid, result)
-            result
+            // v0.4.6：只抓手机页；电脑版（评分）改由 loadRatings() 在内容渲染后单独延迟加载
+            val d = ThreadDetailParser.parse(fetchThreadHtml(tid, page, url), url, tid, page)
+            if (!noCache && page == 1) putDetail(tid, d)
+            d
         }
-
     /**
      * v0.4.1：并行拉取**所有板块**的最新一页主题，合并去重后按发布时间倒序。
      * 首页「最新」用它兜底导读延迟收录（用户要求覆盖全部板块）。
