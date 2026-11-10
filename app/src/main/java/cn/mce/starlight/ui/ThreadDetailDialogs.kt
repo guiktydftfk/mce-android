@@ -134,3 +134,45 @@ internal fun RateDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
 }
+/** v0.4.6：编辑帖子弹窗（从 ThreadDetailScreen 拆出；正文保留 BBCode 原样） */
+@Composable
+internal fun EditPostDialog(
+    post: cn.mce.starlight.data.Post,
+    busy: Boolean,
+    initialSubject: String,
+    initialBody: String,
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit,
+) {
+    var subject by remember { mutableStateOf(initialSubject) }
+    var body by remember { mutableStateOf(initialBody) }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("编辑楼层") },
+        text = {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(
+                    value = subject,
+                    onValueChange = { subject = it },
+                    singleLine = true,
+                    label = { Text("标题") },
+                )
+                OutlinedTextField(
+                    value = body,
+                    onValueChange = { body = it },
+                    label = { Text("正文（保留 BBCode 原样）") },
+                    minLines = 5,
+                    maxLines = 10,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !busy, onClick = { onSave(subject, body) }) {
+                Text(if (busy) "保存中…" else "保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("取消") }
+        },
+    )
+}
