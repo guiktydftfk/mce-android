@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.core
+package cn.mce.starlight.core
 
 import cn.mce.starlight.data.ThreadSummary
 
@@ -31,5 +31,23 @@ object ThreadViewsCache {
     /** 把已知阅读数合并进列表（已有 views 的不覆盖） */
     fun attach(threads: List<ThreadSummary>): List<ThreadSummary> = threads.map { t ->
         if (t.views != null) t else get(t.id)?.let { t.copy(views = it) } ?: t
+    }
+
+    private val fetchedAt = HashMap<Int, Long>()
+
+    /** v0.4.6：同一板块 5 分钟内只补抓一次（首页多板块时避免重复请求） */
+    @Synchronized
+    fun shouldFetch(fid: Int): Boolean {
+        val at = fetchedAt[fid] ?: return true
+        return System.currentTimeMillis() - at > TTL
+    }
+
+    @Synchronized
+    fun markFetching(fid: Int) { fetchedAt[fid] = System.currentTimeMillis() }
+
+    /** 用板块名找 fid（首页卡片只带板块名） */
+    fun fidOfName(name: String?): Int? {
+        if (name.isNullOrBlank()) return null
+        return cn.mce.starlight.data.Boards.all.firstOrNull { it.name == name || name.contains(it.name) }?.fid
     }
 }

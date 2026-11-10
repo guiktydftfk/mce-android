@@ -80,8 +80,24 @@ fun HomeFeedScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
-        PagedThreadList(
+    // v0.4.6：首页卡片附带阅读数（来自后台补抓的电脑版列表），并顺带触发本页板块的补抓
+    fun withViews(p: cn.mce.starlight.data.ForumPage): cn.mce.starlight.data.ForumPage {
+        val merged = p.copy(threads = cn.mce.starlight.core.ThreadViewsCache.attach(p.threads))
+        p.threads.mapNotNull { cn.mce.starlight.core.ThreadViewsCache.fidOfName(it.forumName) }
+            .distinct()
+            .filter { it > 0 && cn.mce.starlight.core.ThreadViewsCache.shouldFetch(it) }
+            .take(3)
+            .forEach { fid ->
+                cn.mce.starlight.core.ThreadViewsCache.markFetching(fid)
+                bgScope.launch {
+                    val views = runCatching { cn.mce.starlight.data.ThreadViewsClient.load(fid, 1) }.getOrDefault(emptyMap())
+                    if (views.isNotEmpty()) cn.mce.starlight.core.ThreadViewsCache.putAll(views)
+                }
+            }
+        return merged
+    }
+
+    Box(Modifier.fillMaxSize()) {        PagedThreadList(
             // 过滤阈值变化时也重建列表（resetKey 变化 → 重新加载第 1 页）
             resetKey = Triple(view, reloadKey, SettingsStore.feedMinChars),
             scrollToTopKey = scrollToTopKey,
@@ -129,12 +145,14 @@ fun HomeFeedScreen(
                             cn.mce.starlight.core.FeedTime.parseApproxMs(it.metaText) ?: 0L
                         }
                         .take(20)
-                    if (extras.isEmpty()) base else base.copy(
-                        threads = cn.mce.starlight.core.FeedTime.mergeExtras(base.threads, extras),
+                    withViews(
+                        if (extras.isEmpty()) base else base.copy(
+                            threads = cn.mce.starlight.core.FeedTime.mergeExtras(base.threads, extras),
+                        ),
                     )
                 } else {
                     // 非「最新」页/非第 1 页：直接走导读，无需额外合并
-                    repo.loadGuide(view, page)
+                    withViews(repo.loadGuide(view, page))
                 }
             },
             // v0.3.8：按字数过滤（只看首页信息流，不影响板块/搜索）
