@@ -506,38 +506,21 @@ fun ThreadDetailScreen(
         // v0.4.2：图片大图查看器
                     // v0.4.5：帖内搜索
                     if (showSearch) {
-                        androidx.compose.material3.AlertDialog(
-                            onDismissRequest = { showSearch = false },
-                            title = { Text("帖内搜索") },
-                            text = {
-                                androidx.compose.material3.OutlinedTextField(
-                                    value = searchText,
-                                    onValueChange = { searchText = it },
-                                    singleLine = true,
-                                    label = { Text("关键词（正文/作者）") },
-                                )
-                            },
-                            confirmButton = {
-                                androidx.compose.material3.TextButton(onClick = {
-                                    showSearch = false
-                                    val kw = searchText.trim()
-                                    if (kw.isNotEmpty()) {
-                                        val posts = (state as? DetailState.Content)?.detail?.posts.orEmpty()
-                                        val pos = posts.indexOfFirst {
-                                            it.contentText.contains(kw, ignoreCase = true) ||
-                                                it.author.contains(kw, ignoreCase = true)
-                                        }
-                                        if (pos >= 0) {
-                                            scope.launch { detailListState.scrollToItem(pos) }
-                                            toast = "找到：${posts[pos].author} ${posts[pos].floorLabel ?: "楼主"}"
-                                        } else {
-                                            toast = "没有找到包含「$kw」的楼层"
-                                        }
-                                    }
-                                }) { Text("查找") }
-                            },
-                            dismissButton = {
-                                androidx.compose.material3.TextButton(onClick = { showSearch = false }) { Text("关闭") }
+                        SearchInThreadDialog(
+                            onDismiss = { showSearch = false },
+                            onSearch = { kw ->
+                                showSearch = false
+                                val posts = (state as? DetailState.Content)?.detail?.posts.orEmpty()
+                                val pos = posts.indexOfFirst {
+                                    it.contentText.contains(kw, ignoreCase = true) ||
+                                        it.author.contains(kw, ignoreCase = true)
+                                }
+                                if (pos >= 0) {
+                                    scope.launch { detailListState.scrollToItem(pos) }
+                                    toast = "找到：${posts[pos].author} ${posts[pos].floorLabel ?: "楼主"}"
+                                } else {
+                                    toast = "没有找到包含「$kw」的楼层"
+                                }
                             },
                         )
                     }

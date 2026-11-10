@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.ui
+package cn.mce.starlight.ui
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
@@ -37,6 +37,35 @@ fun JumpToFloorDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
+}
+/** v0.4.6：帖内搜索对话框（从 ThreadDetailScreen 拆出） */
+@Composable
+fun SearchInThreadDialog(
+    onDismiss: () -> Unit,
+    onSearch: (String) -> Unit,
+) {
+    var text by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("帖内搜索") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                singleLine = true,
+                label = { Text("关键词（正文/作者）") },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val kw = text.trim()
+                if (kw.isNotEmpty()) onSearch(kw) else onDismiss()
+            }) { Text("查找") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("关闭") }
         },
     )
 }
