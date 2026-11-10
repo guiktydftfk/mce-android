@@ -33,6 +33,25 @@ import coil.compose.AsyncImage
  * 结构：头像 + 作者 + 分类标签 + 时间 / 标题 / 摘要 / 大图 / 回复数 + 版块
  * 注意：不使用卡片底色，只在内容间留白（视觉分层靠间距与图片）。
  */
+/** v0.4.6：卡片 meta 只显示「时间 / 阅读 N」，回复数交给底部「回复 N」，避免两处重复 */
+private fun metaLabel(thread: ThreadSummary): String {
+    val raw = thread.metaText ?: ""
+    val time = raw
+        .replace(Regex("""\d+\s*回复"""), "")
+        .replace(Regex("""\d+\s*阅读"""), "")
+        .replace(Regex("""\s*/\s*$"""), "")
+        .replace(Regex("""/\s*/"""), "/")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
+        .trimEnd('/')
+        .trim()
+    val views = thread.views
+    return when {
+        views != null && time.isNotBlank() -> "$time / 阅读 $views"
+        views != null -> "阅读 $views"
+        else -> time
+    }
+}
 @Composable
 fun FeedCard(
     thread: ThreadSummary,
@@ -83,7 +102,7 @@ fun FeedCard(
                 )
             }
             Text(
-                thread.metaText ?: "",
+                metaLabel(thread),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

@@ -24,6 +24,8 @@ object MobileForumParser {
     private val tidRegex = Regex("""tid=(\d+)""")
     // v0.4.6 修复：旧实现同时匹配「N 回复」和「N 阅读」→ 未开放回复/无人回复的帖子会把阅读数当回复数
     private val replyRegex = Regex("""(?:\u56de\u590d[:：]?\s*(\d+)|(\d+)\s*\u56de\u590d)""")
+    // v0.4.6：阅读数单独解析，不再混进回复数
+    private val viewsRegex = Regex("""(\d+)\s*\u9605\u8bfb""")
     private val whitespaceRegex = Regex("""\s+""")
     private val pageRegex = Regex("""page=(\d+)""")
 
@@ -71,6 +73,7 @@ object MobileForumParser {
             author = li.selectFirst("span.th_author")?.text()?.trim()?.takeIf { it.isNotBlank() },
             avatarUrl = avatar,
             replies = repliesOf(meta),
+            views = meta?.let { viewsRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() },
             metaText = meta,
             typeLabel = li.selectFirst("span.threadtypes")?.text()?.trim()?.takeIf { it.isNotBlank() },
             summary = li.selectFirst("a.th_item p")?.text()?.trim()?.takeIf { it.isNotBlank() },
