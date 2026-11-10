@@ -132,6 +132,10 @@ fun ThreadDetailScreen(
     var editSubject by remember { mutableStateOf("") }
     var editBody by remember { mutableStateOf("") }
     var editBusy by remember { mutableStateOf(false) }
+    // v0.4.6：收藏分组/备注
+    var showFavDialog by remember { mutableStateOf(false) }
+    var favGroup by remember { mutableStateOf("") }
+    var favNote by remember { mutableStateOf("") }
     var searchText by remember { mutableStateOf("") }
     var replyText by remember { mutableStateOf(TextFieldValue("")) }
     var replyTo by remember { mutableStateOf<Post?>(null) }
@@ -392,6 +396,13 @@ fun ThreadDetailScreen(
                                 )
                             }
                         }) { Text("分享") }
+                        TextButton(onClick = {
+                            val cur = cn.mce.starlight.core.PostFavoriteStore.items()
+                                .firstOrNull { it.tid == tid }
+                            favGroup = cur?.group ?: ""
+                            favNote = cur?.note ?: ""
+                            showFavDialog = true
+                        }) { Text("收藏备注") }
                         TextButton(onClick = { opOnly = !opOnly }) {
                             // v0.4.5：只看楼主时显示楼主楼层数
                             val opCount = s.detail.posts.count { it.isOp }
@@ -655,6 +666,41 @@ fun ThreadDetailScreen(
                             },
                             dismissButton = {
                                 androidx.compose.material3.TextButton(onClick = { editPost = null }) { Text("取消") }
+                            },
+                        )
+                    }
+                    // v0.4.6：收藏分组/备注
+                    if (showFavDialog) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { showFavDialog = false },
+                            title = { Text("收藏分组 / 备注") },
+                            text = {
+                                androidx.compose.foundation.layout.Column(
+                                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+                                ) {
+                                    androidx.compose.material3.OutlinedTextField(
+                                        value = favGroup,
+                                        onValueChange = { favGroup = it },
+                                        singleLine = true,
+                                        label = { Text("分组（默认：默认分组）") },
+                                    )
+                                    androidx.compose.material3.OutlinedTextField(
+                                        value = favNote,
+                                        onValueChange = { favNote = it },
+                                        singleLine = true,
+                                        label = { Text("备注") },
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(onClick = {
+                                    cn.mce.starlight.core.PostFavoriteStore.put(tid, title, favGroup, favNote)
+                                    showFavDialog = false
+                                    toast = "已保存收藏分组/备注"
+                                }) { Text("保存") }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(onClick = { showFavDialog = false }) { Text("取消") }
                             },
                         )
                     }
