@@ -17,12 +17,12 @@ data class ThreadSummary(
     val author: String?,
     val avatarUrl: String?,
     val replies: Int?,
-    /** v0.4.6：阅读数（列表 meta 里可能给出，也可能没有） */
-    val views: Int? = null,
     val metaText: String?,
     val typeLabel: String?,
     val summary: String? = null,
     val forumName: String? = null,
+    /** v0.4.6：阅读数（列表 meta 里可能给出，也可能没有；放最后保持构造参数位置兼容） */
+    val views: Int? = null,
 )
 
 /** 列表页 */
