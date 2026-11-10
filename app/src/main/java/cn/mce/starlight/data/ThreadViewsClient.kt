@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.data
+package cn.mce.starlight.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -16,6 +16,7 @@ object ThreadViewsClient {
         runCatching {
             val url = "${Net.BASE}/forum.php?mod=forumdisplay&fid=$fid&page=$page&mobile=no"
             val html = GenericPageClient.get(url, userAgent = Net.DESKTOP_UA, isolateCookies = true)
+            cn.mce.starlight.core.DebugDump.dump("views_desktop_fid${fid}_p$page", html)
             val doc = Jsoup.parse(html, url)
             doc.select("tbody[id^=normalthread_], tbody[id^=stickthread_]").mapNotNull { tr ->
                 val href = tr.selectFirst("a[href*=viewthread]")?.attr("href") ?: return@mapNotNull null
