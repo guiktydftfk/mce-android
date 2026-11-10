@@ -1,5 +1,7 @@
 package cn.mce.starlight.ui
 
+import kotlinx.coroutines.launch
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +51,8 @@ fun ThreadListScreen(
     loader: suspend (page: Int, filter: String?) -> ForumPage,
     onOpenThread: (ThreadSummary) -> Unit,
     onCompose: (() -> Unit)? = null,
+    /** v0.4.6：版块 fid，用于后台补抓阅读数（null 表示不补抓） */
+    viewsFid: Int? = null,
 ) {
     // v0.4.5：记住上次排序选择
     var filter by remember {
@@ -57,7 +61,23 @@ fun ThreadListScreen(
         )
     }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val loadPage: suspend (Int) -> ForumPage = { page -> loader(page, filter) }
+    // v0.4.6：先返回手机版数据（不阻塞）；阅读数用缓存合并，并在后台补抓电脑版列表
+    val bgScope = androidx.compose.runtime.rememberCoroutineScope()
+    val loadPage: suspend (Int) -> ForumPage = { page ->
+        val raw = loader(page, filter)
+        val withViews = raw.copy(
+            threads = cn.mce.starlight.core.ThreadViewsCache.attach(raw.threads),
+        )
+        if (viewsFid != null && viewsFid > 0) {
+            bgScope.launch {
+                val views = cn.mce.starlight.data.ThreadViewsClient.load(viewsFid, page)
+                if (views.isNotEmpty()) {
+                    cn.mce.starlight.core.ThreadViewsCache.putAll(views)
+                }
+            }
+        }
+        withViews
+    }
     // v0.3.10：版块列表也用缓存（返回时秒开）
     val cacheKey = "board_${title}_${filter ?: "all"}"
     val cached = remember(cacheKey, reloadKey) { cn.mce.starlight.core.FeedCache.get(cacheKey) }

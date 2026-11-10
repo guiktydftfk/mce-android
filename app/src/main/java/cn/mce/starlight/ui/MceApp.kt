@@ -845,6 +845,7 @@ fun MceApp() {
                 loader = { page, filter -> HttpForumRepository().loadThreads(current.fid, page, filter) },
                 onOpenThread = { push(Route.Thread(it.id, it.title)) },
                 onCompose = { push(Route.Compose(current.fid)) },
+                viewsFid = current.fid,
             )
 
             null -> when (dest) {
