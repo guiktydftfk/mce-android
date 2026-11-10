@@ -543,33 +543,19 @@ fun ThreadDetailScreen(
                     }
 
         // v0.4.4：楼层跳转
-        if (showJump) {
-            val total = (state as? DetailState.Content)?.detail?.posts?.size ?: 0
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { showJump = false },
-                title = { Text("跳转到楼层") },
-                text = {
-                    androidx.compose.material3.OutlinedTextField(
-                        value = jumpText,
-                        onValueChange = { v -> jumpText = v.filter { it.isDigit() }.take(5) },
-                        singleLine = true,
-                        label = { Text("楼层号（1 起，共 $total 楼）") },
-                    )
-                },
-                confirmButton = {
-                    androidx.compose.material3.TextButton(onClick = {
-                        showJump = false
-                        val n = jumpText.toIntOrNull() ?: 1
-                        scope.launch {
-                            detailListState.scrollToItem((n - 1).coerceIn(0, (total - 1).coerceAtLeast(0)))
-                        }
-                    }) { Text("跳转") }
-                },
-                dismissButton = {
-                    androidx.compose.material3.TextButton(onClick = { showJump = false }) { Text("取消") }
-                },
-            )
-        }
+                    // v0.4.6：跳楼对话框已拆到 ui/ThreadDetailDialogs.kt
+                    if (showJump) {
+                        JumpToFloorDialog(
+                            total = (state as? DetailState.Content)?.detail?.posts?.size ?: 0,
+                            onDismiss = { showJump = false },
+                            onJump = { n ->
+                                scope.launch {
+                                    val t = (state as? DetailState.Content)?.detail?.posts?.size ?: 0
+                                    detailListState.scrollToItem((n - 1).coerceIn(0, (t - 1).coerceAtLeast(0)))
+                                }
+                            },
+                        )
+                    }
         // v0.4.4：楼层长按菜单（复制链接 / 举报 / 编辑自己的帖子）
                     // v0.4.6：楼层操作对话框（抽到 ui/PostActionDialog.kt）
                     actionPost?.let { post ->
