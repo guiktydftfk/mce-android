@@ -490,7 +490,13 @@ fun MceApp() {
                 Modifier
                     .fillMaxHeight()
                     // v0.4.7：侧边栏最多占屏幕一半（小屏自动收窄，宽屏最多 340dp），不影响栏目名完整显示
-                    .widthIn(max = minOf(340.dp, (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.5f).dp)),
+                    // v0.4.7：侧边栏占屏幕 60%（上限 90%），随屏幕宽度自适应，保证各机型视觉一致
+                    .width(
+                        minOf(
+                            androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.6f,
+                            androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.9f,
+                        ).dp,
+                    ),
             ) {
                 ModalDrawerSheet(
                     modifier = Modifier.fillMaxSize(),
@@ -1069,6 +1075,8 @@ private fun DrawerItem(
 ) {
     // v0.3.7 修订：尺寸对齐上一版 NavigationDrawerItem（56dp 高、胶囊形、左右各约 12dp 留白），
     // 只把「选中高亮」换成液态玻璃渐变，不再额外收窄每一行的宽度
+    // v0.4.7：按抽屉宽度做等比缩放（以 246dp 设计宽度为基准），各机型视觉一致
+    val drawerScale = ((androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.6f) / 246f).coerceIn(0.85f, 1.2f)
     val shape = RoundedCornerShape(28.dp)
     val selectedFraction by animateFloatAsState(
         targetValue = if (selected) 1f else 0f,
@@ -1078,9 +1086,8 @@ private fun DrawerItem(
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 2.dp)
-            .height(56.dp)
-                .clip(shape)
+            .padding(horizontal = (12.dp * drawerScale), vertical = 2.dp)
+            .height(56.dp * drawerScale)
                 .then(modifier)
                 .then(
                     if (onLongClick == null) Modifier.clickable(onClick = onClick)
@@ -1120,7 +1127,7 @@ private fun DrawerItem(
             color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = (16.dp * drawerScale)),
         )
     }
 }
