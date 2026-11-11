@@ -354,7 +354,8 @@ fun ThreadDetailScreen(
             is DetailState.Content -> LazyColumn(
                 Modifier.fillMaxSize(),
                 state = detailListState,
-                contentPadding = PaddingValues(top = topInset + 56.dp, bottom = 148.dp),
+                // v0.4.7：异常系统栏/异形屏兜底，避免顶部出现超大空白
+                contentPadding = PaddingValues(top = topInset.coerceAtMost(96.dp) + 56.dp, bottom = 148.dp),
             ) {
                 item {
                     Text(
@@ -376,6 +377,8 @@ fun ThreadDetailScreen(
                     Row(
                         Modifier
                             .fillMaxWidth()
+                            // v0.4.7：操作行可横向滚动，窄屏不再挤压换行（跳楼竖排/大空白）
+                            .horizontalScroll(androidx.compose.foundation.rememberScrollState())
                             .padding(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically,
