@@ -278,6 +278,11 @@ fun ThreadDetailScreen(
             if (cur != null && cur.ratings == null) {
                 kotlinx.coroutines.delay(400)
                 val r = runCatching { repo.loadRatings(tid) }.getOrNull()
+                // v0.4.7：阅读数（电脑版页面解析）一并回填
+                repo.viewsOf(tid)?.let { views ->
+                    val nowV = (state as? DetailState.Content)?.detail
+                    if (nowV != null) state = DetailState.Content(nowV.copy(views = views))
+                }
                 if (r != null) {
                     val now = (state as? DetailState.Content)?.detail
                     if (now != null) state = DetailState.Content(now.copy(ratings = r))
