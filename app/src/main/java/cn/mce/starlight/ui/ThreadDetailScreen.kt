@@ -134,6 +134,8 @@ fun ThreadDetailScreen(
     var editBusy by remember { mutableStateOf(false) }
     // v0.4.6：收藏分组/备注
     var showFavDialog by remember { mutableStateOf(false) }
+    // v0.4.7：分享面板（复制文案 / 分享卡片 / 分享链接）
+    var showShare by remember { mutableStateOf(false) }
     var favGroup by remember { mutableStateOf("") }
     var favNote by remember { mutableStateOf("") }
     var searchText by remember { mutableStateOf("") }
@@ -389,29 +391,7 @@ fun ThreadDetailScreen(
                                 toast = r.message
                             }
                         }) { Text("收藏") }
-                        TextButton(onClick = {
-                            val url = cn.mce.starlight.data.Net.BASE + "/forum.php?mod=viewthread&tid=" + tid
-                            val author = s.detail.posts.firstOrNull()?.author ?: ""
-                            val board = cn.mce.starlight.data.Boards.all
-                                .firstOrNull { b -> b.fid == s.detail.fid }?.name ?: ""
-                            // v0.4.7：生成分享卡片（标题+作者+版块+二维码），可转发微信/QQ；
-                            // 扫码/点链接：已装 App 可跳转，未安装则由浏览器打开帖子。
-                            val uri = cn.mce.starlight.ui.ShareCard.create(ctx, tid, s.detail.title, author, board)
-                            val send = if (uri != null) {
-                                android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                    type = "image/png"
-                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                                    putExtra(android.content.Intent.EXTRA_TEXT, url)
-                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                            } else {
-                                android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(android.content.Intent.EXTRA_TEXT, url)
-                                }
-                            }
-                            runCatching { ctx.startActivity(android.content.Intent.createChooser(send, "分享帖子")) }
-                        }) { Text("分享") }
+                        TextButton(onClick = { showShare = true }) { Text("分享") }
                         TextButton(onClick = {
                             val cur = cn.mce.starlight.core.PostFavoriteStore.items()
                                 .firstOrNull { it.tid == tid }
@@ -649,6 +629,69 @@ fun ThreadDetailScreen(
                                 }
                                 showFavDialog = false
                                 toast = "已保存收藏分组/备注"
+                            },
+                        )
+                    }
+                    // v0.4.7：分享面板
+                    if (showShare) {
+                        val pageUrl = cn.mce.starlight.data.Net.BASE + "/forum.php?mod=viewthread&tid=" + tid
+                        val cardAuthor = (state as? DetailState.Content)?.detail?.posts?.firstOrNull()?.author ?: ""
+                        val cardBoard = (state as? DetailState.Content)?.detail?.fid?.let { fid ->
+                            cn.mce.starlight.data.Boards.all.firstOrNull { it.fid == fid }?.name
+                        } ?: ""
+                        val shareText = buildString {
+                            append(title)
+                            append("\n作者：").append(cardAuthor)
+                            if (cardBoard.isNotBlank()) append("\n来源：MCE 星光班 · ").append(cardBoard)
+                            append("\n").append(pageUrl)
+                        }
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { showShare = false },
+                            title = { Text("分享帖子") },
+                            text = {
+                                androidx.compose.foundation.layout.Column(
+                                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(shareText, style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(onClick = {
+                                    runCatching {
+                                        val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                                            as android.content.ClipboardManager
+                                        cm.setPrimaryClip(android.content.ClipData.newPlainText("帖子分享", shareText))
+                                    }
+                                    showShare = false
+                                    toast = "分享文案已复制"
+                                }) { Text("复制文案") }
+                            },
+                            dismissButton = {
+                                androidx.compose.foundation.layout.Row {
+                                    androidx.compose.material3.TextButton(onClick = {
+                                        showShare = false
+                                        val uri = cn.mce.starlight.ui.ShareCard.create(ctx, tid, title, cardAuthor, cardBoard)
+                                        val send = if (uri != null) android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                            type = "image/png"
+                                            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        } else android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                        }
+                                        runCatching { ctx.startActivity(android.content.Intent.createChooser(send, "分享帖子")) }
+                                    }) { Text("分享卡片") }
+                                    androidx.compose.material3.TextButton(onClick = {
+                                        showShare = false
+                                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                        }
+                                        runCatching { ctx.startActivity(android.content.Intent.createChooser(send, "分享帖子")) }
+                                    }) { Text("文字分享") }
+                                }
                             },
                         )
                     }
