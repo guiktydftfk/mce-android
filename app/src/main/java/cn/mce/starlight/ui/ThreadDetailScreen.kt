@@ -171,7 +171,9 @@ fun ThreadDetailScreen(
     var smileySets by remember { mutableStateOf(emptyList<SmileyClient.SmileySet>()) }
     var smileySetIndex by remember { mutableIntStateOf(0) }
     // v0.4.2：帖子图片点开看大图
-    var viewerUrl by remember { mutableStateOf<String?>(null) }
+    // v0.4.7：图片查看器支持多图左右滑动
+    var viewerList by remember { mutableStateOf<List<String>>(emptyList()) }
+    var viewerIndex by remember { mutableStateOf(0) }
     var showMention by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -477,7 +479,16 @@ fun ThreadDetailScreen(
                             toast = "正在回复 ${post.author}（${post.floorLabel}）"
                         },
                         onOpenUser = { onOpenUser(post.uid ?: 0, post.author ?: "") },
-                        onImageClick = { url -> viewerUrl = url },
+                        onImageClick = { url ->
+                        val cur = (state as? DetailState.Content)?.detail
+                        val all = cur?.posts.orEmpty()
+                            .flatMap { post -> post.blocks.filterIsInstance<cn.mce.starlight.data.ContentBlock.Image>() }
+                            .map { it.url }
+                            .distinct()
+                        val list = if (all.contains(url)) all else listOf(url)
+                        viewerList = list
+                        viewerIndex = list.indexOf(url).coerceAtLeast(0)
+                    },
                     onLongPress = { actionPost = post },
                         onRate = {
                             scope.launch {
@@ -627,9 +638,9 @@ fun ThreadDetailScreen(
                             },
                         )
                     }
-        viewerUrl?.let { url ->
-            ImageViewerDialog(url = url) { viewerUrl = null }
-        }
+            if (viewerList.isNotEmpty()) {
+                ImageViewerDialog(urls = viewerList, startIndex = viewerIndex) { viewerList = emptyList() }
+            }
 
         // v0.3.10：赞赏（打赏楼主）从顶部按钮移到右下角悬浮按钮，拇指更容易点到
         detail?.let { d ->
