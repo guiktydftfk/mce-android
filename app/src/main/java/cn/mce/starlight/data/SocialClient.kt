@@ -175,26 +175,50 @@ object SocialClient {
             if (first.isEmpty()) continue
             val merged = LinkedHashMap<Int, Friend>()
             first.forEach { merged[it.uid] = it }
-            // 分页：最大页码来自 a[href*=page=]
-            val maxPage = runCatching {
-                val doc = Jsoup.parse(pageHtml, url)
-                doc.select("a[href*=page=]").mapNotNull { a ->
-                    pageRegex.find(a.attr("href"))?.groupValues?.get(1)?.toIntOrNull()
-                }.maxOrNull() ?: 1
-            }.getOrDefault(1)
-            if (maxPage > 1) {
-                for (p in 2..maxPage.coerceAtMost(20)) {
-                    val pageUrl = "$BASE/$path&page=$p"
-                    val html = runCatching { GenericPageClient.get(pageUrl) }.getOrNull() ?: continue
-                    runCatching { parseFriendsHtml(html, pageUrl) }.getOrDefault(emptyList())
-                        .forEach { f -> merged.putIfAbsent(f.uid, f) }
-                }
+            // v0.4.7：touch 模板没有 page= 链接，用「加载更多」按钮
+            // <a class="morelink" href="home.php?mod=space&uid=..&do=friend" data-num="2-1">加载更多</a>
+            // data-num = "下一页-剩余页数"；按它循环抓取，直到没有更多。
+            var guard = 0
+            var curHtml = pageHtml
+            var curUrl = url
+            var lastPage = nextMorePage(curHtml, curUrl)
+            while (lastPage != null && guard < 20) {
+                guard++
+                val href = moreHref(curHtml, curUrl) ?: break
+                val pageUrl = if (href.contains("?")) "$href&page=$lastPage" else "$href?page=$lastPage"
+                val html = runCatching { GenericPageClient.get(pageUrl) }.getOrNull() ?: break
+                val batch = runCatching { parseFriendsHtml(html, pageUrl) }.getOrDefault(emptyList())
+                batch.forEach { f -> merged.putIfAbsent(f.uid, f) }
+                curHtml = html
+                curUrl = pageUrl
+                val next = nextMorePage(curHtml, curUrl)
+                if (next == null || next <= lastPage) break
+                lastPage = next
             }
             // v0.4.1：好友列表不带在线状态 —— 用「在线好友」页判断（不在其中 = 离线）
             val onlineUids = runCatching { loadOnlineFriendUids() }.getOrDefault(emptySet())
             return@withContext merged.values.map { f -> f.copy(online = f.uid in onlineUids) }
         }
         emptyList()
+    }
+
+    /**
+     * v0.4.7：touch 模板好友页的「加载更多」
+     *   <a class="morelink" href="home.php?mod=space&uid=X&do=friend" data-num="2-1">加载更多</a>
+     * data-num = "下一页页码-剩余页数"；返回下一页页码，没有更多返回 null。
+     */
+    private fun nextMorePage(html: String, url: String): Int? {
+        val doc = Jsoup.parse(html, url)
+        val more = doc.selectFirst("a.morelink[data-num]") ?: return null
+        return more.attr("data-num").substringBefore('-').toIntOrNull()
+    }
+
+    /** 「加载更多」链接的绝对地址 */
+    private fun moreHref(html: String, url: String): String? {
+        val doc = Jsoup.parse(html, url)
+        val a = doc.selectFirst("a.morelink[href]") ?: return null
+        val href = a.attr("abs:href").ifBlank { a.attr("href") }
+        return href.takeIf { it.isNotBlank() }
     }
 
     /**
