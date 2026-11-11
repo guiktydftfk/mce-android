@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.core
+package cn.mce.starlight.core
 
 import android.content.Context
 
@@ -18,6 +18,20 @@ object PostFavoriteStore {
     fun items(): List<Item> {
         val raw = ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.getString(KEY, null) ?: return emptyList()
         return decode(CryptoBox.decrypt(raw) ?: return emptyList())
+
+    /** v0.4.7：导出为可复制文本（换机/重装备份用） */
+    fun exportText(): String = encode(items())
+
+    /** v0.4.7：从文本导入并合并（同 tid 覆盖），返回导入条数 */
+    fun importText(text: String): Int {
+        val incoming = decode(text)
+        if (incoming.isEmpty()) return 0
+        val merged = LinkedHashMap<Int, Item>()
+        items().forEach { merged[it.tid] = it }
+        incoming.forEach { merged[it.tid] = it }
+        save(merged.values.toList().take(200))
+        return incoming.size
+    }
     }
 
     /** 添加/更新（同 tid 覆盖分组与备注） */
@@ -50,4 +64,18 @@ object PostFavoriteStore {
         val at = p[4].toLongOrNull() ?: 0L
         Item(tid, p[1], p[2].ifBlank { "默认分组" }, p[3], at)
     }.toList()
+
+    /** v0.4.7：导出为可复制文本（换机/重装备份用） */
+    fun exportText(): String = encode(items())
+
+    /** v0.4.7：从文本导入并合并（同 tid 覆盖），返回导入条数 */
+    fun importText(text: String): Int {
+        val incoming = decode(text)
+        if (incoming.isEmpty()) return 0
+        val merged = LinkedHashMap<Int, Item>()
+        items().forEach { merged[it.tid] = it }
+        incoming.forEach { merged[it.tid] = it }
+        save(merged.values.toList().take(200))
+        return incoming.size
+    }
 }

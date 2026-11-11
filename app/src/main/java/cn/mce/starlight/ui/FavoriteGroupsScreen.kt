@@ -40,6 +40,27 @@ fun FavoriteGroupsScreen(
     var items by remember { mutableStateOf(PostFavoriteStore.items()) }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val grouped = remember(items) { items.groupBy { it.group } }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var msg by remember { mutableStateOf<String?>(null) }
+    // v0.4.7：收藏分组备份 / 恢复（复制到剪贴板 / 从剪贴板导入）
+    Row(Modifier.fillMaxWidth().padding(top = topInset + 8.dp, start = 12.dp, end = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        androidx.compose.material3.TextButton(onClick = {
+            runCatching {
+                val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("收藏分组", cn.mce.starlight.core.PostFavoriteStore.exportText()))
+            }
+            msg = "已复制收藏分组备份"
+        }) { Text("导出备份") }
+        androidx.compose.material3.TextButton(onClick = {
+            val text = runCatching {
+                val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                cm.primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString()
+            }.getOrNull().orEmpty()
+            val n = cn.mce.starlight.core.PostFavoriteStore.importText(text)
+            items = cn.mce.starlight.core.PostFavoriteStore.items()
+            msg = if (n > 0) "已导入 $n 条收藏分组" else "剪贴板里没有有效备份"
+        }) { Text("导入备份") }
+    }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
