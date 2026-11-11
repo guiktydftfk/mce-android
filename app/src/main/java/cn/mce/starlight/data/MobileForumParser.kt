@@ -33,7 +33,7 @@ object MobileForumParser {
     private fun decodeEntities(s: String?): String? = s?.let { cn.mce.starlight.core.HtmlText.decode(it) }
 
     fun parse(html: String, baseUrl: String, page: Int): ForumPage =
-        parse(Jsoup.parse(html, baseUrl), page)
+        parse(Jsoup.parse(html.replace("&amp;#", "&#"), baseUrl), page)
 
     /** 复用已解析的 [doc]（避免同一份 HTML 解析两遍） */
     fun parse(doc: Document, page: Int): ForumPage {

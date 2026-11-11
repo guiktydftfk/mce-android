@@ -42,7 +42,7 @@ object ThreadDetailParser {
     )
 
     fun parse(html: String, baseUrl: String, tid: Int, page: Int): ThreadDetail {
-        val doc = Jsoup.parse(html, baseUrl)
+        val doc = Jsoup.parse(html.replace("&amp;#", "&#"), baseUrl)
 
         // v0.3.7：移动模板里 <h1> 是版块名（如"综合交流"），真题面在 div.thname/#myshares 的链接里
         val title = decodeEntities(doc.selectFirst("div.thname a")?.text()?.trim())

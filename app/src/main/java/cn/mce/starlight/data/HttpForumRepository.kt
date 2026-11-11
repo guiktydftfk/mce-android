@@ -183,6 +183,16 @@ class HttpForumRepository(
         if (GenericPageClient.isLoginPage(html)) {
             throw IOException("\u9700\u8981\u767b\u5f55\uff0c\u8bf7\u5148\u767b\u5f55\u540e\u518d\u8bd5")
         }
-        return html
+        // v0.4.7：站点部分标题存在 &amp;#129402; 之类多重转义（列表/详情都见过），
+        // 在交给 Jsoup 前先把 &amp; 循环还原，让数字实体能被正常解码成 emoji。
+        var out = html
+        if (out.contains("&amp;#")) {
+            repeat(3) {
+                val next = out.replace("&amp;", "&")
+                if (next == out) return@repeat
+                out = next
+            }
+        }
+        return out
     }
 }
