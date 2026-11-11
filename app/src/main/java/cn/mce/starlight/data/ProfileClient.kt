@@ -44,6 +44,35 @@ object ProfileClient {
     /** v0.4.1：积分明细字段顺序（网页端资料页 ul.user_box 里刚好是这些） */
     private val CREDIT_LABELS = listOf("社区值", "赞赏值", "职务值", "活动值", "实践值", "已使用")
 
+    /**
+     * v0.4.7：多数据源取「精确积分」。
+     * 手机版资料页会把大额积分四舍五入成「1.4万」，这里依次尝试：
+     * 电脑版资料页 → 积分明细页（电脑）→ 积分明细页（手机），
+     * 每个页面取「积分」后面最大的合法数字（规避页面里其它小数字）。
+     */
+    private suspend fun exactPoints(): Int? = withContext(Dispatchers.IO) {
+        val candidates = listOf(
+            "home.php?mod=space&do=profile&mobile=no" to true,
+            "home.php?mod=spacecp&ac=credit&mobile=no" to true,
+            "home.php?mod=spacecp&ac=credit" to false,
+        )
+        for ((path, desktop) in candidates) {
+            val html = runCatching {
+                GenericPageClient.get(
+                    Net.absolutize(path),
+                    userAgent = if (desktop) Net.DESKTOP_UA else null,
+                    isolateCookies = true,
+                )
+            }.getOrNull() ?: continue
+            val value = Regex("""积分[^\d]{0,12}([\d,]{2,})""").findAll(html)
+                .mapNotNull { it.groupValues[1].replace(",", "").toIntOrNull() }
+                .filter { it > 0 }
+                .maxOrNull()
+            if (value != null) return@withContext value
+        }
+        null
+    }
+
     suspend fun load(): Profile? = withContext(Dispatchers.IO) {
         runCatching {
             val html = GenericPageClient.get(URL)
@@ -64,20 +93,11 @@ object ProfileClient {
             val labels = listOf("主题", "回帖", "积分", "好友", "威望")
             // v0.4.7：先结构化解析（避免整页正则误命中「积分 1」），取不到再退回整页正则
             var stats = ProfileCommon.statsFromDoc(doc, labels).ifEmpty { ProfileCommon.stats(text, labels) }
-            // v0.4.7：手机版大额积分会显示成「1.4万」这类近似值（我们换算后是 14000，
-            // 与网页真实 13661 不一致）。检测到万/千单位时补抓电脑版资料页取精确数字。
-            if (Regex("""积分\s*[:：]?\s*[\d.,]+\s*[万千]""").containsMatchIn(text)) {
-                val exact = runCatching {
-                    val deskHtml = GenericPageClient.get(
-                        Net.absolutize("home.php?mod=space&do=profile&mobile=no"),
-                        userAgent = Net.DESKTOP_UA,
-                        isolateCookies = true,
-                    )
-                    Regex("""积分\s*[:：]?\s*([\d,]{2,})""").findAll(deskHtml)
-                        .mapNotNull { it.groupValues[1].replace(",", "").toIntOrNull() }
-                        .maxOrNull()
-                }.getOrNull()
-                if (exact != null) stats = stats + ("积分" to exact.toString())
+            // v0.4.7：手机版大额积分显示为「1.4万」这类近似值（换算成 14000，与真实 13661 不符）。
+            // 只要页面上出现近似单位或积分缺失，就用多数据源取精确值：电脑版资料页 → 积分明细页（电脑/手机）。
+            val approximated = Regex("""积分\s*[:：]?\s*[\d.,]+\s*[万千]""").containsMatchIn(text)
+            if (approximated || stats["积分"] == null) {
+                exactPoints()?.let { stats = stats + ("积分" to it.toString()) }
             }
             val fields = ProfileCommon.fieldsFromBox(doc, text, FIELD_LABELS)
             // v0.4.1：积分明细（社区值/赞赏值/…）也在 ul.user_box 里
