@@ -29,6 +29,12 @@ object MobileForumParser {
     private val whitespaceRegex = Regex("""\s+""")
     private val pageRegex = Regex("""page=(\d+)""")
 
+    /** v0.4.7：站点偶发双重转义（&amp;#129402; → 文本里留下 &#129402;），这里再解一次实体 */
+    private fun decodeEntities(s: String?): String? {
+        if (s == null || !s.contains('&')) return s
+        return runCatching { org.jsoup.parser.Parser.unescapeEntities(s, false) }.getOrDefault(s)
+    }
+
     fun parse(html: String, baseUrl: String, page: Int): ForumPage =
         parse(Jsoup.parse(html, baseUrl), page)
 
@@ -58,7 +64,7 @@ object MobileForumParser {
         val href = link.attr("href")
         val tid = tidRegex.find(href)?.groupValues?.get(1)?.toIntOrNull() ?: return null
 
-        val title = (link.selectFirst("h1") ?: link.selectFirst("h2") ?: link).text().trim()
+        val title = decodeEntities((link.selectFirst("h1") ?: link.selectFirst("h2") ?: link).text().trim()) ?: ""
         if (title.isBlank()) return null
 
         val meta = li.selectFirst("span.y")?.text()?.replace(whitespaceRegex, " ")?.trim()
@@ -70,14 +76,14 @@ object MobileForumParser {
         return ThreadSummary(
             id = tid,
             title = title.trim(),
-            author = li.selectFirst("span.th_author")?.text()?.trim()?.takeIf { it.isNotBlank() },
+            author = decodeEntities(li.selectFirst("span.th_author")?.text()?.trim())?.takeIf { it.isNotBlank() },
             avatarUrl = avatar,
             replies = repliesOf(meta),
             views = meta?.let { viewsRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() },
             metaText = meta,
-            typeLabel = li.selectFirst("span.threadtypes")?.text()?.trim()?.takeIf { it.isNotBlank() },
-            summary = li.selectFirst("a.th_item p")?.text()?.trim()?.takeIf { it.isNotBlank() },
-            forumName = li.selectFirst("a[href*=forumdisplay]")?.text()?.trim()?.takeIf { it.isNotBlank() },
+            typeLabel = decodeEntities(li.selectFirst("span.threadtypes")?.text()?.trim())?.takeIf { it.isNotBlank() },
+            summary = decodeEntities(li.selectFirst("a.th_item p")?.text()?.trim())?.takeIf { it.isNotBlank() },
+            forumName = decodeEntities(li.selectFirst("a[href*=forumdisplay]")?.text()?.trim())?.takeIf { it.isNotBlank() },
         )
     }
 

@@ -18,6 +18,12 @@ import org.jsoup.nodes.TextNode
  *  - smilies / none.gif / filetype icons are not content images
  */
 object ThreadDetailParser {
+    /** v0.4.7：标题等文本二次解码 HTML 实体（站点点偶发双重转义） */
+    private fun decodeEntities(s: String?): String? {
+        if (s == null || !s.contains('&')) return s
+        return runCatching { org.jsoup.parser.Parser.unescapeEntities(s, false) }.getOrDefault(s)
+    }
+
 
     private val pidRegex = Regex("""pid(\d+)""")
     private val imageExtRegex = Regex("""\.(jpe?g|png|gif|webp|bmp)(\?|$)""", RegexOption.IGNORE_CASE)
@@ -42,11 +48,11 @@ object ThreadDetailParser {
         val doc = Jsoup.parse(html, baseUrl)
 
         // v0.3.7：移动模板里 <h1> 是版块名（如"综合交流"），真题面在 div.thname/#myshares 的链接里
-        val title = doc.selectFirst("div.thname a")?.text()?.trim()
+        val title = decodeEntities(doc.selectFirst("div.thname a")?.text()?.trim())
             ?.takeIf { it.isNotBlank() }
             ?: doc.selectFirst("#myshares a")?.text()?.trim()?.takeIf { it.isNotBlank() }
             ?: doc.title().substringBefore(" - ").trim().takeIf { it.isNotBlank() }
-            ?: doc.selectFirst("h1")?.text()?.trim()
+            ?: decodeEntities(doc.selectFirst("h1")?.text()?.trim())
             ?: ""
 
         val blocks = blockSelectors
