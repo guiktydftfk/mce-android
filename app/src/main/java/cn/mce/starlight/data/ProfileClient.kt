@@ -63,7 +63,22 @@ object ProfileClient {
             val level = ProfileCommon.level(doc, text)
             val labels = listOf("主题", "回帖", "积分", "好友", "威望")
             // v0.4.7：先结构化解析（避免整页正则误命中「积分 1」），取不到再退回整页正则
-            val stats = ProfileCommon.statsFromDoc(doc, labels).ifEmpty { ProfileCommon.stats(text, labels) }
+            var stats = ProfileCommon.statsFromDoc(doc, labels).ifEmpty { ProfileCommon.stats(text, labels) }
+            // v0.4.7：手机版大额积分会显示成「1.4万」这类近似值（我们换算后是 14000，
+            // 与网页真实 13661 不一致）。检测到万/千单位时补抓电脑版资料页取精确数字。
+            if (Regex("""积分\s*[:：]?\s*[\d.,]+\s*[万千]""").containsMatchIn(text)) {
+                val exact = runCatching {
+                    val deskHtml = GenericPageClient.get(
+                        Net.absolutize("home.php?mod=space&do=profile&mobile=no"),
+                        userAgent = Net.DESKTOP_UA,
+                        isolateCookies = true,
+                    )
+                    Regex("""积分\s*[:：]?\s*([\d,]{2,})""").findAll(deskHtml)
+                        .mapNotNull { it.groupValues[1].replace(",", "").toIntOrNull() }
+                        .maxOrNull()
+                }.getOrNull()
+                if (exact != null) stats = stats + ("积分" to exact.toString())
+            }
             val fields = ProfileCommon.fieldsFromBox(doc, text, FIELD_LABELS)
             // v0.4.1：积分明细（社区值/赞赏值/…）也在 ul.user_box 里
             val creditBox = ProfileCommon.boxKv(doc)
