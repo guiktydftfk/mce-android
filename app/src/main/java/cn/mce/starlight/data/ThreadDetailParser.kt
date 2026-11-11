@@ -18,11 +18,8 @@ import org.jsoup.nodes.TextNode
  *  - smilies / none.gif / filetype icons are not content images
  */
 object ThreadDetailParser {
-    /** v0.4.7：标题等文本二次解码 HTML 实体（站点点偶发双重转义） */
-    private fun decodeEntities(s: String?): String? {
-        if (s == null || !s.contains('&')) return s
-        return runCatching { org.jsoup.parser.Parser.unescapeEntities(s, false) }.getOrDefault(s)
-    }
+    /** v0.4.7：二次解码 HTML 实体（委托 HtmlText） */
+    private fun decodeEntities(s: String?): String? = s?.let { cn.mce.starlight.core.HtmlText.decode(it) }
 
 
     private val pidRegex = Regex("""pid(\d+)""")

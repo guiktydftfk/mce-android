@@ -29,11 +29,8 @@ object MobileForumParser {
     private val whitespaceRegex = Regex("""\s+""")
     private val pageRegex = Regex("""page=(\d+)""")
 
-    /** v0.4.7：站点偶发双重转义（&amp;#129402; → 文本里留下 &#129402;），这里再解一次实体 */
-    private fun decodeEntities(s: String?): String? {
-        if (s == null || !s.contains('&')) return s
-        return runCatching { org.jsoup.parser.Parser.unescapeEntities(s, false) }.getOrDefault(s)
-    }
+    /** v0.4.7：二次解码 HTML 实体（委托 HtmlText，自带数字实体解码） */
+    private fun decodeEntities(s: String?): String? = s?.let { cn.mce.starlight.core.HtmlText.decode(it) }
 
     fun parse(html: String, baseUrl: String, page: Int): ForumPage =
         parse(Jsoup.parse(html, baseUrl), page)
