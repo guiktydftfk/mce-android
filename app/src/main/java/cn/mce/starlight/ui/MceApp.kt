@@ -489,7 +489,8 @@ fun MceApp() {
             Box(
                 Modifier
                     .fillMaxHeight()
-                    .widthIn(max = 340.dp),
+                    // v0.4.7：侧边栏最多占屏幕一半（小屏自动收窄，宽屏最多 340dp），不影响栏目名完整显示
+                    .widthIn(max = minOf(340.dp, (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.5f).dp)),
             ) {
                 ModalDrawerSheet(
                     modifier = Modifier.fillMaxSize(),
