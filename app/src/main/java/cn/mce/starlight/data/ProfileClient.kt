@@ -61,7 +61,9 @@ object ProfileClient {
             // v0.4.1：记录管理身份，帖子页据此判断是否补抓电脑版管理条
             cn.mce.starlight.core.SessionStore.updateStaff(staff)
             val level = ProfileCommon.level(doc, text)
-            val stats = ProfileCommon.stats(text, listOf("主题", "回帖", "积分", "好友", "威望"))
+            val labels = listOf("主题", "回帖", "积分", "好友", "威望")
+            // v0.4.7：先结构化解析（避免整页正则误命中「积分 1」），取不到再退回整页正则
+            val stats = ProfileCommon.statsFromDoc(doc, labels).ifEmpty { ProfileCommon.stats(text, labels) }
             val fields = ProfileCommon.fieldsFromBox(doc, text, FIELD_LABELS)
             // v0.4.1：积分明细（社区值/赞赏值/…）也在 ul.user_box 里
             val creditBox = ProfileCommon.boxKv(doc)

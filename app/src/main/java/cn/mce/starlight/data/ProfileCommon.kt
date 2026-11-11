@@ -131,4 +131,41 @@ object ProfileCommon {
         }
         return result
     }
+
+    /**
+     * v0.4.7：结构化解析统计数字（主题/回帖/积分…）。
+     * 旧实现用整页正则找「积分 数字」，页面上任意一处「积分 1」都会被先命中
+     * （用户反馈：网页 13661，App 显示 1）。现在只认「元素文本以标签开头」的节点，
+     * 并支持 1.3万 / 1,234 这类格式。
+     */
+    fun statsFromDoc(doc: org.jsoup.nodes.Document, labels: List<String>): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        val els = doc.select("li, span, em, p, b, dd, a, td")
+        labels.forEach { label ->
+            // 收集所有「标签+数字」候选，取最大（真实统计值通常最大；避免被页面里
+            // 其它「积分 1」之类的小数字先命中）
+            val values = els.asSequence()
+                .map { it.text().trim() }
+                .filter { it.startsWith(label) && it.length <= label.length + 24 }
+                .mapNotNull { numberAfterLabel(it, label) }
+                .toList()
+            values.maxByOrNull { it.toLongOrNull() ?: -1L }?.let { out[label] = it }
+        }
+        return out
+    }
+
+    /** 从「积分 13661」这类文本里取数字（支持千分位与 万/千 单位） */
+    fun numberAfterLabel(text: String, label: String): String? {
+        if (!text.startsWith(label)) return null
+        val rest = text.substring(label.length).trim().trimStart(':', '：', ' ')
+        if (rest.isEmpty()) return null
+        val m = Regex("""^([\d,]+(?:\.\d+)?)\s*([万千wWkK]?)""").find(rest) ?: return null
+        val num = m.groupValues[1].replace(",", "").toDoubleOrNull() ?: return null
+        val mult = when (m.groupValues[2]) {
+            "万", "w", "W" -> 10000.0
+            "千", "k", "K" -> 1000.0
+            else -> 1.0
+        }
+        return (num * mult).toLong().toString()
+    }
 }
