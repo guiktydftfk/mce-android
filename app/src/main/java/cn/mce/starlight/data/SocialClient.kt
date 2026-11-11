@@ -11,6 +11,8 @@ object SocialClient {
     private const val BASE = Net.BASE
 
     private val uidRegex = Regex("""uid=(\d+)""")
+    /** v0.4.7：好友列表分页 */
+    private val pageRegex = Regex("""page=(\d+)""")
 
     /** v0.4.1：勋章墙 —— 补全未解锁勋章 + 进度文案 */
     data class Medal(
@@ -153,7 +155,11 @@ object SocialClient {
         return emptyList()
     }
 
-    /** 好友列表：多入口兜底（不同模板路径不同） */
+    /**
+     * 好友列表：多入口兜底（不同模板路径不同）。
+     * v0.4.7：修复「好友显示不全」—— 旧实现只取第 1 页（touch 模板一页约 20 人），
+     * 现在按分页链接继续抓取后续页并合并去重（最多 20 页兜底防死循环）。
+     */
     suspend fun loadFriends(): List<Friend> = withContext(Dispatchers.IO) {
         val candidates = listOf(
             "home.php?mod=space&do=friend&view=me",
@@ -165,12 +171,28 @@ object SocialClient {
             val url = "$BASE/$path"
             val pageHtml = runCatching { GenericPageClient.get(url) }.getOrNull() ?: continue
             cn.mce.starlight.core.DebugDump.dump("friends_mobile", pageHtml)
-            val list = runCatching { parseFriendsHtml(pageHtml, url) }.getOrDefault(emptyList())
-            if (list.isNotEmpty()) {
-                // v0.4.1：好友列表不带在线状态 —— 用「在线好友」页判断（不在其中 = 离线）
-                val onlineUids = runCatching { loadOnlineFriendUids() }.getOrDefault(emptySet())
-                return@withContext list.map { f -> f.copy(online = f.uid in onlineUids) }
+            val first = runCatching { parseFriendsHtml(pageHtml, url) }.getOrDefault(emptyList())
+            if (first.isEmpty()) continue
+            val merged = LinkedHashMap<Int, Friend>()
+            first.forEach { merged[it.uid] = it }
+            // 分页：最大页码来自 a[href*=page=]
+            val maxPage = runCatching {
+                val doc = Jsoup.parse(pageHtml, url)
+                doc.select("a[href*=page=]").mapNotNull { a ->
+                    pageRegex.find(a.attr("href"))?.groupValues?.get(1)?.toIntOrNull()
+                }.maxOrNull() ?: 1
+            }.getOrDefault(1)
+            if (maxPage > 1) {
+                for (p in 2..maxPage.coerceAtMost(20)) {
+                    val pageUrl = "$BASE/$path&page=$p"
+                    val html = runCatching { GenericPageClient.get(pageUrl) }.getOrNull() ?: continue
+                    runCatching { parseFriendsHtml(html, pageUrl) }.getOrDefault(emptyList())
+                        .forEach { f -> merged.putIfAbsent(f.uid, f) }
+                }
             }
+            // v0.4.1：好友列表不带在线状态 —— 用「在线好友」页判断（不在其中 = 离线）
+            val onlineUids = runCatching { loadOnlineFriendUids() }.getOrDefault(emptySet())
+            return@withContext merged.values.map { f -> f.copy(online = f.uid in onlineUids) }
         }
         emptyList()
     }
