@@ -13,7 +13,7 @@ object HtmlText {
 
     fun decode(text: String?): String {
         if (text.isNullOrEmpty() || !text.contains('&')) return text.orEmpty()
-        var out = text
+        var out: String = text
         // 最多两轮：兼容 &amp;#129402; 这类双重转义
         repeat(2) {
             val next = unescape(out)
