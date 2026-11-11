@@ -1115,8 +1115,9 @@ private fun DrawerItem(
             text = label,
             // 与旧版 NavigationDrawerItem 一致：labelLarge + 左侧 16dp 内边距 + 垂直居中
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            // v0.4.7：菜单文字整体加粗（未选中 SemiBold）更醒目
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(horizontal = 16.dp),
