@@ -71,6 +71,8 @@ fun HomeFeedScreen(
     val cacheKey = "guide_$view"
     // v0.4.3：首屏的非关键后台任务（全板块预热）用独立 scope，不阻塞列表加载
     val bgScope = androidx.compose.runtime.rememberCoroutineScope()
+    // v0.4.7：后台阅读数到达后递增，触发列表局部刷新
+    var viewsTick by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     // v0.4.1：缓存由 Application 后台预热；未就绪时先走网络加载，不在主线程解析 JSON
     val cached = remember(view, reloadKey) {
         if (cn.mce.starlight.core.FeedCache.isReady()) {
@@ -91,7 +93,10 @@ fun HomeFeedScreen(
                 cn.mce.starlight.core.ThreadViewsCache.markFetching(fid)
                 bgScope.launch {
                     val views = runCatching { cn.mce.starlight.data.ThreadViewsClient.load(fid, 1) }.getOrDefault(emptyMap())
-                    if (views.isNotEmpty()) cn.mce.starlight.core.ThreadViewsCache.putAll(views)
+                    if (views.isNotEmpty()) {
+                        cn.mce.starlight.core.ThreadViewsCache.putAll(views)
+                        viewsTick++
+                    }
                 }
             }
         return merged
@@ -101,6 +106,7 @@ fun HomeFeedScreen(
             // 过滤阈值变化时也重建列表（resetKey 变化 → 重新加载第 1 页）
             resetKey = Triple(view, reloadKey, SettingsStore.feedMinChars),
             scrollToTopKey = scrollToTopKey,
+            viewPatchTick = viewsTick,
             externalListState = listState,
             topPadding = topInset + 104.dp,
             horizontalPadding = 12.dp,

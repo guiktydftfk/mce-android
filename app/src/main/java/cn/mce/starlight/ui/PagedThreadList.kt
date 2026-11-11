@@ -102,6 +102,8 @@ fun PagedThreadList(
     externalListState: androidx.compose.foundation.lazy.LazyListState? = null,
     /** v0.4.3：滚动位置按 key 缓存，返回上一页时恢复位置 */
     listStateKey: String? = null,
+    /** v0.4.7：变化时把缓存里的阅读数合并进当前列表（不重新加载） */
+    viewPatchTick: Int = 0,
 ) {
     val scope = rememberCoroutineScope()
     val st = remember(resetKey) {
@@ -111,6 +113,13 @@ fun PagedThreadList(
         )
     }
     val ownListState = remember(resetKey) { LazyListState() }
+
+    // v0.4.7：后台阅读数到达 → 局部刷新卡片
+    LaunchedEffect(viewPatchTick) {
+        if (viewPatchTick == 0) return@LaunchedEffect
+        val patched = cn.mce.starlight.core.ThreadViewsCache.attach(st.items)
+        if (patched != st.items) st.items = patched
+    }
     // v0.4.1：外部状态优先——返回首页时保留滚动位置
     val listState = externalListState
         ?: listStateKey?.let { cn.mce.starlight.core.ListStateCache.get(it) }
