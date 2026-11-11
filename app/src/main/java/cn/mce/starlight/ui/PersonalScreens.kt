@@ -136,7 +136,6 @@ fun MyRepliesScreen(
             .onFailure { state = PState.Error(it.message ?: "加载失败") }
     }
     LaunchedEffect(Unit) { load() }
-
     Box(Modifier.fillMaxSize()) {
         when (val s = state) {
             is PState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
@@ -210,7 +209,20 @@ fun FavoritesScreen(
             .onSuccess { state = PState.Content(it) }
             .onFailure { state = PState.Error(it.message ?: "加载失败") }
     }
-    LaunchedEffect(Unit) { load() }
+        LaunchedEffect(Unit) {
+            load()
+            // v0.4.7：收藏列表打开后，后台缓存前几个帖子正文（断网可读）
+            val items = (state as? PState.Content)?.items.orEmpty().take(6)
+            val repo = cn.mce.starlight.data.HttpForumRepository()
+            items.forEach { item ->
+                runCatching {
+                    repo.cacheThreadHtml(
+                        item.tid, 1,
+                        cn.mce.starlight.data.Net.BASE + "/forum.php?mod=viewthread&tid=" + item.tid,
+                    )
+                }
+            }
+        }
 
     Box(Modifier.fillMaxSize()) {
         when (val s = state) {
@@ -235,6 +247,19 @@ fun FavoritesScreen(
                                 color = MaterialTheme.colorScheme.primary)
                         }
                     }
+                        // v0.4.7：叠加本地收藏分组/备注
+                        cn.mce.starlight.core.PostFavoriteStore.items()
+                            .firstOrNull { it.tid == item.tid }
+                            ?.let { fav ->
+                                val tag = "★ " + fav.group + if (fav.note.isNotBlank()) (" · " + fav.note) else ""
+                                Text(
+                                    tag,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                     HorizontalDivider()
                 }
             }

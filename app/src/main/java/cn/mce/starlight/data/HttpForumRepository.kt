@@ -78,6 +78,9 @@ class HttpForumRepository(
     }
 
     /** v0.4.5：抓帖子页；网络失败时用磁盘缓存兜底（离线可读） */
+    /** v0.4.7：供收藏等场景预热正文缓存（公开包装） */
+    suspend fun cacheThreadHtml(tid: Int, page: Int, url: String): String = fetchThreadHtml(tid, page, url)
+
     private suspend fun fetchThreadHtml(tid: Int, page: Int, url: String): String =
         runCatching { fetch(url).also { cn.mce.starlight.core.ThreadHtmlCache.put(tid, page, it) } }
             .getOrElse { e ->

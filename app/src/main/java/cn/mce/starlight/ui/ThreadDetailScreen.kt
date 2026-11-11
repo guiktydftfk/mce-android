@@ -613,6 +613,15 @@ fun ThreadDetailScreen(
                                 favGroup = group
                                 favNote = note
                                 cn.mce.starlight.core.PostFavoriteStore.put(tid, title, group, note)
+                                // v0.4.7：收藏即缓存正文，断网可读
+                                scope.launch {
+                                    runCatching {
+                                        repo.cacheThreadHtml(
+                                            tid, 1,
+                                            cn.mce.starlight.data.Net.BASE + "/forum.php?mod=viewthread&tid=" + tid,
+                                        )
+                                    }
+                                }
                                 showFavDialog = false
                                 toast = "已保存收藏分组/备注"
                             },
