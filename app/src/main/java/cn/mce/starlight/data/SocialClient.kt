@@ -195,6 +195,17 @@ object SocialClient {
                 if (next == null || next <= lastPage) break
                 lastPage = next
             }
+            // v0.4.7：部分设备/模板「加载更多」不生效 —— 再用 view=me&page=N 直接翻页兜底
+            var fp = 2
+            while (fp <= 8) {
+                val fbUrl = "$BASE/home.php?mod=space&do=friend&view=me&page=$fp"
+                val fbHtml = runCatching { GenericPageClient.get(fbUrl) }.getOrNull() ?: break
+                val batch = runCatching { parseFriendsHtml(fbHtml, fbUrl) }.getOrDefault(emptyList())
+                val before = merged.size
+                batch.forEach { f -> merged.putIfAbsent(f.uid, f) }
+                if (merged.size == before) break
+                fp++
+            }
             // v0.4.1：好友列表不带在线状态 —— 用「在线好友」页判断（不在其中 = 离线）
             val onlineUids = runCatching { loadOnlineFriendUids() }.getOrDefault(emptySet())
             return@withContext merged.values.map { f -> f.copy(online = f.uid in onlineUids) }

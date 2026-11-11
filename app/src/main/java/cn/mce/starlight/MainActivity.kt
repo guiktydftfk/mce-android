@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        cn.mce.starlight.core.DiagStats.markLaunchStart()
         // v0.4.5：点通知直达私信会话
         runCatching {
             val touid = intent?.getIntExtra("mce_open_pm", 0) ?: 0

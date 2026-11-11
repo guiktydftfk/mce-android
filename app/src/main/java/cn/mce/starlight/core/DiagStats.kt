@@ -24,6 +24,21 @@ object DiagStats {
         startup.clear()
     }
 
+    private var launchStartedAt = 0L
+    private var firstFrameRecorded = false
+
+    /** v0.4.7：每次 Activity 启动时调用；首帧耗时按本次启动计时，避免进程复用导致的 96s/204s 假数据 */
+    fun markLaunchStart() {
+        launchStartedAt = System.currentTimeMillis()
+        firstFrameRecorded = false
+    }
+
+    fun recordFirstFrameIfNeeded() {
+        if (firstFrameRecorded || launchStartedAt <= 0L) return
+        firstFrameRecorded = true
+        val ms = (System.currentTimeMillis() - launchStartedAt).coerceIn(0L, 60000L)
+        recordStartup("首帧", ms)
+    }
     /** 距进程启动的毫秒数（首帧/启动阶段计时用） */
     fun processElapsedMs(): Long = System.currentTimeMillis() - processStartAt
 

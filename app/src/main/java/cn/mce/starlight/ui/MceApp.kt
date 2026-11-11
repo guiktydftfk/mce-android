@@ -206,7 +206,7 @@ fun MceApp() {
 
     val context = LocalContext.current
     var lastBackAt by remember { mutableLongStateOf(0L) }
-    androidx.compose.runtime.SideEffect { cn.mce.starlight.core.DiagStats.recordStartup("首帧", cn.mce.starlight.core.DiagStats.processElapsedMs()) }
+    androidx.compose.runtime.SideEffect { cn.mce.starlight.core.DiagStats.recordFirstFrameIfNeeded() }
     // v0.4.1：启动后台检查到更新时延后弹窗；以及本次启动进入首页的次数
     var deferredUpdate by remember { mutableStateOf<UpdateClient.Release?>(null) }
     var feedEnterCount by remember { mutableIntStateOf(0) }
