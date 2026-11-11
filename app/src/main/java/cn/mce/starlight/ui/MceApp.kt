@@ -320,6 +320,11 @@ fun MceApp() {
         // → ③ 签到提醒（未开启则跳过）→ ④ 消息刷新 → ⑤ 后台检查更新（弹窗延后）
         val probeStart = System.currentTimeMillis()
         // v0.4.5：从通知进入 → 直接打开对应私信会话
+        // v0.4.7：分享链接进入 → 直接打开对应帖子
+        if (cn.mce.starlight.core.PendingNav.threadTid > 0) {
+            stack = listOf(Route.Thread(cn.mce.starlight.core.PendingNav.threadTid, "帖子"))
+            cn.mce.starlight.core.PendingNav.threadTid = 0
+        }
         if (cn.mce.starlight.core.PendingNav.pmTouid > 0) {
             stack = listOf(Route.Pm(cn.mce.starlight.core.PendingNav.pmTouid, "私信"))
             dest = Dest.Feed

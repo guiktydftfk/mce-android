@@ -45,6 +45,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- v0.4.7：分享卡片/网页链接可打开对应帖子；未安装时由系统浏览器处理 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="mce.msi.cn" android:pathPrefix="/forum.php" />
+            </intent-filter>
         </activity>
         <provider
             android:name="androidx.core.content.FileProvider"

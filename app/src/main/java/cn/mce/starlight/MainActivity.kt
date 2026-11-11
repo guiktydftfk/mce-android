@@ -35,6 +35,15 @@ class MainActivity : ComponentActivity() {
                 cn.mce.starlight.core.PendingNav.pmTouid = touid
                 intent?.removeExtra("mce_open_pm")
             }
+            // v0.4.7：从分享卡片/网页链接触发的 VIEW intent → 打开对应帖子
+            intent?.data?.let { uri ->
+                if (uri.host == "mce.msi.cn") {
+                    Regex("""tid=(\d+)""").find(uri.toString())?.groupValues?.get(1)
+                        ?.toIntOrNull()?.let { tid ->
+                            if (tid > 0) cn.mce.starlight.core.PendingNav.threadTid = tid
+                        }
+                }
+            }
         }
         // v0.4.4：Android 13+ 申请通知权限（用于未读私信提醒）
         if (android.os.Build.VERSION.SDK_INT >= 33 &&

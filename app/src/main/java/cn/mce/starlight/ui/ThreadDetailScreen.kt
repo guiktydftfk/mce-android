@@ -390,16 +390,27 @@ fun ThreadDetailScreen(
                             }
                         }) { Text("收藏") }
                         TextButton(onClick = {
-                            val text = "${cn.mce.starlight.data.Net.BASE}/forum.php?mod=viewthread&tid=$tid"
-                            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(android.content.Intent.EXTRA_TEXT, text)
+                            val url = cn.mce.starlight.data.Net.BASE + "/forum.php?mod=viewthread&tid=" + tid
+                            val author = s.detail.posts.firstOrNull()?.author ?: ""
+                            val board = cn.mce.starlight.data.Boards.all
+                                .firstOrNull { b -> b.fid == s.detail.fid }?.name ?: ""
+                            // v0.4.7：生成分享卡片（标题+作者+版块+二维码），可转发微信/QQ；
+                            // 扫码/点链接：已装 App 可跳转，未安装则由浏览器打开帖子。
+                            val uri = cn.mce.starlight.ui.ShareCard.create(ctx, tid, s.detail.title, author, board)
+                            val send = if (uri != null) {
+                                android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "image/png"
+                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                    putExtra(android.content.Intent.EXTRA_TEXT, url)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                            } else {
+                                android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(android.content.Intent.EXTRA_TEXT, url)
+                                }
                             }
-                            runCatching {
-                                ctx.startActivity(
-                                    android.content.Intent.createChooser(send, "分享帖子"),
-                                )
-                            }
+                            runCatching { ctx.startActivity(android.content.Intent.createChooser(send, "分享帖子")) }
                         }) { Text("分享") }
                         TextButton(onClick = {
                             val cur = cn.mce.starlight.core.PostFavoriteStore.items()
