@@ -112,7 +112,6 @@ class HttpForumRepository(
         }.onFailure { cn.mce.starlight.core.DiagLog.record("thread-desktop", it) }.getOrNull()
             ?: return@withContext null
         // v0.4.7：同一份电脑版页面顺便取阅读数
-        Regex("""查看[:：]?\s*(\d+)""").find(html)?.groupValues?.get(1)?.toIntOrNull()?.let { viewsCache[tid] = it }
 
         val parsed = runCatching { ThreadDetailParser.parseRatingsFromHtml(html, desktopUrl) }
             .onFailure { e -> cn.mce.starlight.core.DiagLog.record("ratings", e) }
