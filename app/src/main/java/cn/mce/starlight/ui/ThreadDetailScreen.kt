@@ -419,7 +419,7 @@ fun ThreadDetailScreen(
                         val floorCount = s.detail.posts.size
                         val replyCount = s.detail.replies ?: (floorCount - 1).coerceAtLeast(0)
                         Text(
-                            "共 $floorCount 楼 · $replyCount 条回复",
+                            "共 $floorCount 楼 · $replyCount 条回复" + (s.detail.views?.let { " · 阅读 $it" } ?: ""),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

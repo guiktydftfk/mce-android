@@ -71,6 +71,8 @@ object ThreadDetailParser {
         return ThreadDetail(
             tid = tid,
             title = title,
+            // v0.4.7：页头「查看 N」→ 阅读数
+            views = Regex("""(?:查看|阅读)[:：]?\s*(\d+)""").find(doc.text())?.groupValues?.get(1)?.toIntOrNull(),
             replies = replies,
             posts = posts,
             page = page,

@@ -93,6 +93,8 @@ data class ThreadDetail(
     /** v0.4.1：网页端管理组可见的管理操作（普通用户为空，界面不显示入口） */
     /** v0.4.2：评分/打赏（电脑版帖子页 dl.rate 区块，手机模板不渲染） */
     val ratings: ThreadRatings? = null,
+    /** v0.4.7：帖子阅读数（页头「查看 N」） */
+    val views: Int? = null,
 )
 
 /** 帖子评分/打赏汇总 */
