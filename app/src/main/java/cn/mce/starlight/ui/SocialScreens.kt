@@ -67,7 +67,7 @@ fun MedalsScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     contentPadding = PaddingValues(
-                        top = topInset + 96.dp, bottom = 110.dp,
+                        top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 96.dp, bottom = 110.dp,
                         start = 12.dp, end = 12.dp,
                     ),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -199,7 +199,7 @@ fun FriendsScreen(
                     Text("还没有好友", style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
-                LazyColumn(contentPadding = PaddingValues(top = topInset + 64.dp, bottom = 110.dp)) {
+                LazyColumn(contentPadding = PaddingValues(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 64.dp, bottom = 110.dp)) {
                     items(list, key = { it.uid }) { friend ->
                         Row(
                             Modifier

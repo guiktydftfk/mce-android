@@ -109,7 +109,7 @@ fun UserThreadsScreen(
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(top = topInset + 60.dp, bottom = 110.dp, start = 10.dp, end = 10.dp),
+            contentPadding = PaddingValues(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 60.dp, bottom = 110.dp, start = 10.dp, end = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             itemsIndexed(items, key = { index, item -> "${item.tid}#$index" }) { _, item ->

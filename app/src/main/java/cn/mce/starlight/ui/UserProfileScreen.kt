@@ -93,7 +93,7 @@ fun UserProfileScreen(
                 LazyColumn(
                     Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        top = topInset + 64.dp, bottom = 120.dp,
+                        top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 64.dp, bottom = 120.dp,
                         start = 16.dp, end = 16.dp,
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),

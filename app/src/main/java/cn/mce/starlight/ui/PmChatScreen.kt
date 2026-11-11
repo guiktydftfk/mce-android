@@ -115,7 +115,7 @@ fun PmChatScreen(
             else -> Column(
                 Modifier
                     .fillMaxSize()
-                    .padding(top = topInset + 56.dp),
+                    .padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 56.dp),
             ) {
                 LazyColumn(
                     state = listState,

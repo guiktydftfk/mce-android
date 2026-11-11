@@ -68,7 +68,7 @@ fun MagicScreen(
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            Spacer(Modifier.height(topInset + 56.dp))
+            Spacer(Modifier.height(topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 56.dp))
             // 分类 chips
             Row(
                 Modifier

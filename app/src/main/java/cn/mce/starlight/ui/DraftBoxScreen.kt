@@ -53,7 +53,7 @@ fun DraftBoxScreen(
         } else {
             LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = topInset + 64.dp, bottom = 110.dp),
+                contentPadding = PaddingValues(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 64.dp, bottom = 110.dp),
             ) {
                 items(drafts, key = { it.id }) { draft ->
                     DraftListItem(

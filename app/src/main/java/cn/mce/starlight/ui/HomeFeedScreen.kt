@@ -108,7 +108,7 @@ fun HomeFeedScreen(
             scrollToTopKey = scrollToTopKey,
             viewPatchTick = viewsTick,
             externalListState = listState,
-            topPadding = topInset + 104.dp,
+            topPadding = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 104.dp,
             horizontalPadding = 12.dp,
             initialItems = cached?.threads.orEmpty(),
             initialHasNext = cached?.hasNext ?: true,
@@ -176,7 +176,7 @@ fun HomeFeedScreen(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(top = topInset + 52.dp, start = 12.dp, end = 12.dp),
+                .padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 52.dp, start = 12.dp, end = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             GUIDE_TABS.forEach { (value, label) ->

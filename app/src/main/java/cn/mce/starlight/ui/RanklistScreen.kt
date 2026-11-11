@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.ui
+package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -91,7 +91,7 @@ fun RanklistScreen(
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .padding(top = topInset + 64.dp),
+                        .padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 64.dp),
                 ) {
                     Row(
                         Modifier

@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.ui
+package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -94,7 +94,7 @@ fun ProfileEditScreen(
                     Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(top = topInset + 70.dp, start = 16.dp, end = 16.dp, bottom = 120.dp),
+                        .padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 70.dp, start = 16.dp, end = 16.dp, bottom = 120.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     val fields = f.sections.flatMap { it.fields }
@@ -206,7 +206,7 @@ fun GenericListScreen(
                     Text("暂无内容", style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
-                LazyColumn(contentPadding = PaddingValues(top = topInset + 64.dp, bottom = 110.dp)) {
+                LazyColumn(contentPadding = PaddingValues(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 64.dp, bottom = 110.dp)) {
                     itemsIndexed(list, key = { index, item -> "${item.url ?: item.title}#$index" }) { _, item ->
                         Row(
                             Modifier

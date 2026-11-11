@@ -346,7 +346,7 @@ fun ThreadDetailScreen(
 
     Box(modifier.fillMaxSize()) {
         when (val s = state) {
-            is DetailState.Loading -> DetailSkeleton(topPadding = topInset + 56.dp)
+            is DetailState.Loading -> DetailSkeleton(topPadding = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 56.dp)
 
             is DetailState.Error -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {

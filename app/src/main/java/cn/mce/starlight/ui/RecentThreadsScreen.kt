@@ -43,7 +43,7 @@ fun RecentThreadsScreen(
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
-            contentPadding = PaddingValues(top = topInset + 60.dp, bottom = 100.dp, start = 10.dp, end = 10.dp),
+            contentPadding = PaddingValues(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 60.dp, bottom = 100.dp, start = 10.dp, end = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (items.isEmpty()) {

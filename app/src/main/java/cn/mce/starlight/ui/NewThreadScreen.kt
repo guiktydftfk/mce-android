@@ -433,7 +433,7 @@ fun NewThreadScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(pageScroll)
-            .padding(top = topInset + 64.dp, start = 14.dp, end = 14.dp),
+            .padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 64.dp, start = 14.dp, end = 14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // 页签：发表帖子 / 发起投票

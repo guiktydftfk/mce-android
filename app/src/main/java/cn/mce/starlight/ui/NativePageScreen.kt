@@ -99,7 +99,7 @@ fun NativePageScreen(
 
             is PageState.Content -> LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = topInset + 56.dp, bottom = 110.dp),
+                contentPadding = PaddingValues(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 56.dp, bottom = 110.dp),
             ) {
                 items(s.page.blocks) { block ->
                     when (block) {

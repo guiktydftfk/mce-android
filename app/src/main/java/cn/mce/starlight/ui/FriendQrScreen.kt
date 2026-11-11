@@ -61,7 +61,7 @@ fun FriendQrScreen(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(top = topInset + 70.dp, start = 24.dp, end = 24.dp, bottom = 40.dp),
+                .padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 70.dp, start = 24.dp, end = 24.dp, bottom = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(

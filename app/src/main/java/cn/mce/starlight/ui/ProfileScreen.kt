@@ -134,7 +134,7 @@ fun ProfileScreen(
             is ProfileState.Error -> Column(
                 Modifier
                     .fillMaxSize()
-                    .padding(top = topInset + 120.dp),
+                    .padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 120.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(s.message, style = MaterialTheme.typography.bodyMedium)
@@ -151,7 +151,7 @@ fun ProfileScreen(
                 LazyColumn(
                     Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        top = topInset + 64.dp,
+                        top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 64.dp,
                         bottom = 120.dp,
                         start = 16.dp,
                         end = 16.dp,

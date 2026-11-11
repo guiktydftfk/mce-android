@@ -157,7 +157,7 @@ fun SigninScreen(
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 state = listState,
-                contentPadding = PaddingValues(top = topInset + 64.dp, bottom = 96.dp),
+                contentPadding = PaddingValues(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 64.dp, bottom = 96.dp),
             ) {
                 // 1. 统计卡
                 item {

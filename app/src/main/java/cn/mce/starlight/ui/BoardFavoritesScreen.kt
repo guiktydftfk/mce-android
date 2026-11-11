@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.ui
+package cn.mce.starlight.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +38,7 @@ fun BoardFavoritesScreen(
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
-            contentPadding = PaddingValues(top = topInset + 60.dp, bottom = 90.dp, start = 10.dp, end = 10.dp),
+            contentPadding = PaddingValues(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 60.dp, bottom = 90.dp, start = 10.dp, end = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (favorites.isEmpty()) {

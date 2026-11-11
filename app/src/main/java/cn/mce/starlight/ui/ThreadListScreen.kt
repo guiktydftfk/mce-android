@@ -85,7 +85,7 @@ fun ThreadListScreen(
     Box(modifier.fillMaxSize()) {
         PagedThreadList(
             resetKey = Triple(title, filter, reloadKey),
-            topPadding = topInset + if (enableFilters) 100.dp else 56.dp,
+            topPadding = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + if (enableFilters) 100.dp else 56.dp,
             showDivider = true,
             emptyText = "这个版块还没有帖子，下拉刷新试试",
             loader = loadPage,
@@ -108,7 +108,7 @@ fun ThreadListScreen(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = topInset + 52.dp, start = 12.dp, end = 12.dp),
+                    .padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 52.dp, start = 12.dp, end = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 FILTERS.forEach { (value, label) ->
