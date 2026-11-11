@@ -113,7 +113,7 @@ fun FeedCard(
         }
 
         Text(
-            text = thread.title,
+            text = cn.mce.starlight.core.HtmlText.decode(thread.title),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             maxLines = 2,

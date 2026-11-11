@@ -286,7 +286,7 @@ fun ThreadDetailScreen(
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val detail = (state as? DetailState.Content)?.detail
-    val title = detail?.title ?: fallbackTitle
+    val title = cn.mce.starlight.core.HtmlText.decode(detail?.title ?: fallbackTitle)
     // v0.4.4：记录最近浏览
     LaunchedEffect(detail?.title) {
         detail?.title?.takeIf { it.isNotBlank() }?.let { cn.mce.starlight.core.RecentThreads.add(tid, it, cn.mce.starlight.data.Boards.all.firstOrNull { b -> b.fid == detail?.fid }?.name) }
@@ -358,7 +358,7 @@ fun ThreadDetailScreen(
             ) {
                 item {
                     Text(
-                        text = s.detail.title,
+                    text = cn.mce.starlight.core.HtmlText.decode(s.detail.title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 4,
