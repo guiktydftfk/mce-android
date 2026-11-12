@@ -59,8 +59,10 @@ object ThreadDetailParser {
 
         val posts = blocks.mapNotNull { block -> parsePost(block, blocks.indexOf(block), page) }
 
-        val fid = fidRegex.find(html)
-            ?.groupValues?.get(1)?.toIntOrNull()
+        // v0.4.7：部分页面没有 action=reply&fid= 链接 → 用面包屑 forumdisplay&fid= 兜底，
+        // 否则 fid 为空会导致回帖按钮被禁用（表现为「无法回复楼层」）
+        val fid = fidRegex.find(html)?.groupValues?.get(1)?.toIntOrNull()
+            ?: Regex("""forumdisplay&(?:amp;)?fid=(\d+)""").find(html)?.groupValues?.get(1)?.toIntOrNull()
 
         val rewardCount = doc.selectFirst("div.view_reward .reward_num span")
             ?.text()?.trim()?.toIntOrNull()
