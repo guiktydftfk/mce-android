@@ -260,6 +260,16 @@ fun ThreadDetailScreen(
         }
     }
 
+    /** v0.4.7：刷新整帖但保持当前滚动位置（回复/赞赏后不回到顶部） */
+    suspend fun reloadKeepScroll() {
+        val keepIndex = detailListState.firstVisibleItemIndex
+        val keepOffset = detailListState.firstVisibleItemScrollOffset
+        page = 1
+        load(1, keepOnError = true)
+        loadRemainingPages()
+        runCatching { detailListState.scrollToItem(keepIndex, keepOffset) }
+    }
+
     // v0.3.7：首屏只发一次请求（旧实现 LaunchedEffect(tid) 与 LaunchedEffect(tid, reloadKey) 同时跑，
     // 进帖子必然连发 2 次整页 GET，加载态被置两次，既慢又闪）
     LaunchedEffect(tid, reloadKey) {
@@ -830,18 +840,8 @@ fun ThreadDetailScreen(
                                     // v0.4.0：回帖成功后自动收起输入法并把焦点移出输入框（不再一直挂着键盘）
                                     keyboard?.hide()
                                     focusManager.clearFocus()
-                                    // v0.3.8 流水式阅读：回帖成功后从第 1 页重新聚合所有楼层，
-                                    // 新回复会自动出现在列表末尾，并滚到底部。
-                                    page = 1
-                                    load(1)
-                                    loadRemainingPages()
-                                    kotlinx.coroutines.delay(150)
-                                    val total = (state as? DetailState.Content)?.detail?.posts?.size ?: 0
-                                    if (total > 0) {
-                                        detailListState.requestScrollToItem(
-                                            index = (total - 1).coerceAtLeast(0),
-                                        )
-                                    }
+                                    // v0.4.7：回帖成功后刷新整帖，但保持当前滚动位置（不跳回顶部）
+                                    reloadKeepScroll()
                                 }
                             }
                         },
@@ -1034,9 +1034,8 @@ fun ThreadDetailScreen(
                     )
                     toast = msg
                     // 不管回包判定结果如何，都重新聚合整帖：楼层里的赞赏状态 / 赞赏人数由服务端页面决定
-                    page = 1
-                    load(1, keepOnError = true)
-                    loadRemainingPages()
+                    // v0.4.7：赞赏/评分后刷新但保持滚动位置（不回到顶部）
+                    reloadKeepScroll()
                     if (!ok) {
                         val afterReward = (state as? DetailState.Content)?.detail?.rewardCount ?: 0
                         if (afterReward > beforeReward) toast = "赞赏成功（已刷新赞赏状态）"
