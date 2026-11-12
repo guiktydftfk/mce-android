@@ -42,6 +42,8 @@ object UpdateClient {
          * 客户端不弹「是否更新」确认框，直接后台下载；下载完仍会拉起系统安装器（需用户点一次安装）。
          */
         val emergency: Boolean = false,
+        /** v0.4.7：是否灰度（beta）通道 */
+        val isBeta: Boolean = false,
     )
 
     private fun httpGet(url: String): String? = runCatching {
@@ -126,6 +128,30 @@ object UpdateClient {
             notes = json.optString("notes", ""),
             apkUrl = json.optString("apk").takeIf { it.isNotBlank() },
             emergency = json.optBoolean("emergency", false) || json.optBoolean("urgent", false),
+        )
+    }.getOrNull()
+
+    /** v0.4.7：解析 version.json 的 canary 段（灰度测试） */
+    private fun parseCanary(body: String, currentCode: Int, uid: Int?): Release? = runCatching {
+        if (!SettingsStore.canaryOptIn) return@runCatching null
+        if (uid == null || uid <= 0) return@runCatching null
+        val json = JSONObject(body)
+        val c = json.optJSONObject("canary") ?: return@runCatching null
+        val code = c.optInt("versionCode", 0)
+        if (code <= currentCode) return@runCatching null
+        val uids = c.optJSONArray("uids") ?: return@runCatching null
+        var allowed = false
+        for (i in 0 until uids.length()) {
+            if (uids.optInt(i, -1) == uid) { allowed = true; break }
+        }
+        if (!allowed) return@runCatching null
+        Release(
+            versionName = c.optString("versionName", "beta"),
+            versionCode = code,
+            notes = c.optString("notes", ""),
+            apkUrl = c.optString("apk").takeIf { it.isNotBlank() },
+            emergency = c.optBoolean("emergency", false),
+            isBeta = true,
         )
     }.getOrNull()
 

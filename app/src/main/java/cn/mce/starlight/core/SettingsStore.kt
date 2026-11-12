@@ -60,6 +60,7 @@ object SettingsStore {
     private const val KEY_UI_SCALE = "ui_scale" // 已废弃（0.3.6 起并入 font_scale），仅用于清理
     private const val KEY_FONT_SCALE = "font_scale"
     private const val KEY_THREAD_FONT_SCALE = "thread_font_scale"
+    private const val KEY_CANARY_OPT_IN = "canary_opt_in"
     private const val KEY_SIGNIN_REMIND = "signin_reminder_enabled"
     private const val KEY_SIGNIN_REMIND_HOUR = "signin_reminder_hour"
     private const val KEY_FEED_MIN_CHARS = "feed_min_chars"
@@ -103,6 +104,8 @@ object SettingsStore {
     var fontScale by mutableFloatStateOf(1f)
     /** v0.4.7：帖子详情正文字号（仅作用帖子页，和全局字体大小独立） */
     var threadFontScale by mutableFloatStateOf(1f)
+    /** v0.4.7：参与灰度测试（仅当账号 UID 在 version.json 的灰度名单里才生效） */
+    var canaryOptIn by mutableStateOf(true)
         private set
     var signinReminderEnabled by mutableStateOf(false)
         private set
@@ -165,6 +168,7 @@ object SettingsStore {
         pendingUpdateCode = prefs.getInt(KEY_PENDING_UPDATE, 0)
         fontScale = prefs.getFloat(KEY_FONT_SCALE, 1f)
         threadFontScale = prefs.getFloat(KEY_THREAD_FONT_SCALE, 1f)
+        canaryOptIn = prefs.getBoolean(KEY_CANARY_OPT_IN, true)
         // 0.3.6：界面大小与字体大小合并为单一「字体大小」，清掉旧键
         if (prefs.contains(KEY_UI_SCALE)) prefs.edit().remove(KEY_UI_SCALE)?.apply()
         signinReminderEnabled = prefs.getBoolean(KEY_SIGNIN_REMIND, false)
@@ -258,6 +262,12 @@ object SettingsStore {
     fun updateThreadFontScale(value: Float) {
         threadFontScale = value.coerceIn(0.85f, 1.3f)
         prefs()?.edit()?.putFloat(KEY_THREAD_FONT_SCALE, threadFontScale)?.apply()
+    }
+
+    /** v0.4.7：切换灰度测试开关 */
+    fun updateCanaryOptIn(value: Boolean) {
+        canaryOptIn = value
+        prefs()?.edit()?.putBoolean(KEY_CANARY_OPT_IN, value)?.apply()
     }
 
     fun updateSigninReminder(enabled: Boolean) {

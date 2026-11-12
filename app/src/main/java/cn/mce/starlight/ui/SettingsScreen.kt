@@ -426,10 +426,26 @@ fun SettingsScreen(
             )
             Text(
                 "当前版本 ${cn.mce.starlight.data.UpdateClient.currentVersionName(context)}" +
-                    "（${cn.mce.starlight.data.UpdateClient.currentVersionCode(context)}）",
+                    "（${cn.mce.starlight.data.UpdateClient.currentVersionCode(context)}）" + (if (cn.mce.starlight.data.UpdateClient.currentVersionName(context).contains("beta")) " · 灰度测试通道" else ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(8.dp))
+            // v0.4.7：灰度测试开关（仅在 version.json 灰度名单内的 UID 生效）
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("参与灰度测试", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "仅当账号 UID 在灰度名单内时才会收到 beta 更新",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = SettingsStore.canaryOptIn,
+                    onCheckedChange = { SettingsStore.updateCanaryOptIn(it) },
+                )
+            }
             Spacer(Modifier.height(6.dp))
             Text(
                 if (SettingsStore.isUpdateSnoozed())
