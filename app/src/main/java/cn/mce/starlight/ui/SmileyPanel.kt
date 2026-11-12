@@ -18,6 +18,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +48,9 @@ fun SmileyPickerDialog(
     onDeleteCustom: ((java.io.File) -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
+    // v0.4.7：本地表情管理（删除）
+    var showManage by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("表情") },
@@ -66,13 +74,23 @@ fun SmileyPickerDialog(
                                     modifier = Modifier.clickable { add() }.padding(horizontal = 6.dp),
                                 )
                             }
+                            if (customEmojis.isNotEmpty()) {
+                                Text(
+                                    "管理",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.clickable { showManage = true }.padding(horizontal = 6.dp),
+                                )
+                            }
                             customEmojis.forEach { f ->
                                 AsyncImage(
                                     model = f,
                                     contentDescription = null,
                                     contentScale = ContentScale.Fit,
-                                    modifier = Modifier.size(34.dp).clickable {
-                                    },
+                                    modifier = Modifier.size(34.dp).combinedClickable(
+                                        onClick = { onPickCustom?.invoke(f) },
+                                        onLongClick = { onDeleteCustom?.invoke(f) },
+                                    ),
                                 )
                             }
                         }
@@ -128,4 +146,40 @@ fun SmileyPickerDialog(
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
     )
+
+    // v0.4.7：本地表情管理弹窗（逐个删除）
+    if (showManage) {
+        AlertDialog(
+            onDismissRequest = { showManage = false },
+            title = { Text("本地表情管理") },
+            text = {
+                Column(
+                    Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (customEmojis.isEmpty()) {
+                        Text("还没有本地表情，点「＋」从相册添加", style = MaterialTheme.typography.bodySmall)
+                    }
+                    customEmojis.forEach { f ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            AsyncImage(
+                                model = f,
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.size(40.dp),
+                            )
+                            Text(
+                                f.name,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                                maxLines = 1,
+                            )
+                            TextButton(onClick = { onDeleteCustom?.invoke(f) }) { Text("删除") }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showManage = false }) { Text("关闭") } },
+        )
+    }
 }
