@@ -676,18 +676,52 @@ fun ThreadDetailScreen(
                                 androidx.compose.foundation.layout.Row {
                                     androidx.compose.material3.TextButton(onClick = {
                                         showShare = false
-                                        val uri = cn.mce.starlight.ui.ShareCard.create(ctx, tid, title, cardAuthor, cardBoard)
-                                        val send = if (uri != null) android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                            type = "image/png"
-                                            putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                                            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
-                                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        } else android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                            type = "text/plain"
-                                            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                        // v0.4.7：带帖子首图的分享卡片（异步加载封面）
+                                        scope.launch {
+                                            val coverUrl = (state as? DetailState.Content)?.detail?.posts.orEmpty()
+                                                .flatMap { p -> p.blocks.filterIsInstance<cn.mce.starlight.data.ContentBlock.Image>() }
+                                                .firstOrNull()?.url
+                                            val uri = runCatching {
+                                                cn.mce.starlight.ui.ShareCard.createWithCover(
+                                                    ctx, tid, title, cardAuthor, cardBoard, coverUrl,
+                                                )
+                                            }.getOrNull()
+                                            val send = if (uri != null) android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                type = "image/png"
+                                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            } else android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                            }
+                                            runCatching { ctx.startActivity(android.content.Intent.createChooser(send, "分享帖子")) }
                                         }
-                                        runCatching { ctx.startActivity(android.content.Intent.createChooser(send, "分享帖子")) }
                                     }) { Text("分享卡片") }
+                                    androidx.compose.material3.TextButton(onClick = {
+                                        showShare = false
+                                        // v0.4.7：复制卡片图片到剪贴板（部分应用可直接粘贴图片）
+                                        scope.launch {
+                                            val coverUrl2 = (state as? DetailState.Content)?.detail?.posts.orEmpty()
+                                                .flatMap { p -> p.blocks.filterIsInstance<cn.mce.starlight.data.ContentBlock.Image>() }
+                                                .firstOrNull()?.url
+                                            val uri2 = runCatching {
+                                                cn.mce.starlight.ui.ShareCard.createWithCover(
+                                                    ctx, tid, title, cardAuthor, cardBoard, coverUrl2,
+                                                )
+                                            }.getOrNull()
+                                            if (uri2 != null) {
+                                                runCatching {
+                                                    val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                                                        as android.content.ClipboardManager
+                                                    cm.setPrimaryClip(android.content.ClipData.newUri(ctx.contentResolver, "帖子分享卡片", uri2))
+                                                }
+                                                toast = "卡片图片已复制"
+                                            } else {
+                                                toast = "卡片生成失败"
+                                            }
+                                        }
+                                    }) { Text("复制图片") }
                                     androidx.compose.material3.TextButton(onClick = {
                                         showShare = false
                                         val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {

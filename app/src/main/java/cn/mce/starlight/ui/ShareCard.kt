@@ -28,6 +28,7 @@ object ShareCard {
         title: String,
         author: String,
         board: String,
+        cover: Bitmap? = null,
     ): android.net.Uri? = runCatching {
         val w = 900
         val h = 1200
@@ -42,13 +43,21 @@ object ShareCard {
         p.typeface = Typeface.DEFAULT_BOLD
         c.drawText("MCE 星光班 · 校园论坛", 60f, 96f, p)
 
+        // v0.4.7：帖子首图（有图时顶部放一张大图，更接近主流分享卡片）
+        cover?.let { cb ->
+            val dst = android.graphics.RectF(0f, 130f, w.toFloat(), 470f)
+            c.drawBitmap(cb, null, dst, Paint(Paint.FILTER_BITMAP_FLAG))
+            val scrim = Paint()
+            scrim.color = Color.parseColor("#55000000")
+            c.drawRect(dst, scrim)
+        }
         // 标题（自动换行，最多 4 行）
         p.typeface = Typeface.DEFAULT_BOLD
         p.color = Color.WHITE
         p.textSize = 52f
         val maxWidth = w - 120f
         var line = ""
-        var y = 210f
+        var y = if (cover != null) 520f else 210f
         var lines = 0
         for (ch in title) {
             val next = line + ch
@@ -80,7 +89,7 @@ object ShareCard {
         if (matrix != null) {
             val box = 360f
             val left = (w - box) / 2f
-            val top = 700f
+            val top = if (cover != null) 840f else 700f
             val bg = Paint(Paint.ANTI_ALIAS_FLAG)
             bg.color = Color.WHITE
             c.drawRoundRect(left - 26f, top - 26f, left + box + 26f, top + box + 26f, 30f, 30f, bg)
@@ -113,4 +122,33 @@ object ShareCard {
         file.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", file)
     }.getOrNull()
+
+    /** v0.4.7：带帖子首图的分享卡片（异步加载封面后绘制） */
+    suspend fun createWithCover(
+        ctx: Context,
+        tid: Int,
+        title: String,
+        author: String,
+        board: String,
+        coverUrl: String?,
+    ): android.net.Uri? {
+        if (coverUrl.isNullOrBlank()) return create(ctx, tid, title, author, board, null)
+        val cover = runCatching {
+            val req = coil.request.ImageRequest.Builder(ctx)
+                .data(coverUrl)
+                .size(800, 420)
+                .allowHardware(false)
+                .build()
+            val res = coil.Coil.imageLoader(ctx).execute(req)
+            val d = (res as? coil.request.SuccessResult)?.drawable ?: return@runCatching null
+            val bw = d.intrinsicWidth.coerceAtLeast(1)
+            val bh = d.intrinsicHeight.coerceAtLeast(1)
+            val out = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888)
+            val cv = Canvas(out)
+            d.setBounds(0, 0, bw, bh)
+            d.draw(cv)
+            out
+        }.getOrNull()
+        return create(ctx, tid, title, author, board, cover)
+    }
 }
