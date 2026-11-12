@@ -260,14 +260,23 @@ fun ThreadDetailScreen(
         }
     }
 
-    /** v0.4.7：刷新整帖但保持当前滚动位置（回复/赞赏后不回到顶部） */
-    suspend fun reloadKeepScroll() {
+    /**
+     * v0.4.7：刷新整帖。
+     * - [scrollToBottom] = true：回帖成功后直接滚到最底层，方便看到自己刚发的回复；
+     * - 否则保持当前滚动位置（赞赏/评分刷新不跳回顶部）。
+     */
+    suspend fun reloadKeepScroll(scrollToBottom: Boolean = false) {
         val keepIndex = detailListState.firstVisibleItemIndex
         val keepOffset = detailListState.firstVisibleItemScrollOffset
         page = 1
         load(1, keepOnError = true)
         loadRemainingPages()
-        runCatching { detailListState.scrollToItem(keepIndex, keepOffset) }
+        if (scrollToBottom) {
+            val total = (state as? DetailState.Content)?.detail?.posts?.size ?: 0
+            if (total > 0) runCatching { detailListState.scrollToItem(total - 1) }
+        } else {
+            runCatching { detailListState.scrollToItem(keepIndex, keepOffset) }
+        }
     }
 
     // v0.3.7：首屏只发一次请求（旧实现 LaunchedEffect(tid) 与 LaunchedEffect(tid, reloadKey) 同时跑，
@@ -854,7 +863,7 @@ fun ThreadDetailScreen(
                                     keyboard?.hide()
                                     focusManager.clearFocus()
                                     // v0.4.7：回帖成功后刷新整帖，但保持当前滚动位置（不跳回顶部）
-                                    reloadKeepScroll()
+                                    reloadKeepScroll(scrollToBottom = true)
                                 }
                             }
                         },
