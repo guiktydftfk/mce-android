@@ -179,7 +179,8 @@ fun SearchScreen(
 
             // v0.4.4：搜索历史（输入为空时显示，点一下直接再搜）
             if (keyword.isBlank()) {
-                val hist = remember { cn.mce.starlight.core.SearchHistory.items() }
+                // v0.4.7：搜索历史支持单条删除 + 清空
+                var hist by remember { mutableStateOf(cn.mce.starlight.core.SearchHistory.items()) }
                 if (hist.isNotEmpty()) {
                     Row(
                         Modifier
@@ -190,15 +191,29 @@ fun SearchScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         hist.forEach { h ->
-                            Text(
-                                h,
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier
+                            Row(
+                                Modifier
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .clickable { keyword = h; doSearch() }
                                     .padding(horizontal = 10.dp, vertical = 5.dp),
-                            )
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    h,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.clickable { keyword = h; doSearch() },
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "×",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.clickable {
+                                        cn.mce.starlight.core.SearchHistory.remove(h)
+                                        hist = cn.mce.starlight.core.SearchHistory.items()
+                                    },
+                                )
+                            }
                         }
                         Text(
                             "清空",

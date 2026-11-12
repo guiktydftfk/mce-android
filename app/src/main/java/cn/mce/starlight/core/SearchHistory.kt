@@ -24,6 +24,17 @@ object SearchHistory {
         prefs.edit().putString(KEY, CryptoBox.encrypt(list.joinToString("\n"))).apply()
     }
 
+    /** v0.4.7：删除单条历史 */
+    fun remove(keyword: String) {
+        val list = items().filterNot { it == keyword }
+        val prefs = ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE) ?: return
+        if (list.isEmpty()) {
+            prefs.edit().remove(KEY).apply()
+        } else {
+            prefs.edit().putString(KEY, CryptoBox.encrypt(list.joinToString("\n"))).apply()
+        }
+    }
+
     fun clear() {
         ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()?.remove(KEY)?.apply()
     }

@@ -67,6 +67,8 @@ fun SettingsScreen(
     // v0.4.3：最近生成的自检报告预览（仅展示，不做导出）
     var diagPreview by remember { mutableStateOf<String?>(null) }
     var diagBusy by remember { mutableStateOf(false) }
+    // v0.4.7：最近错误日志
+    var showErrLog by remember { mutableStateOf(false) }
 
     val pickBackground = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
