@@ -107,6 +107,31 @@ object UpdateClient {
         }
     }
 
+    /** v0.4.7：当前是否为 beta（灰度）构建 */
+    fun isBetaBuild(context: Context): Boolean =
+        currentVersionName(context).contains("beta", ignoreCase = true)
+
+    /** v0.4.7：读取 version.json 里的最新正式版信息（不比较版本号，供一键回滚用） */
+    suspend fun latestStable(context: Context): Release? = withContext(Dispatchers.IO) {
+        for (manifestUrl in MANIFEST_URLS) {
+            val body = httpGet(withTimestamp(manifestUrl)) ?: continue
+            val r = runCatching {
+                val json = JSONObject(body)
+                val code = json.optInt("versionCode", 0)
+                if (code <= 0) null else Release(
+                    versionName = json.optString("versionName", "?"),
+                    versionCode = code,
+                    notes = json.optString("notes", ""),
+                    apkUrl = json.optString("apk").takeIf { it.isNotBlank() },
+                    emergency = false,
+                    isBeta = false,
+                )
+            }.getOrNull()
+            if (r != null) return@withContext r
+        }
+        null
+    }
+
     /** 兼容旧调用：只关心有没有新版（失败/最新都返回 null） */
     suspend fun check(context: Context): Release? =
         when (val r = checkDetailed(context)) {

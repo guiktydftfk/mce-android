@@ -446,6 +446,79 @@ fun SettingsScreen(
                     onCheckedChange = { SettingsStore.updateCanaryOptIn(it) },
                 )
             }
+            // v0.4.7：beta 用户一键回滚到正式版（正式版用户不显示）
+            if (cn.mce.starlight.data.UpdateClient.isBetaBuild(context)) {
+                var showRollback by remember { mutableStateOf(false) }
+                var rollbackBusy by remember { mutableStateOf(false) }
+                Text(
+                    if (rollbackBusy) "正在回滚…" else "一键回滚到最新正式版",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (rollbackBusy) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !rollbackBusy) { showRollback = true }
+                        .padding(vertical = 10.dp),
+                )
+                Text(
+                    "当前为灰度测试版；回滚将下载并安装最新正式版",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (showRollback) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { if (!rollbackBusy) showRollback = false },
+                        title = { Text("回滚到正式版？") },
+                        text = {
+                            Text(
+                                "将下载最新正式版并调起系统安装。\n" +
+                                    "注意：正式版版本号低于当前 beta，系统可能提示「版本降级」而拒绝安装；" +
+                                    "若安装失败，可选择卸载当前 beta 后再安装（本地设置/收藏备注会清空）。",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        },
+                        confirmButton = {
+                            androidx.compose.material3.TextButton(enabled = !rollbackBusy, onClick = {
+                                rollbackBusy = true
+                                scope.launch {
+                                    val stable = cn.mce.starlight.data.UpdateClient.latestStable(context)
+                                    val url = stable?.apkUrl
+                                    if (url.isNullOrBlank()) {
+                                        rollbackBusy = false
+                                        showRollback = false
+                                        message = "无法获取正式版安装包，请稍后重试"
+                                    } else {
+                                        val file = cn.mce.starlight.data.UpdateClient.download(context, url)
+                                        rollbackBusy = false
+                                        showRollback = false
+                                        if (file != null) {
+                                            val ok = cn.mce.starlight.data.UpdateClient.install(context, file)
+                                            message = if (ok) "已开始安装正式版 ${stable?.versionName ?: ""}" else "安装器启动失败"
+                                        } else {
+                                            message = "正式版下载失败，请检查网络"
+                                        }
+                                    }
+                                }
+                            }) { Text(if (rollbackBusy) "下载中…" else "下载并安装") }
+                        },
+                        dismissButton = {
+                            androidx.compose.foundation.layout.Row {
+                                androidx.compose.material3.TextButton(onClick = {
+                                    runCatching {
+                                        context.startActivity(
+                                            android.content.Intent(
+                                                android.content.Intent.ACTION_DELETE,
+                                                android.net.Uri.parse("package:" + context.packageName),
+                                            ),
+                                        )
+                                    }
+                                    showRollback = false
+                                }) { Text("卸载后重装") }
+                                androidx.compose.material3.TextButton(onClick = { showRollback = false }) { Text("取消") }
+                            }
+                        },
+                    )
+                }
+            }
             Spacer(Modifier.height(6.dp))
             Text(
                 if (SettingsStore.isUpdateSnoozed())
