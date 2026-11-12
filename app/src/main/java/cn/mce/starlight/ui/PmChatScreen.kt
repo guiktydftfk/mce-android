@@ -62,6 +62,13 @@ fun PmChatScreen(
     var chat by remember { mutableStateOf<PersonalClient.PmChat?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var input by remember { mutableStateOf("") }
+    // v0.4.7：私信表情入口（论坛表情集）
+    var showSmiley by remember { mutableStateOf(false) }
+    var smileySets by remember { mutableStateOf(emptyList<cn.mce.starlight.data.SmileyClient.SmileySet>()) }
+    var smileySetIndex by remember { mutableStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(showSmiley) {
+        if (showSmiley && smileySets.isEmpty()) smileySets = cn.mce.starlight.data.SmileyClient.load(0)
+    }
     var sending by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
     // v0.3.9：屏内提示 2.6s 后自动消失（旧实现 toast 永不清空 → 小弹窗一直挂在界面上）
@@ -201,6 +208,7 @@ fun PmChatScreen(
                         modifier = Modifier.weight(1f),
                     )
                     Spacer(Modifier.padding(horizontal = 4.dp))
+                    TextButton(onClick = { showSmiley = true }) { Text("表情") }
                     TextButton(
                         enabled = !sending && input.isNotBlank() && chat != null,
                         onClick = {
@@ -217,6 +225,19 @@ fun PmChatScreen(
                             }
                         },
                     ) { Text(if (sending) "发送中" else "发送") }
+                }
+                // v0.4.7：表情选择弹窗
+                if (showSmiley) {
+                    cn.mce.starlight.ui.SmileyPickerDialog(
+                        sets = smileySets,
+                        selectedIndex = smileySetIndex,
+                        onSelectSet = { smileySetIndex = it },
+                        onPick = { smiley ->
+                            input = input + smiley.code
+                            showSmiley = false
+                        },
+                        onDismiss = { showSmiley = false },
+                    )
                 }
                 toast?.let {
                     Text(

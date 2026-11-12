@@ -572,7 +572,6 @@ fun NewThreadScreen(
                 lastSelectionTextLen = contentField.text.length
             }
             ToolButton("@") { insertText("@") }
-            ToolButton("\u8868\u60c5") { showSmiley = true }
         }
 
         OutlinedTextField(
@@ -780,41 +779,6 @@ fun NewThreadScreen(
         Spacer(Modifier.height(24.dp))
     }
 
-    if (showSmiley) {
-        SmileyPickerDialog(
-            sets = smileySets,
-            selectedIndex = smileySetIndex,
-            onSelectSet = { smileySetIndex = it },
-            onPick = { smile ->
-                contentField = contentField.insertAtCursor(smile.code)
-                showSmiley = false
-            },
-            customEmojis = customEmojis,
-            onAddCustom = { pickCustomEmoji.launch("image/*") },
-            onDeleteCustom = { f ->
-                cn.mce.starlight.core.CustomEmojiStore.delete(f)
-                customEmojis = cn.mce.starlight.core.CustomEmojiStore.list()
-            },
-            onPickCustom = { file ->
-                showSmiley = false
-                scope.launch {
-                    uploading = true
-                    runCatching {
-                        val bytes = file.readBytes()
-                        val aid = PostActions.uploadImage(fid, null, bytes, "emoji_" + file.name)
-                        if (aid != null) {
-                            uploaded.add(android.net.Uri.fromFile(file) to aid)
-                            contentField = contentField.insertAtCursor("\\n[attach]" + aid + "[/attach]\\n")
-                        } else {
-                            draftTip = "表情上传失败：" + (PostActions.lastUploadError?.take(60) ?: "未知原因")
-                        }
-                    }
-                    uploading = false
-                }
-            },
-            onDismiss = { showSmiley = false },
-        )
-    }
     if (showColorPicker) {
         ColorPickerDialog(
             onPick = { applyColor(it) },
