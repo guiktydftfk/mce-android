@@ -59,6 +59,7 @@ object SettingsStore {
     private const val KEY_DOWNLOADED_APK = "update_downloaded_apk"
     private const val KEY_UI_SCALE = "ui_scale" // 已废弃（0.3.6 起并入 font_scale），仅用于清理
     private const val KEY_FONT_SCALE = "font_scale"
+    private const val KEY_THREAD_FONT_SCALE = "thread_font_scale"
     private const val KEY_SIGNIN_REMIND = "signin_reminder_enabled"
     private const val KEY_SIGNIN_REMIND_HOUR = "signin_reminder_hour"
     private const val KEY_FEED_MIN_CHARS = "feed_min_chars"
@@ -100,6 +101,8 @@ object SettingsStore {
         private set
 
     var fontScale by mutableFloatStateOf(1f)
+    /** v0.4.7：帖子详情正文字号（仅作用帖子页，和全局字体大小独立） */
+    var threadFontScale by mutableFloatStateOf(1f)
         private set
     var signinReminderEnabled by mutableStateOf(false)
         private set
@@ -161,6 +164,7 @@ object SettingsStore {
         downloadedApkPath = prefs.getString(KEY_DOWNLOADED_APK, null)
         pendingUpdateCode = prefs.getInt(KEY_PENDING_UPDATE, 0)
         fontScale = prefs.getFloat(KEY_FONT_SCALE, 1f)
+        threadFontScale = prefs.getFloat(KEY_THREAD_FONT_SCALE, 1f)
         // 0.3.6：界面大小与字体大小合并为单一「字体大小」，清掉旧键
         if (prefs.contains(KEY_UI_SCALE)) prefs.edit().remove(KEY_UI_SCALE)?.apply()
         signinReminderEnabled = prefs.getBoolean(KEY_SIGNIN_REMIND, false)
@@ -248,6 +252,12 @@ object SettingsStore {
     fun updateFontScale(value: Float) {
         fontScale = value.coerceIn(0.8f, 1.4f)
         prefs()?.edit()?.putFloat(KEY_FONT_SCALE, fontScale)?.apply()
+    }
+
+    /** v0.4.7：更新帖子详情正文字号（0.85~1.3） */
+    fun updateThreadFontScale(value: Float) {
+        threadFontScale = value.coerceIn(0.85f, 1.3f)
+        prefs()?.edit()?.putFloat(KEY_THREAD_FONT_SCALE, threadFontScale)?.apply()
     }
 
     fun updateSigninReminder(enabled: Boolean) {

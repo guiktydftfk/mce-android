@@ -99,6 +99,13 @@ internal fun PostItem(
     onImageClick: (String) -> Unit = {},
     onLongPress: (() -> Unit)? = null,
 ) {
+    // v0.4.7：帖子正文字号独立缩放（设置 → 外观 → 帖子正文字号）
+    val baseDensity = androidx.compose.ui.platform.LocalDensity.current
+    val postScale = cn.mce.starlight.core.SettingsStore.threadFontScale
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalDensity provides
+            androidx.compose.ui.unit.Density(baseDensity.density, baseDensity.fontScale * postScale),
+    ) {
     // v0.4.1：类酷安观感——每个楼层一张卡片（圆角 + 浅底色），与页面背景区分开
     Box(
         Modifier
@@ -213,6 +220,7 @@ internal fun PostItem(
     }
     }
 }
+    }
 
 /**
  * 正文文字块（v0.3.8）：

@@ -174,6 +174,14 @@ fun SettingsScreen(
                 onValueChangeFinished = { SettingsStore.updateFontScale(fontScaleLocal) },
                 valueRange = 0.8f..1.4f,
             )
+            Spacer(Modifier.height(8.dp))
+            // v0.4.7：帖子详情正文字号（独立于全局字体大小）
+            Text("帖子正文字号 ${(SettingsStore.threadFontScale * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+            Slider(
+                value = SettingsStore.threadFontScale,
+                onValueChange = { SettingsStore.updateThreadFontScale(it) },
+                valueRange = 0.85f..1.3f,
+            )
             Text(
                 "只缩放文字，不改变整体布局；即时生效，重启后保持",
                 style = MaterialTheme.typography.bodySmall,
