@@ -323,6 +323,27 @@ fun NoticesScreen(
             .onFailure { pmState = PState.Error(it.message ?: "加载失败") }
     }
 
+    // v0.4.7：私信列表分页（加载更多）
+    var pmPage by remember { mutableStateOf(1) }
+    var pmLoadingMore by remember { mutableStateOf(false) }
+    var pmHasMore by remember { mutableStateOf(true) }
+
+    suspend fun loadMorePm() {
+        pmLoadingMore = true
+        val next = pmPage + 1
+        val more = runCatching { PersonalClient.loadPm(next) }.getOrDefault(emptyList())
+        val cur = (pmState as? PState.Content)?.items.orEmpty()
+        val seen = cur.mapTo(HashSet()) { it.touid }
+        val merged = cur + more.filterNot { it.touid in seen }
+        if (merged.size > cur.size) {
+            pmState = PState.Content(cn.mce.starlight.core.PmReadStore.overlay(merged))
+            pmPage = next
+        } else {
+            pmHasMore = false
+        }
+        pmLoadingMore = false
+    }
+
     // 进入消息页 / 切到私信页签：只清顶部提示（私信角标交给列表真值，避免出现「角标 0 但列表还有红点」）
     LaunchedEffect(tab) {
         if (tab == 1) MessageCenter.dismissBanner()
@@ -424,6 +445,15 @@ fun NoticesScreen(
                         contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp),
                     ) {
                         if (s.items.isEmpty()) { item { EmptyHint("暂无私信") } }
+                        // v0.4.7：私信分页（加载更多）
+                        if (s.items.isNotEmpty() && pmHasMore) {
+                            item {
+                                TextButton(
+                                    enabled = !pmLoadingMore,
+                                    onClick = { scope.launch { loadMorePm() } },
+                                ) { Text(if (pmLoadingMore) "加载中…" else "加载更多私信") }
+                            }
+                        }
                         items(s.items.size, key = { i -> "p-${s.items[i].touid}" }) { i ->
                             val item = s.items[i]
                             NoticeRow(

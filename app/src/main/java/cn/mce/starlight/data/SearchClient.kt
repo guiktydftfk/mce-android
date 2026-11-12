@@ -62,19 +62,21 @@ object SearchClient {
      * v0.4.1：帖子关键词搜索 —— 关键词同时匹配**标题与正文**（论坛全文搜索）。
      * 手机模板若只回标题命中（结果为空/不全），回退电脑版模板再搜一次。
      */
-    suspend fun searchThreads(query: String): List<Hit> = withContext(Dispatchers.IO) {
+    suspend fun searchThreads(query: String, page: Int = 1): List<Hit> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext emptyList()
-        val fields = listOf(
+        val fields = mutableListOf(
             "formhash" to formhash(),
             "mod" to "forum",
             "srchtxt" to query,
             "searchsubmit" to "yes",
         )
+        // v0.4.7：搜索结果分页（page>1 时带上页码）
+        if (page > 1) fields += "page" to page.toString()
         val mobileHits = runCatching { parseThreads(post(fields, mobile = true)) }.getOrDefault(emptyList())
         if (mobileHits.isNotEmpty()) return@withContext mobileHits
         runCatching { parseThreads(post(fields, mobile = false)) }.getOrDefault(emptyList())
     }
-    suspend fun advancedSearch(advanced: Advanced): List<Hit> = withContext(Dispatchers.IO) {
+    suspend fun advancedSearch(advanced: Advanced, page: Int = 1): List<Hit> = withContext(Dispatchers.IO) {
         val fields = mutableListOf(
             "formhash" to formhash(),
             "mod" to "forum",
@@ -86,6 +88,7 @@ object SearchClient {
         if (advanced.author.isNotBlank()) fields += "searchuser" to advanced.author
         advanced.fid?.let { fields += "srchfid" to it.toString() }
         advanced.days?.let { fields += "srchfrom" to it.toString() }
+        if (page > 1) fields += "page" to page.toString()
         parseThreads(post(fields))
     }
 

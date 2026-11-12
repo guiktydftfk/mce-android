@@ -72,6 +72,9 @@ fun SearchScreen(
     // 空结果用中性提示（旧实现塞进 error → 红色报错色，把"没搜到"显示成"出错了"）
     var notice by remember { mutableStateOf<String?>(null) }
     var threads by remember { mutableStateOf(emptyList<SearchClient.Hit>()) }
+    // v0.4.7：搜索结果分页（加载更多）
+    var searchPage by remember { mutableStateOf(1) }
+    var loadingMore by remember { mutableStateOf(false) }
     var users by remember { mutableStateOf(emptyList<SearchClient.UserHit>()) }
 
     // advanced
@@ -391,6 +394,44 @@ fun SearchScreen(
                             )
                             androidx.compose.material3.HorizontalDivider()
                         }
+                    // v0.4.7：加载更多搜索结果
+                    if (threads.isNotEmpty()) {
+                        item {
+                            TextButton(
+                                enabled = !loadingMore,
+                                onClick = {
+                                    loadingMore = true
+                                    scope.launch {
+                                        val next = searchPage + 1
+                                        val more = runCatching {
+                                            if (!showAdvanced && author.isBlank() && boardIndex < 0 && daysIndex == 0) {
+                                                cn.mce.starlight.data.SearchClient.searchThreads(keyword.trim(), next)
+                                            } else {
+                                                cn.mce.starlight.data.SearchClient.advancedSearch(
+                                                    cn.mce.starlight.data.SearchClient.Advanced(
+                                                        keyword = keyword.trim(),
+                                                        author = author.trim(),
+                                                        fid = if (boardIndex >= 0) Boards.all.getOrNull(boardIndex)?.fid else null,
+                                                        days = if (daysIndex > 0) dayOptions.getOrNull(daysIndex)?.first else null,
+                                                        orderBy = orderOptions.getOrNull(orderIndex)?.first ?: "lastpost",
+                                                    ),
+                                                    next,
+                                                )
+                                            }
+                                        }.getOrDefault(emptyList())
+                                        if (more.isNotEmpty()) {
+                                            val seen = threads.mapTo(HashSet()) { it.tid }
+                                            threads = threads + more.filterNot { it.tid in seen }
+                                            searchPage = next
+                                        } else {
+                                            notice = "没有更多结果了"
+                                        }
+                                        loadingMore = false
+                                    }
+                                },
+                            ) { Text(if (loadingMore) "加载中…" else "加载更多") }
+                        }
+                    }
                     } else {
                         items(users, key = { it.uid }) { user ->
                             Row(
