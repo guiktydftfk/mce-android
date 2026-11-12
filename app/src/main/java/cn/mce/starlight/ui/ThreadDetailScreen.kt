@@ -344,6 +344,17 @@ fun ThreadDetailScreen(
         }
     }
 
+    // v0.4.7：本地自定义表情包（回帖时作为附件上传）
+    var customEmojis by remember { mutableStateOf(cn.mce.starlight.core.CustomEmojiStore.list()) }
+    val pickCustomEmoji = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching { cn.mce.starlight.core.CustomEmojiStore.add(uri) }
+            customEmojis = cn.mce.starlight.core.CustomEmojiStore.list()
+        }
+    }
+
     Box(modifier.fillMaxSize()) {
         when (val s = state) {
             is DetailState.Loading -> DetailSkeleton(topPadding = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 56.dp)
@@ -918,6 +929,33 @@ fun ThreadDetailScreen(
             onPick = { smiley ->
                 replyText = replyText.insertAtCursor(smiley.code)
                 showSmiley = false
+            },
+            customEmojis = customEmojis,
+            onAddCustom = { pickCustomEmoji.launch("image/*") },
+            onDeleteCustom = { f ->
+                cn.mce.starlight.core.CustomEmojiStore.delete(f)
+                customEmojis = cn.mce.starlight.core.CustomEmojiStore.list()
+            },
+            onPickCustom = { file ->
+                showSmiley = false
+                val uploadFid2 = detail?.fid
+                if (uploadFid2 == null) {
+                    toast = "该板块不支持贴图"
+                } else {
+                    scope.launch {
+                        uploadingImage = true
+                        runCatching {
+                            val aid = PostActions.uploadImage(uploadFid2, tid, file.readBytes(), "emoji_" + file.name)
+                            if (aid != null) {
+                                replyImages.add(android.net.Uri.fromFile(file) to aid)
+                                toast = "表情已加入回复"
+                            } else {
+                                toast = "表情上传失败：" + (PostActions.lastUploadError?.take(60) ?: "未知原因")
+                            }
+                        }
+                        uploadingImage = false
+                    }
+                }
             },
             onDismiss = { showSmiley = false },
         )

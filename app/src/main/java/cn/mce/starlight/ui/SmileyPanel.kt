@@ -1,6 +1,8 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package cn.mce.starlight.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,6 +37,10 @@ fun SmileyPickerDialog(
     selectedIndex: Int,
     onSelectSet: (Int) -> Unit,
     onPick: (SmileyClient.Smiley) -> Unit,
+    customEmojis: List<java.io.File> = emptyList(),
+    onAddCustom: (() -> Unit)? = null,
+    onPickCustom: ((java.io.File) -> Unit)? = null,
+    onDeleteCustom: ((java.io.File) -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -46,6 +52,31 @@ fun SmileyPickerDialog(
                     Text("正在加载表情…", style = MaterialTheme.typography.bodySmall)
                 } else {
                     val set = sets.getOrNull(selectedIndex) ?: sets.first()
+                    // v0.4.7：本地自定义表情包（点＋从相册添加，长按删除）
+                    if (customEmojis.isNotEmpty() || onAddCustom != null) {
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            onAddCustom?.let { add ->
+                                Text(
+                                    "＋",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.clickable { add() }.padding(horizontal = 6.dp),
+                                )
+                            }
+                            customEmojis.forEach { f ->
+                                AsyncImage(
+                                    model = f,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.size(34.dp).clickable {
+                                    },
+                                )
+                            }
+                        }
+                    }
                     if (sets.size > 1) {
                         Row(
                             Modifier

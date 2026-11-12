@@ -218,6 +218,15 @@ fun NewThreadScreen(
         }
     }
 
+
+    // v0.4.7：本地自定义表情包
+    var customEmojis by remember { mutableStateOf(cn.mce.starlight.core.CustomEmojiStore.list()) }
+    val pickCustomEmoji = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            runCatching { cn.mce.starlight.core.CustomEmojiStore.add(uri) }
+            customEmojis = cn.mce.starlight.core.CustomEmojiStore.list()
+        }
+    }
     /** 删除一张已插入的图片（同时把正文里的 [attach] 标记去掉） */
     fun removeUploaded(item: Pair<Uri, String>) {
         uploaded.remove(item)
@@ -779,6 +788,29 @@ fun NewThreadScreen(
             onPick = { smile ->
                 contentField = contentField.insertAtCursor(smile.code)
                 showSmiley = false
+            },
+            customEmojis = customEmojis,
+            onAddCustom = { pickCustomEmoji.launch("image/*") },
+            onDeleteCustom = { f ->
+                cn.mce.starlight.core.CustomEmojiStore.delete(f)
+                customEmojis = cn.mce.starlight.core.CustomEmojiStore.list()
+            },
+            onPickCustom = { file ->
+                showSmiley = false
+                scope.launch {
+                    uploading = true
+                    runCatching {
+                        val bytes = file.readBytes()
+                        val aid = PostActions.uploadImage(fid, null, bytes, "emoji_" + file.name)
+                        if (aid != null) {
+                            uploaded.add(android.net.Uri.fromFile(file) to aid)
+                            contentField = contentField.insertAtCursor("\\n[attach]" + aid + "[/attach]\\n")
+                        } else {
+                            draftTip = "表情上传失败：" + (PostActions.lastUploadError?.take(60) ?: "未知原因")
+                        }
+                    }
+                    uploading = false
+                }
             },
             onDismiss = { showSmiley = false },
         )
