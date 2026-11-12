@@ -823,6 +823,19 @@ fun ThreadDetailScreen(
                             // v0.3.8：图片用 [attach]aid[/attach] 内嵌到正文（只传 attachnew 会堆在楼末）
                             val message = buildString {
                                 val body = replyText.text.trim()
+                                // v0.4.7：楼层回复像网页版一样引用原帖内容
+                                replyTo?.let { target ->
+                                    val quoteBody = target.contentText.trim()
+                                        .replace("\n", " ")
+                                        .take(300)
+                                    val quoteTime = target.dateText ?: target.floorLabel ?: ""
+                                    append("[quote][size=2][url=forum.php?mod=redirect&goto=findpost&pid=")
+                                    append(target.pid)
+                                    append("&ptid=").append(tid)
+                                    append("][color=#999999]").append(target.author).append(" 发表于 ")
+                                    append(quoteTime).append("[/color][/url][/size]")
+                                    append(quoteBody).append("[/quote]\n")
+                                }
                                 if (body.isNotEmpty()) append(body)
                                 aids.forEach { aid ->
                                     if (isNotEmpty()) append('\n')
