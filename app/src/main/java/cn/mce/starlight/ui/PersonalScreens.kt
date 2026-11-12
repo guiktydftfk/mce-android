@@ -68,6 +68,8 @@ fun MyThreadsScreen(
     Box(Modifier.fillMaxSize()) {
         PagedThreadList(
             resetKey = Unit,
+            // v0.4.7：记住「我的主题」滚动位置
+            listStateKey = "my_threads",
             topPadding = topPadding() + 64.dp,
             horizontalPadding = 14.dp,
             showDivider = true,

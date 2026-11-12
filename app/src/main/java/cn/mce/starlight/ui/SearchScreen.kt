@@ -381,7 +381,11 @@ fun SearchScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
-                LazyColumn(contentPadding = PaddingValues(bottom = 120.dp)) {
+                LazyColumn(
+                    // v0.4.7：记住搜索结果滚动位置
+                    state = remember { cn.mce.starlight.core.ListStateCache.get("search_results") },
+                    contentPadding = PaddingValues(bottom = 120.dp),
+                ) {
                     if (mode == "thread") {
                         items(threads, key = { it.tid }) { hit ->
                             Text(
