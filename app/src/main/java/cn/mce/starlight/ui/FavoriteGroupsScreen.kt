@@ -42,6 +42,9 @@ fun FavoriteGroupsScreen(
     val grouped = remember(items) { items.groupBy { it.group } }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var msg by remember { mutableStateOf<String?>(null) }
+    // v0.4.7：批量管理（多选删除）
+    var manageMode by remember { mutableStateOf(false) }
+    val selected = remember { androidx.compose.runtime.mutableStateListOf<Int>() }
     // v0.4.7：收藏分组备份 / 恢复（复制到剪贴板 / 从剪贴板导入）
     Row(Modifier.fillMaxWidth().padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 8.dp, start = 12.dp, end = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         androidx.compose.material3.TextButton(onClick = {
@@ -60,6 +63,22 @@ fun FavoriteGroupsScreen(
             items = cn.mce.starlight.core.PostFavoriteStore.items()
             msg = if (n > 0) "已导入 $n 条收藏分组" else "剪贴板里没有有效备份"
         }) { Text("导入备份") }
+        androidx.compose.material3.TextButton(onClick = {
+            manageMode = !manageMode
+            selected.clear()
+        }) { Text(if (manageMode) "完成" else "管理") }
+        if (manageMode) {
+            androidx.compose.material3.TextButton(
+                enabled = selected.isNotEmpty(),
+                onClick = {
+                    selected.toList().forEach { cn.mce.starlight.core.PostFavoriteStore.remove(it) }
+                    items = cn.mce.starlight.core.PostFavoriteStore.items()
+                    msg = "已删除 ${selected.size} 条收藏"
+                    selected.clear()
+                    manageMode = false
+                },
+            ) { Text("删除所选(${selected.size})") }
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -92,10 +111,24 @@ fun FavoriteGroupsScreen(
                         Modifier
                             .fillMaxWidth()
                             .iosGlass(14)
-                            .clickable { onOpenThread(item.tid, item.title) }
+                            .clickable {
+                                if (manageMode) {
+                                    if (selected.contains(item.tid)) selected.remove(item.tid) else selected.add(item.tid)
+                                } else {
+                                    onOpenThread(item.tid, item.title)
+                                }
+                            }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        if (manageMode) {
+                            Text(
+                                if (selected.contains(item.tid)) "✓" else "○",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(end = 8.dp),
+                            )
+                        }
                         Column(Modifier.weight(1f)) {
                             Text(
                                 item.title,
@@ -114,10 +147,12 @@ fun FavoriteGroupsScreen(
                                 )
                             }
                         }
+                        if (!manageMode) {
                         TextButton(onClick = {
                             PostFavoriteStore.remove(item.tid)
                             items = PostFavoriteStore.items()
                         }) { Text("移除") }
+                        }
                     }
                 }
             }
