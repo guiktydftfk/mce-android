@@ -1068,14 +1068,21 @@ fun MceApp() {
  */
 @Composable
 private fun DrawerSection(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        letterSpacing = 1.2.sp,
-        modifier = Modifier.padding(start = 24.dp, top = 12.dp, bottom = 2.dp),
-    )
+    // v0.4.7：一级标题——分隔线 + 主题色粗体，层级更明显
+    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth()) {
+        androidx.compose.material3.HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            letterSpacing = 1.6.sp,
+            modifier = Modifier.padding(start = 20.dp, top = 2.dp, bottom = 6.dp),
+        )
+    }
 }
 
 /**
@@ -1112,7 +1119,7 @@ private fun DrawerItem(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = (12.dp * drawerScale), vertical = 2.dp)
-            .height((if (secondary) 44f else 56f).dp * drawerScale)
+            .height((if (secondary) 40f else 56f).dp * drawerScale)
                 .then(modifier)
                 .then(
                     if (onLongClick == null) Modifier.clickable(onClick = onClick)
@@ -1145,18 +1152,25 @@ private fun DrawerItem(
         }
         Text(
             text = label,
-            // 与旧版 NavigationDrawerItem 一致：labelLarge + 左侧 16dp 内边距 + 垂直居中
-            style = if (secondary) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.labelLarge,
+            // 三级条目更小更淡；二级条目保持 labelLarge 半粗
+            style = if (secondary) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelLarge,
             // v0.4.7：菜单文字整体加粗（未选中 SemiBold）更醒目
             fontWeight = when {
                 selected -> FontWeight.Bold
                 secondary -> FontWeight.Normal
                 else -> FontWeight.SemiBold
             },
-            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface,
+            color = when {
+                selected -> MaterialTheme.colorScheme.primary
+                secondary -> MaterialTheme.colorScheme.onSurfaceVariant
+                else -> MaterialTheme.colorScheme.onSurface
+            },
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(horizontal = (16.dp * drawerScale)),
+                .padding(
+                    start = ((if (secondary) 30 else 16).dp * drawerScale),
+                    end = (16.dp * drawerScale),
+                ),
         )
     }
 }
