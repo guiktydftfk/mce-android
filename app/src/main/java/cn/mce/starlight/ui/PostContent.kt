@@ -132,7 +132,7 @@ internal fun PostItem(
                 if (!url.isNullOrBlank()) {
                     AsyncImage(
                         model = url,
-                        contentDescription = null,
+                        contentDescription = "查看图片",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -189,13 +189,13 @@ internal fun PostItem(
                         // 正文表情（小红龙等）：按原尺寸小图显示，不要拉满整行
                         AsyncImage(
                             model = block.url,
-                            contentDescription = null,
+                            contentDescription = "查看图片",
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.size(30.dp),
                         )
                     } else AsyncImage(
                         model = block.url,
-                        contentDescription = null,
+                        contentDescription = "查看图片",
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxWidth()
