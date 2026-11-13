@@ -100,7 +100,9 @@ class HttpForumRepository(
     /** v0.4.6：评分卡片所需的电脑版页面单独加载（延迟到内容渲染后，避免和图片抢带宽） */
     suspend fun loadRatings(tid: Int, noCache: Boolean = false): ThreadRatings? = withContext(Dispatchers.IO) {
         val (hit, cached) = if (noCache) false to null else cachedRatings(tid)
-        if (hit) return@withContext cached
+        val haveViews = viewsOf(tid) != null
+        // 评分与阅读数都已有缓存 → 直接返回
+        if (hit && haveViews) return@withContext cached
         val desktopUrl = "$baseHost/forum.php?mod=viewthread&tid=$tid&mobile=no"
         val html = runCatching {
             GenericPageClient.get(
@@ -110,9 +112,12 @@ class HttpForumRepository(
                 retryOnFailure = false,
             )
         }.onFailure { cn.mce.starlight.core.DiagLog.record("thread-desktop", it) }.getOrNull()
-            ?: return@withContext null
-        // v0.4.7：同一份电脑版页面顺便取阅读数
-
+            ?: return@withContext cached
+        // v0.4.7：同一份电脑版页面解析「查看 N」（阅读数）
+        Regex("""查看[^\d]{0,24}?(\d+)""").find(html)
+            ?.groupValues?.get(1)?.toIntOrNull()
+            ?.let { viewsCache[tid] = it }
+        if (hit) return@withContext cached
         val parsed = runCatching { ThreadDetailParser.parseRatingsFromHtml(html, desktopUrl) }
             .onFailure { e -> cn.mce.starlight.core.DiagLog.record("ratings", e) }
             .getOrNull()

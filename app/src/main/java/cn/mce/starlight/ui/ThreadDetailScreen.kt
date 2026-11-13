@@ -294,7 +294,8 @@ fun ThreadDetailScreen(
         // v0.4.6：内容渲染完成后再拉评分（电脑版页面），避免和图片抢带宽
         if (cn.mce.starlight.core.SessionStore.isLoggedIn) {
             val cur = (state as? DetailState.Content)?.detail
-            if (cur != null && cur.ratings == null) {
+        // v0.4.7：评分或阅读数任一缺失都需要补抓电脑版页面
+        if (cur != null && (cur.ratings == null || cur.views == null)) {
                 kotlinx.coroutines.delay(400)
                 val r = runCatching { repo.loadRatings(tid) }.getOrNull()
                 // v0.4.7：阅读数（电脑版页面解析）一并回填
