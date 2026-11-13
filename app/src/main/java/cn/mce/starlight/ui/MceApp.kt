@@ -68,6 +68,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import cn.mce.starlight.R
 import cn.mce.starlight.core.DiagStats
 import cn.mce.starlight.core.SessionStore
@@ -546,7 +547,8 @@ fun MceApp() {
                             }
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
 
-                            DrawerEntry(0, "全部最新", dest == Dest.Feed && stack.isEmpty())
+                            DrawerSection("导航")
+            DrawerEntry(0, "全部最新", dest == Dest.Feed && stack.isEmpty())
                             DrawerEntry(1, "我的", dest == Dest.Profile)
                             // v0.3.7：签到入口提到「我的」下方（用户要求调整菜单顺序）
                             DrawerEntry(2, "签到", dest == Dest.SignIn)
@@ -595,6 +597,7 @@ fun MceApp() {
 
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
 
+                            DrawerSection("创作与管理")
                             DrawerEntry(4, "发帖", false)
                             DrawerEntry(
                                 5,
@@ -622,6 +625,7 @@ fun MceApp() {
                                 stack = listOf(Route.RecentThreads)
                                 closeDrawer()
                             }
+                            DrawerSection("更多")
                             DrawerEntry(8, "搜索", dest == Dest.Search)
                             DrawerEntry(9, "排行榜", dest == Dest.Ranklist)
                             DrawerEntry(10, "消息提醒", dest == Dest.Notice)
@@ -1060,12 +1064,26 @@ fun MceApp() {
 }
 
 /**
+ * v0.4.7：侧栏分区标题（一级标题），与二级菜单项形成视觉层级。
+ */
+@Composable
+private fun DrawerSection(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        letterSpacing = 1.2.sp,
+        modifier = Modifier.padding(start = 24.dp, top = 12.dp, bottom = 2.dp),
+    )
+}
+
+/**
  * 抽屉菜单项（v0.3.7 液态玻璃）：
  * 选中态不再用纯色 pill，而是半透明主题色渐变 + 白色边缘高光，渐变随 [sheen] 缓慢流动形成「液态玻璃」质感。
  * [sheen] 只在抽屉打开时由 MceApp 的无限动画驱动（0f 表示不动画）。
  */
 @Composable
-@androidx.annotation.OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 private fun DrawerItem(
     label: String,
@@ -1076,6 +1094,8 @@ private fun DrawerItem(
     showHighlight: Boolean = selected,
     /** v0.4.4：长按（侧栏板块用于收藏/取消收藏） */
     onLongClick: (() -> Unit)? = null,
+    /** v0.4.7：二级条目（更小的字号/缩进，用于板块与子项） */
+    secondary: Boolean = false,
     onClick: () -> Unit,
 ) {
     // v0.3.7 修订：尺寸对齐上一版 NavigationDrawerItem（56dp 高、胶囊形、左右各约 12dp 留白），
@@ -1092,7 +1112,7 @@ private fun DrawerItem(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = (12.dp * drawerScale), vertical = 2.dp)
-            .height(56.dp * drawerScale)
+            .height((if (secondary) 44f else 56f).dp * drawerScale)
                 .then(modifier)
                 .then(
                     if (onLongClick == null) Modifier.clickable(onClick = onClick)
@@ -1126,9 +1146,13 @@ private fun DrawerItem(
         Text(
             text = label,
             // 与旧版 NavigationDrawerItem 一致：labelLarge + 左侧 16dp 内边距 + 垂直居中
-            style = MaterialTheme.typography.labelLarge,
+            style = if (secondary) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.labelLarge,
             // v0.4.7：菜单文字整体加粗（未选中 SemiBold）更醒目
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+            fontWeight = when {
+                selected -> FontWeight.Bold
+                secondary -> FontWeight.Normal
+                else -> FontWeight.SemiBold
+            },
             color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .align(Alignment.CenterStart)

@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
@@ -75,6 +76,8 @@ fun SearchScreen(
     // v0.4.7：搜索结果分页（加载更多）
     var searchPage by remember { mutableStateOf(1) }
     var loadingMore by remember { mutableStateOf(false) }
+    // v0.4.7：搜索结果下拉刷新
+    var pullRefreshing by remember { mutableStateOf(false) }
     var users by remember { mutableStateOf(emptyList<SearchClient.UserHit>()) }
 
     // advanced
@@ -381,6 +384,17 @@ fun SearchScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
+                androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                    isRefreshing = pullRefreshing,
+                    onRefresh = {
+                        pullRefreshing = true
+                        scope.launch {
+                            doSearch()
+                            pullRefreshing = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
                 LazyColumn(
                     // v0.4.7：记住搜索结果滚动位置
                     state = remember { cn.mce.starlight.core.ListStateCache.get("search_results") },
@@ -388,15 +402,24 @@ fun SearchScreen(
                 ) {
                     if (mode == "thread") {
                         items(threads, key = { it.tid }) { hit ->
-                            Text(
-                                hit.title,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier
+                            // v0.4.7：搜索结果改成卡片式（与首页信息流一致）
+                            Box(
+                                Modifier
                                     .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
                                     .clickable { onOpenThread(hit.tid, hit.title) }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                            )
-                            androidx.compose.material3.HorizontalDivider()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                            ) {
+                                Text(
+                                    hit.title,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     // v0.4.7：加载更多搜索结果
                     if (threads.isNotEmpty()) {
@@ -484,6 +507,7 @@ fun SearchScreen(
                             androidx.compose.material3.HorizontalDivider()
                         }
                     }
+                }
                 }
             }
         }
