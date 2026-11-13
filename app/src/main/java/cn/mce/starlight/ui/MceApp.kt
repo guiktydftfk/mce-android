@@ -1131,7 +1131,7 @@ private fun DrawerItem(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = (12.dp * drawerScale), vertical = 2.dp)
-            .height((if (secondary) 36f else 56f).dp * drawerScale)
+            .height((if (secondary) 40f else 56f).dp * drawerScale)
                 .then(modifier)
                 .then(
                     if (onLongClick == null) Modifier.clickable(onClick = onClick)
@@ -1166,7 +1166,7 @@ private fun DrawerItem(
             text = label,
             // 三级条目更小更淡；二级条目保持 labelLarge 半粗
             style = when {
-                secondary -> MaterialTheme.typography.bodySmall
+                secondary -> MaterialTheme.typography.bodyMedium
                 isGroupHeader -> MaterialTheme.typography.bodyLarge
                 else -> MaterialTheme.typography.labelLarge
             },
@@ -1178,7 +1178,7 @@ private fun DrawerItem(
             },
             color = when {
                 selected -> MaterialTheme.colorScheme.primary
-                secondary -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.60f)
+                secondary -> MaterialTheme.colorScheme.onSurface
                 else -> MaterialTheme.colorScheme.onSurface
             },
             modifier = Modifier
