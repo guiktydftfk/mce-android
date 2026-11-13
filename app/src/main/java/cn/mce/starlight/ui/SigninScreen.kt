@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
@@ -55,6 +56,7 @@ import kotlinx.coroutines.launch
  *    排行榜按论坛真实分页（每页 200 条）触底自动加载，直到没有下一页。
  */
 @Composable
+@androidx.annotation.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun SigninScreen(
     onMenu: () -> Unit,
     reloadKey: Int = 0,
@@ -137,7 +139,19 @@ fun SigninScreen(
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val state = data
 
-    Box(Modifier.fillMaxSize()) {
+    // v0.4.7：下拉刷新（替代顶栏刷新按钮）
+    var pullRefreshing by remember { mutableStateOf(false) }
+    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+        isRefreshing = pullRefreshing,
+        onRefresh = {
+            pullRefreshing = true
+            scope.launch {
+                load()
+                pullRefreshing = false
+            }
+        },
+        modifier = Modifier.fillMaxSize(),
+    ) {
         when {
             state == null && loading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                 CircularProgressIndicator()
@@ -311,8 +325,6 @@ fun SigninScreen(
             title = "签到",
             modifier = Modifier.align(Alignment.TopStart),
             onMenu = onMenu,
-            // v0.4.7：签到页刷新
-            onRefresh = { scope.launch { load() } },
         )
     }
 }

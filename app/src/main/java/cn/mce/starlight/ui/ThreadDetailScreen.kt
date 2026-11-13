@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 package cn.mce.starlight.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -98,6 +98,7 @@ private sealed interface DetailState {
 
 /** 帖子详情：楼层 + 图片 + 楼层回复 + 评分（v0.3.8 起为流水式阅读：后续页自动追加，不翻页） */
 @Composable
+@androidx.annotation.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun ThreadDetailScreen(
     tid: Int,
     fallbackTitle: String,
@@ -379,7 +380,19 @@ fun ThreadDetailScreen(
         }
     }
 
-    Box(modifier.fillMaxSize()) {
+    // v0.4.7：下拉刷新（替代顶栏刷新按钮）
+    var pullRefreshing by remember { mutableStateOf(false) }
+    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+        isRefreshing = pullRefreshing,
+        onRefresh = {
+            pullRefreshing = true
+            scope.launch {
+                reloadKeepScroll(noCache = true)
+                pullRefreshing = false
+            }
+        },
+        modifier = Modifier.fillMaxSize(),
+    ) {
         when (val s = state) {
             is DetailState.Loading -> DetailSkeleton(topPadding = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 56.dp)
 

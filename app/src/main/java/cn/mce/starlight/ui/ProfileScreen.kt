@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package cn.mce.starlight.ui
 
 import androidx.compose.foundation.background
@@ -57,6 +58,7 @@ private sealed interface ProfileState {
  * 头像 + 昵称 + 用户组 → 统计（主题/回帖/积分）→ 资料字段 → 入口列表。
  */
 @Composable
+@androidx.annotation.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun ProfileScreen(
     onMenu: () -> Unit,
     reloadKey: Int = 0,
@@ -125,7 +127,20 @@ fun ProfileScreen(
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    Box(Modifier.fillMaxSize()) {
+    // v0.4.7：下拉刷新（替代顶栏刷新按钮）
+    var pullRefreshing by remember { mutableStateOf(false) }
+    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+        isRefreshing = pullRefreshing,
+        onRefresh = {
+            pullRefreshing = true
+            scope.launch {
+                reloadTick += 1
+                kotlinx.coroutines.delay(700)
+                pullRefreshing = false
+            }
+        },
+        modifier = Modifier.fillMaxSize(),
+    ) {
         when (val s = state) {
             is ProfileState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                 CircularProgressIndicator()
@@ -403,8 +418,6 @@ fun ProfileScreen(
             title = "我的",
             modifier = Modifier.align(Alignment.TopStart),
             onMenu = onMenu,
-            // v0.4.7：我的页刷新
-            onRefresh = { reloadTick += 1 },
         )
     }
     // v0.4.1：退出登录二次确认

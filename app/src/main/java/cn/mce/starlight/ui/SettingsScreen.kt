@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package cn.mce.starlight.ui
 
 import android.content.ClipData
@@ -54,6 +55,7 @@ import java.io.File
 
 /** Settings: appearance (dark mode / background image), account, about */
 @Composable
+@androidx.annotation.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun SettingsScreen(
     onMenu: () -> Unit,
     onLogin: () -> Unit,
@@ -107,7 +109,20 @@ fun SettingsScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    // v0.4.7：下拉刷新（替代顶栏刷新按钮）
+    var pullRefreshing by remember { mutableStateOf(false) }
+    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+        isRefreshing = pullRefreshing,
+        onRefresh = {
+            pullRefreshing = true
+            scope.launch {
+                kotlinx.coroutines.delay(400)
+                pullRefreshing = false
+                message = "设置已刷新"
+            }
+        },
+        modifier = Modifier.fillMaxSize(),
+    ) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -803,8 +818,6 @@ fun SettingsScreen(
         ImmersiveTopBar(
             title = "设置",
             onMenu = onMenu,
-            // v0.4.7：设置页刷新（重算缓存/版本等展示值）
-            onRefresh = { message = "设置已刷新" },
         )
     }
 }
