@@ -1162,13 +1162,13 @@ private fun DrawerItem(
             },
             color = when {
                 selected -> MaterialTheme.colorScheme.primary
-                secondary -> MaterialTheme.colorScheme.onSurfaceVariant
+                secondary -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
                 else -> MaterialTheme.colorScheme.onSurface
             },
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(
-                    start = ((if (secondary) 30 else 16).dp * drawerScale),
+                    start = ((if (secondary) 34 else 16).dp * drawerScale),
                     end = (16.dp * drawerScale),
                 ),
         )
