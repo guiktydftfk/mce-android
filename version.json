@@ -6,14 +6,14 @@
     "apk":  "https://gh-proxy.com/https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/MCE-latest.apk",
     "canary":  {
                    "versionName":  "0.4.7-beta",
-                   "versionCode":  51,
+                   "versionCode":  52,
                    "uids":  [
                                 2549,
                                 3303,
                                 4146,
                                 2782
                             ],
-                   "notes":  "0.4.7 灰度测试版（beta）更新：\\n- 新增：私信列表/搜索结果分页加载更多、收藏分组批量管理、搜索历史单条删除、最近错误日志页\\n- 新增：帖子正文字号独立设置、我的主题/搜索结果记忆滚动位置\\n- 修复：引用回复自动引用原帖、回帖后滚到底部、赞赏保持位置、无法回复楼层\\n- 新增：本地自定义表情包（相册导入/管理删除）、表情入口移至回帖与私信\\n- 其他：侧栏 60% 宽度与加粗、分享面板（文案/卡片/复制图片）、星光值精确值修复等",
+                   "notes":  "0.4.7-beta 更新内容（灰度测试）：\\n- 表情：全新仿微信/QQ 底部表情面板（分类标签 / 最近使用 / 8列大网格 / 自定义导入与管理）\\n- 帖子：楼层引用回复（引用原帖内容）、回复后滚到底部、赞赏保持位置、修复无法回复楼层\\n- 阅读：帖子详情显示阅读数（电脑版解析+缓存兜底）\\n- 交互：设置/签到/我的/帖子页支持下拉刷新；侧栏一级/二级/三级标题分层\\n- 内容：搜索历史单条删除、搜索结果卡片化+分页、我的主题/搜索记忆滚动位置\\n- 设置：帖子正文字号独立调节、启动页首图、最近错误日志、收藏分组批量管理\\n- 稳定：弱网/失败提示统一化；单元测试 146 个、冒烟 9/9 通过",
                    "apk":  "https://gh-proxy.com/https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/canary/MCE-starlight-v0.4.7-beta.apk"
                }
 }
