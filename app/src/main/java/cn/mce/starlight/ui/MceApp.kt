@@ -720,7 +720,11 @@ fun MceApp() {
             }
         }
 
+        // v0.4.7：平板/横屏双栏（宽屏时左侧保留列表/上一级，右侧显示帖子）
         val current = stack.lastOrNull()
+        val dualPane = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600 && current is Route.Thread
+        @Composable
+        fun RenderRoute(current: Route?) {
         when (current) {
             is Route.Thread -> ThreadDetailScreen(
                 tid = current.tid,
@@ -959,6 +963,21 @@ fun MceApp() {
                     },
                 )
             }
+        } // 结束 RenderRoute
+
+        if (dualPane) {
+            androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
+                androidx.compose.foundation.layout.Box(Modifier.weight(0.42f)) {
+                    RenderRoute(stack.dropLast(1).lastOrNull())
+                }
+                androidx.compose.material3.VerticalDivider()
+                androidx.compose.foundation.layout.Box(Modifier.weight(0.58f)) {
+                    RenderRoute(current)
+                }
+            }
+        } else {
+            RenderRoute(current)
+        }
         }
         } // 关闭「右侧内容模糊」容器
     }
