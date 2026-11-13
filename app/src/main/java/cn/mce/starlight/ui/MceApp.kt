@@ -1116,6 +1116,8 @@ private fun DrawerItem(
     onLongClick: (() -> Unit)? = null,
     /** v0.4.7：二级条目（更小的字号/缩进，用于板块与子项） */
     secondary: Boolean = false,
+    /** v0.4.7：板块分组标题（二级标题，与普通菜单项、三级板块明显区分） */
+    isGroupHeader: Boolean = false,
     onClick: () -> Unit,
 ) {
     // v0.3.7 修订：尺寸对齐上一版 NavigationDrawerItem（56dp 高、胶囊形、左右各约 12dp 留白），
@@ -1166,7 +1168,11 @@ private fun DrawerItem(
         Text(
             text = label,
             // 三级条目更小更淡；二级条目保持 labelLarge 半粗
-            style = if (secondary) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelLarge,
+            style = when {
+                secondary -> MaterialTheme.typography.bodySmall
+                isGroupHeader -> MaterialTheme.typography.titleSmall
+                else -> MaterialTheme.typography.labelLarge
+            },
             // v0.4.7：菜单文字整体加粗（未选中 SemiBold）更醒目
             fontWeight = when {
                 selected -> FontWeight.Bold
