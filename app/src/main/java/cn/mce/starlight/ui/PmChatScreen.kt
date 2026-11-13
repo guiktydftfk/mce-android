@@ -104,7 +104,7 @@ fun PmChatScreen(
                     listState.requestScrollToItem((it.messages.size - 1).coerceAtLeast(0))
                 }
             }
-            .onFailure { error = it.message ?: "加载失败" }
+            .onFailure { error = cn.mce.starlight.core.UiError.friendly(it) }
     }
     LaunchedEffect(touid) { load() }
     // 消息数量变化（首次加载 / 发送成功重拉）后自动滚到底部

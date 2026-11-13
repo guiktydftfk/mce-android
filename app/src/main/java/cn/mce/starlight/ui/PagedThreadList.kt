@@ -196,9 +196,9 @@ fun PagedThreadList(
             .onFailure {
                 if (gen == st.generation) {
                     if (st.items.isEmpty()) {
-                        st.error = it.message ?: "加载失败"
+                        st.error = cn.mce.starlight.core.UiError.friendly(it)
                     } else {
-                        st.message = "网络较弱，已保留原有内容（${it.message ?: "加载失败"}）"
+                        st.message = "网络较弱，已保留原有内容（${cn.mce.starlight.core.UiError.friendly(it)}）"
                     }
                 }
             }
@@ -254,7 +254,7 @@ fun PagedThreadList(
                     runCatching { listState.requestScrollToItem(0) }
                 }
                 .onFailure {
-                    if (gen == st.generation) st.message = "刷新失败：" + (it.message ?: "网络错误")
+                    if (gen == st.generation) st.message = "刷新失败：" + (cn.mce.starlight.core.UiError.friendly(it))
                 }
             st.refreshing = false
         }

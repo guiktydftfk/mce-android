@@ -94,8 +94,8 @@ fun SigninScreen(
                 error = null
             }
             .onFailure {
-                if (data == null) error = it.message ?: "加载失败"
-                else message = "刷新失败：" + (it.message ?: "网络错误")
+                if (data == null) error = cn.mce.starlight.core.UiError.friendly(it)
+                else message = "刷新失败：" + (cn.mce.starlight.core.UiError.friendly(it))
             }
         loading = false
     }
@@ -116,7 +116,7 @@ fun SigninScreen(
                     hasMore = p.hasMore
                 }
             }
-            .onFailure { message = "加载更多失败：" + (it.message ?: "网络错误") }
+            .onFailure { message = "加载更多失败：" + (cn.mce.starlight.core.UiError.friendly(it)) }
         loadingMore = false
     }
 

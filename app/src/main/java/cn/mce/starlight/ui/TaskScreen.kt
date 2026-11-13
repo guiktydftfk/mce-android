@@ -59,7 +59,7 @@ fun TaskScreen(
             .onSuccess {
                 state = TaskState.Content(it)
             }
-            .onFailure { state = TaskState.Error(it.message ?: "加载失败") }
+            .onFailure { state = TaskState.Error(cn.mce.starlight.core.UiError.friendly(it)) }
     }
 
     LaunchedEffect(reloadKey) { load() }

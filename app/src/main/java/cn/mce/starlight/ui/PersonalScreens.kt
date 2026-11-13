@@ -135,7 +135,7 @@ fun MyRepliesScreen(
     suspend fun load() {
         runCatching { PersonalClient.loadMyReplies(1) }
             .onSuccess { state = PState.Content(it) }
-            .onFailure { state = PState.Error(it.message ?: "加载失败") }
+            .onFailure { state = PState.Error(cn.mce.starlight.core.UiError.friendly(it)) }
     }
     LaunchedEffect(Unit) { load() }
     Box(Modifier.fillMaxSize()) {
@@ -209,7 +209,7 @@ fun FavoritesScreen(
     suspend fun load() {
         runCatching { PersonalClient.loadFavorites(1) }
             .onSuccess { state = PState.Content(it) }
-            .onFailure { state = PState.Error(it.message ?: "加载失败") }
+            .onFailure { state = PState.Error(cn.mce.starlight.core.UiError.friendly(it)) }
     }
         LaunchedEffect(Unit) {
             load()
@@ -322,7 +322,7 @@ fun NoticesScreen(
                 // 页签角标与列表行不再出现「列表读完了、角标还挂着 (2)」的错位
                 MessageCenter.applyPmItems(overlaid)
             }
-            .onFailure { pmState = PState.Error(it.message ?: "加载失败") }
+            .onFailure { pmState = PState.Error(cn.mce.starlight.core.UiError.friendly(it)) }
     }
 
     // v0.4.7：私信列表分页（加载更多）

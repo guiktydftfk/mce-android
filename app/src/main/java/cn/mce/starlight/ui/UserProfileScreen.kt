@@ -67,7 +67,7 @@ fun UserProfileScreen(
         state = UState.Loading
         runCatching { UserProfileClient.load(uid) }
             .onSuccess { state = if (it == null) UState.Error("无法加载该用户资料") else UState.Content(it) }
-            .onFailure { state = UState.Error(it.message ?: "加载失败") }
+            .onFailure { state = UState.Error(cn.mce.starlight.core.UiError.friendly(it)) }
     }
 
     LaunchedEffect(uid) { load() }

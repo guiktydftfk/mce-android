@@ -73,7 +73,7 @@ fun NativePageScreen(
         state = PageState.Loading
         runCatching { GenericPageClient.load(currentUrl) }
             .onSuccess { state = PageState.Content(it) }
-            .onFailure { state = PageState.Error(it.message ?: "加载失败") }
+            .onFailure { state = PageState.Error(cn.mce.starlight.core.UiError.friendly(it)) }
     }
 
     LaunchedEffect(currentUrl) { reload() }

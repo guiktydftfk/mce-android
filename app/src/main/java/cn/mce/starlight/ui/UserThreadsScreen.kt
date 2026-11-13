@@ -81,7 +81,7 @@ fun UserThreadsScreen(
                     if (next == 1) error = "没有查到主题"
                 }
             }
-            .onFailure { error = it.message ?: "加载失败" }
+            .onFailure { error = cn.mce.starlight.core.UiError.friendly(it) }
         loading = false
     }
 

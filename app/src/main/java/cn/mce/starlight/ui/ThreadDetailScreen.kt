@@ -218,7 +218,7 @@ fun ThreadDetailScreen(
                 if (keepOnError && existing != null) {
                     toast = (e.message ?: "刷新失败") + "（已保留上次内容）"
                 } else {
-                    state = DetailState.Error(e.message ?: "加载失败")
+                    state = DetailState.Error(cn.mce.starlight.core.UiError.friendly(e))
                 }
             }
     }

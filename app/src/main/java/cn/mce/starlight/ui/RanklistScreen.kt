@@ -62,7 +62,7 @@ fun RanklistScreen(
             .onSuccess {
                 state = if (it.isEmpty()) RankState.Error("没有解析到榜单") else RankState.Content(it)
             }
-            .onFailure { state = RankState.Error(it.message ?: "加载失败") }
+            .onFailure { state = RankState.Error(cn.mce.starlight.core.UiError.friendly(it)) }
     }
 
     LaunchedEffect(Unit) { load() }
