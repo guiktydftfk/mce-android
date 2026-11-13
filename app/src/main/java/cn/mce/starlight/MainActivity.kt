@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
                 ),
             ) {
                 AppTheme(darkTheme = darkTheme) {
-                    MceApp()
+                    cn.mce.starlight.ui.CustomSplashHost { MceApp() }
                 }
             }
         }

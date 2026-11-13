@@ -69,7 +69,21 @@ fun SettingsScreen(
     var diagBusy by remember { mutableStateOf(false) }
     // v0.4.7：最近错误日志
     var showErrLog by remember { mutableStateOf(false) }
+    // v0.4.7：启动页首图（切换后刷新预览）
+    var splashTick by remember { mutableStateOf(0) }
 
+    // v0.4.7：启动页首图选择器
+    val pickSplash = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    cn.mce.starlight.core.SplashImageStore.save(context, uri)
+                }
+                splashTick++
+                message = if (ok) "启动页首图已设置（下次启动生效）" else "图片保存失败"
+            }
+        }
+    }
     val pickBackground = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
     ) { uri ->
@@ -309,6 +323,50 @@ fun SettingsScreen(
                 )
             }
 
+            Spacer(Modifier.height(10.dp))
+            // v0.4.7：自定义启动页首图
+            val splashFile = remember(splashTick) { cn.mce.starlight.core.SplashImageStore.current(context) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("启动页首图", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (splashFile != null) "已设置首图（下次启动生效）" else "未设置首图",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (splashFile != null) {
+                    Text(
+                        "清除",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .clickable {
+                                cn.mce.starlight.core.SplashImageStore.clear(context)
+                                splashTick++
+                                message = "启动页首图已清除"
+                            }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    )
+                }
+                Text(
+                    "选择图片",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clickable { pickSplash.launch("image/*") }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                )
+            }
+            splashFile?.let { f ->
+                Spacer(Modifier.height(8.dp))
+                AsyncImage(
+                    model = f,
+                    contentDescription = "启动页首图预览",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(10.dp)),
+                )
+            }
             message?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
