@@ -1074,14 +1074,27 @@ private fun DrawerSection(title: String) {
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
         )
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            letterSpacing = 1.6.sp,
+        androidx.compose.foundation.layout.Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(start = 20.dp, top = 2.dp, bottom = 6.dp),
-        )
+        ) {
+            // v0.4.7：主题色竖条 + 加粗加大文字，一级标题一眼可辨
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .width(4.dp)
+                    .height(18.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+            androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.2.sp,
+            )
+        }
     }
 }
 
@@ -1158,7 +1171,7 @@ private fun DrawerItem(
             fontWeight = when {
                 selected -> FontWeight.Bold
                 secondary -> FontWeight.Normal
-                else -> FontWeight.SemiBold
+                else -> FontWeight.Bold
             },
             color = when {
                 selected -> MaterialTheme.colorScheme.primary
