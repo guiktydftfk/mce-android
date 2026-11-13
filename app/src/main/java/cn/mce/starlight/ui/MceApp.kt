@@ -575,9 +575,11 @@ fun MceApp() {
                                             ?.let { it is Route.Board && it.fid == board.fid } == true
                                         val starred = cn.mce.starlight.core.BoardFavorites.isFavorite(board.fid)
                                         DrawerItem(
-                                            label = "    " + (if (starred) "\u2605 " else "") + board.name,
+                                            label = (if (starred) "\u2605 " else "") + board.name,
                                             selected = selected,
                                             sheen = sheen,
+                                            // v0.4.7：三级板块（更小更淡、缩进）
+                                            secondary = true,
                                             onLongClick = {
                                                 cn.mce.starlight.core.BoardFavorites.toggle(board.fid, board.name)
                                             },
