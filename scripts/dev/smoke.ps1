@@ -43,6 +43,11 @@ if ((Test-Path $Apk)) {
     Check "APK 安装成功" $true
 } else { Check ("APK 存在: " + $Apk) $false }
 
+$sizeOut = (& $adb -s $s shell wm size 2>&1) -join " "
+$m = [regex]::Match($sizeOut, "(\d+)x(\d+)")
+$W = if ($m.Success) { [int]$m.Groups[1].Value } else { 1440 }
+$H = if ($m.Success) { [int]$m.Groups[2].Value } else { 2560 }
+
 & $adb -s $s shell am force-stop cn.mce.starlight | Out-Null
 & $adb -s $s shell am start -n cn.mce.starlight/.MainActivity | Out-Null
 Start-Sleep -Seconds 9
@@ -55,11 +60,11 @@ Check "首页帖子列表非空" ($homePage -match "回复 \d+|分钟前|小时�
 Start-Sleep -Seconds 2
 $x = Dump
 Check "抽屉可打开（含我的）" ($x -match '"我的"')
-& $adb -s $s shell input swipe 300 2200 300 600 300 | Out-Null
+& $adb -s $s shell input swipe ([int]($W/2)) ([int]($H*0.86)) ([int]($W/2)) ([int]($H*0.24)) 300 | Out-Null
 Start-Sleep -Seconds 1
 $xd = Dump
 Check "抽屉含最近浏览（滚动后）" ($xd -match "最近浏览")
-& $adb -s $s shell input swipe 300 600 300 2200 300 | Out-Null
+& $adb -s $s shell input swipe ([int]($W/2)) ([int]($H*0.24)) ([int]($W/2)) ([int]($H*0.86)) 300 | Out-Null
 Start-Sleep -Seconds 1
 $x = Dump
 
@@ -75,18 +80,18 @@ if ($n) {
 # 设置页（从抽屉滚动到底部）
 & $adb -s $s shell input tap 63 113 | Out-Null
 Start-Sleep -Seconds 2
-& $adb -s $s shell input swipe 200 2200 200 600 300 | Out-Null
+& $adb -s $s shell input swipe ([int]($W*0.14)) ([int]($H*0.86)) ([int]($W*0.14)) ([int]($H*0.24)) 300 | Out-Null
 Start-Sleep -Seconds 1
-& $adb -s $s shell input swipe 200 2200 200 600 300 | Out-Null
+& $adb -s $s shell input swipe ([int]($W*0.14)) ([int]($H*0.86)) ([int]($W*0.14)) ([int]($H*0.24)) 300 | Out-Null
 Start-Sleep -Seconds 1
 $d = Dump
 $set = Node $d "设置"
 if ($set) {
     & $adb -s $s shell input tap $set.X $set.Y | Out-Null
     Start-Sleep -Seconds 5
-    & $adb -s $s shell input swipe 700 2000 700 700 300 | Out-Null
+    & $adb -s $s shell input swipe ([int]($W*0.5)) ([int]($H*0.78)) ([int]($W*0.5)) ([int]($H*0.27)) 300 | Out-Null
     Start-Sleep -Seconds 1
-    & $adb -s $s shell input swipe 700 2000 700 700 300 | Out-Null
+    & $adb -s $s shell input swipe ([int]($W*0.5)) ([int]($H*0.78)) ([int]($W*0.5)) ([int]($H*0.27)) 300 | Out-Null
     Start-Sleep -Seconds 1
     $st = Dump
     Check "设置页加载" ($st -match "检查更新|明暗模式|存储")

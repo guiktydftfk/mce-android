@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.layout.boundsInRoot
@@ -437,16 +438,18 @@ fun MceApp() {
             )
             fun dragModifierFor(index: Int, isSelected: Boolean): Modifier {
                 if (!isSelected) return Modifier
+                // v0.4.7：长按后拖动才切换菜单，普通上下滑动用于抽屉滚动（大屏列表变长后必需）
                 return Modifier.pointerInput(index) {
-                    detectVerticalDragGestures(
+                    detectDragGesturesAfterLongPress(
                         onDragStart = { offset ->
                             drawerDragStartTop = drawerItemBounds[index]?.start ?: 0f
                             drawerDragDelta = offset.y
                             drawerDragActive = true
                             drawerDragIndex = index
                         },
-                        onVerticalDrag = { _, delta ->
-                            drawerDragDelta += delta
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            drawerDragDelta += dragAmount.y
                             val pointerY = drawerDragStartTop + drawerDragDelta
                             var best = -1
                             var bestDist = Float.MAX_VALUE
@@ -1220,3 +1223,4 @@ private fun DrawerItem(
         )
     }
 }
+
