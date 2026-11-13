@@ -720,20 +720,46 @@ fun MceApp() {
             }
         }
 
-        // v0.4.7：平板/横屏双栏（宽屏时左侧保留列表/上一级，右侧显示帖子）
         val current = stack.lastOrNull()
-        val dualPane = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600 && current is Route.Thread
-        @Composable
-        fun RenderRoute(current: Route?) {
         when (current) {
-            is Route.Thread -> ThreadDetailScreen(
-                tid = current.tid,
-                fallbackTitle = current.title,
-                onMenu = ::openDrawer,
-                reloadKey = dataVersion,
-                onOpenUser = { uid, name -> push(Route.User(if (uid > 0) uid else null, name)) },
-                onOpenPage = { url, title -> push(Route.Page(url, title)) },
-            )
+            is Route.Thread -> {
+                // v0.4.7：平板/横屏双栏——左侧列表、右侧帖子
+                val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+                val wide = cfg.screenWidthDp >= 600 && (cfg.screenWidthDp > cfg.screenHeightDp || cfg.screenWidthDp >= 720)
+                if (wide) {
+                    androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
+                        androidx.compose.foundation.layout.Box(Modifier.weight(0.42f)) {
+                            HomeFeedScreen(
+                                onMenu = ::openDrawer,
+                                reloadKey = dataVersion,
+                                onOpenThread = { push(Route.Thread(it.id, it.title)) },
+                                scrollToTopKey = feedTopTick,
+                                listStates = feedListStates,
+                            )
+                        }
+                        androidx.compose.material3.VerticalDivider()
+                        androidx.compose.foundation.layout.Box(Modifier.weight(0.58f)) {
+                            ThreadDetailScreen(
+                    tid = current.tid,
+                    fallbackTitle = current.title,
+                    onMenu = ::openDrawer,
+                    reloadKey = dataVersion,
+                    onOpenUser = { uid, name -> push(Route.User(if (uid > 0) uid else null, name)) },
+                    onOpenPage = { url, title -> push(Route.Page(url, title)) },
+                )
+                        }
+                    }
+                } else {
+                    ThreadDetailScreen(
+                    tid = current.tid,
+                    fallbackTitle = current.title,
+                    onMenu = ::openDrawer,
+                    reloadKey = dataVersion,
+                    onOpenUser = { uid, name -> push(Route.User(if (uid > 0) uid else null, name)) },
+                    onOpenPage = { url, title -> push(Route.Page(url, title)) },
+                )
+                }
+            }
 
             is Route.Web -> WebPageScreen(
                 url = current.url,
@@ -963,21 +989,6 @@ fun MceApp() {
                     },
                 )
             }
-        } // 结束 RenderRoute
-
-        if (dualPane) {
-            androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
-                androidx.compose.foundation.layout.Box(Modifier.weight(0.42f)) {
-                    RenderRoute(stack.dropLast(1).lastOrNull())
-                }
-                androidx.compose.material3.VerticalDivider()
-                androidx.compose.foundation.layout.Box(Modifier.weight(0.58f)) {
-                    RenderRoute(current)
-                }
-            }
-        } else {
-            RenderRoute(current)
-        }
         }
         } // 关闭「右侧内容模糊」容器
     }
