@@ -229,6 +229,11 @@ fun MceApp() {
 
     fun openDrawer() {
         drawerEverOpened = true
+        // v0.4.7：首次打开抽屉提示「长按菜单项拖动切换」（拖动改为长按触发后需要引导）
+        if (!SettingsStore.drawerDragHintShown) {
+            SettingsStore.markDrawerDragHintShown()
+            appToast = "提示：长按菜单项后上下拖动可快速切换"
+        }
         scope.launch { drawerState.open() }
     }
     fun closeDrawer() { scope.launch { drawerState.close() } }
@@ -732,13 +737,29 @@ fun MceApp() {
                 if (wide) {
                     androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
                         androidx.compose.foundation.layout.Box(Modifier.weight(0.42f)) {
-                            HomeFeedScreen(
-                                onMenu = ::openDrawer,
-                                reloadKey = dataVersion,
-                                onOpenThread = { push(Route.Thread(it.id, it.title)) },
-                                scrollToTopKey = feedTopTick,
-                                listStates = feedListStates,
-                            )
+                            // v0.4.7：左栏显示「来源列表」——从板块进入就显示板块列表
+                            val prev = stack.dropLast(1).lastOrNull()
+                            if (prev is Route.Board) {
+                                ThreadListScreen(
+                                    title = prev.name,
+                                    modifier = Modifier.fillMaxSize(),
+                                    onMenu = ::openDrawer,
+                                    reloadKey = dataVersion,
+                                    enableFilters = true,
+                                    loader = { page, filter -> HttpForumRepository().loadThreads(prev.fid, page, filter) },
+                                    onOpenThread = { push(Route.Thread(it.id, it.title)) },
+                                    onCompose = { push(Route.Compose(prev.fid)) },
+                                    viewsFid = prev.fid,
+                                )
+                            } else {
+                                HomeFeedScreen(
+                                    onMenu = ::openDrawer,
+                                    reloadKey = dataVersion,
+                                    onOpenThread = { push(Route.Thread(it.id, it.title)) },
+                                    scrollToTopKey = feedTopTick,
+                                    listStates = feedListStates,
+                                )
+                            }
                         }
                         androidx.compose.material3.VerticalDivider()
                         androidx.compose.foundation.layout.Box(Modifier.weight(0.58f)) {
@@ -750,6 +771,22 @@ fun MceApp() {
                     onOpenUser = { uid, name -> push(Route.User(if (uid > 0) uid else null, name)) },
                     onOpenPage = { url, title -> push(Route.Page(url, title)) },
                 )
+                            // v0.4.7：双栏右栏关闭按钮
+                            androidx.compose.material3.Surface(
+                                shape = androidx.compose.foundation.shape.CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(top = 6.dp, end = 10.dp),
+                            ) {
+                                Text(
+                                    "×",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier
+                                        .clickable { pop() }
+                                        .padding(horizontal = 10.dp, vertical = 2.dp),
+                                )
+                            }
                         }
                     }
                 } else {

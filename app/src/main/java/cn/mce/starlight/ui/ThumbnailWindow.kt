@@ -7,7 +7,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 
 /** 缩略图预取条数：当前可见条目之后再多拉几条 */
-const val THUMBNAIL_PREFETCH = 3
+const val THUMBNAIL_PREFETCH = 5
 
 /**
  * 缩略图加载窗口：只对「可见 + 之后 [prefetch] 条」加载缩略图。

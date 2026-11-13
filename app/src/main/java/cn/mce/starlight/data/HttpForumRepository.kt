@@ -65,10 +65,22 @@ class HttpForumRepository(
         if (detailCache.size > 5) detailCache.clear()
         detailCache[tid] = System.currentTimeMillis() to detail
     }
-    /** v0.4.7：帖子阅读数（来自电脑版页面「查看 N」） */
-    private val viewsCache = java.util.concurrent.ConcurrentHashMap<Int, Int>()
+    /** v0.4.7：帖子阅读数（来自电脑版页面「查看 N」）；缓存 1 小时过期 */
+    private val viewsCache = java.util.concurrent.ConcurrentHashMap<Int, Pair<Long, Int>>()
 
-    fun viewsOf(tid: Int): Int? = viewsCache[tid]
+    fun viewsOf(tid: Int): Int? {
+        val e = viewsCache[tid] ?: return null
+        if (System.currentTimeMillis() - e.first > 60 * 60_000L) {
+            viewsCache.remove(tid)
+            return null
+        }
+        return e.second
+    }
+
+    private fun putViews(tid: Int, views: Int) {
+        if (viewsCache.size > 100) viewsCache.clear()
+        viewsCache[tid] = System.currentTimeMillis() to views
+    }
 
     private fun cachedRatings(tid: Int): Pair<Boolean, ThreadRatings?> {
         val entry = ratingsCache[tid] ?: return false to null
@@ -116,7 +128,7 @@ class HttpForumRepository(
         // v0.4.7：同一份电脑版页面解析「查看 N」（阅读数）
         Regex("""查看[^\d]{0,24}?(\d+)""").find(html)
             ?.groupValues?.get(1)?.toIntOrNull()
-            ?.let { viewsCache[tid] = it }
+            ?.let { putViews(tid, it) }
         if (hit) return@withContext cached
         val parsed = runCatching { ThreadDetailParser.parseRatingsFromHtml(html, desktopUrl) }
             .onFailure { e -> cn.mce.starlight.core.DiagLog.record("ratings", e) }
