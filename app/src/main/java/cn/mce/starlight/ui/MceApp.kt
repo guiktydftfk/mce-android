@@ -556,12 +556,7 @@ fun MceApp() {
                             DrawerEntry(3, "打Call", false)
 
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
-                            Text(
-                                "板块",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = 20.dp, top = 6.dp, bottom = 2.dp),
-                            )
+                            DrawerSection("板块")
                             Boards.groups.forEach { (groupName, groupBoards) ->
                                 val expanded = groupName in expandedGroups
                                 DrawerItem(
@@ -1134,7 +1129,7 @@ private fun DrawerItem(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = (12.dp * drawerScale), vertical = 2.dp)
-            .height((if (secondary) 40f else 56f).dp * drawerScale)
+            .height((if (secondary) 36f else 56f).dp * drawerScale)
                 .then(modifier)
                 .then(
                     if (onLongClick == null) Modifier.clickable(onClick = onClick)
@@ -1170,7 +1165,7 @@ private fun DrawerItem(
             // 三级条目更小更淡；二级条目保持 labelLarge 半粗
             style = when {
                 secondary -> MaterialTheme.typography.bodySmall
-                isGroupHeader -> MaterialTheme.typography.titleSmall
+                isGroupHeader -> MaterialTheme.typography.bodyLarge
                 else -> MaterialTheme.typography.labelLarge
             },
             // v0.4.7：菜单文字整体加粗（未选中 SemiBold）更醒目
@@ -1181,13 +1176,13 @@ private fun DrawerItem(
             },
             color = when {
                 selected -> MaterialTheme.colorScheme.primary
-                secondary -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                secondary -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.60f)
                 else -> MaterialTheme.colorScheme.onSurface
             },
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(
-                    start = ((if (secondary) 34 else 16).dp * drawerScale),
+                    start = ((if (secondary) 38 else 16).dp * drawerScale),
                     end = (16.dp * drawerScale),
                 ),
         )
