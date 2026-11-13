@@ -1,4 +1,4 @@
-﻿param([string]$Apk = "D:\大D老师的地盘\mce-android-v034\dist\MCE-starlight-v0.4.5-dev.apk")
+﻿param([string]$Apk = "D:\大D老师的地盘\mce-android-v034\dist\MCE-starlight-v0.4.7-beta-test.apk")
 $ErrorActionPreference = "Continue"
 $adb = "D:\大D老师的地盘\android-dev\sdk\platform-tools\adb.exe"
 $s = "127.0.0.1:7555"
@@ -36,7 +36,7 @@ function Check([string]$name, [bool]$ok) {
 & $adb start-server 2>&1 | Out-Null
 & $adb connect $s 2>&1 | Out-Null
 Start-Sleep -Seconds 2
-Check "设备已连接" ((& $adb devices 2>&1) -match "127\.0\.0\.1:7555\s+device")
+Check "设备已连接" ([bool]((& $adb devices 2>&1) -match "127\.0\.0\.1:7555\s+device"))
 
 if ((Test-Path $Apk)) {
     & $adb -s $s install -r $Apk 2>&1 | Out-Null
@@ -55,7 +55,13 @@ Check "首页帖子列表非空" ($homePage -match "回复 \d+|分钟前|小时�
 Start-Sleep -Seconds 2
 $x = Dump
 Check "抽屉可打开（含我的）" ($x -match '"我的"')
-Check "抽屉含最近浏览" ($x -match "最近浏览")
+& $adb -s $s shell input swipe 300 2200 300 600 300 | Out-Null
+Start-Sleep -Seconds 1
+$xd = Dump
+Check "抽屉含最近浏览（滚动后）" ($xd -match "最近浏览")
+& $adb -s $s shell input swipe 300 600 300 2200 300 | Out-Null
+Start-Sleep -Seconds 1
+$x = Dump
 
 # 我的页
 $n = Node $x "^我的$"
