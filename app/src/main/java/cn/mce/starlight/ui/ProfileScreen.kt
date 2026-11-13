@@ -399,7 +399,13 @@ fun ProfileScreen(
             }
         }
 
-        ImmersiveTopBar(title = "我的", modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
+        ImmersiveTopBar(
+            title = "我的",
+            modifier = Modifier.align(Alignment.TopStart),
+            onMenu = onMenu,
+            // v0.4.7：我的页刷新
+            onRefresh = { reloadTick += 1 },
+        )
     }
     // v0.4.1：退出登录二次确认
     // v0.4.1：点「星光值」查看积分明细（社区值/赞赏值/职务值/活动值/实践值/已使用）

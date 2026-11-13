@@ -307,7 +307,13 @@ fun SigninScreen(
             }
         }
 
-        ImmersiveTopBar(title = "签到", modifier = Modifier.align(Alignment.TopStart), onMenu = onMenu)
+        ImmersiveTopBar(
+            title = "签到",
+            modifier = Modifier.align(Alignment.TopStart),
+            onMenu = onMenu,
+            // v0.4.7：签到页刷新
+            onRefresh = { scope.launch { load() } },
+        )
     }
 }
 

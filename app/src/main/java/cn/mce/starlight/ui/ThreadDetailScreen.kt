@@ -187,8 +187,12 @@ fun ThreadDetailScreen(
      * v0.3.9 弱网：[keepOnError] = true 时（当前已有内容）失败不清空界面，
      * 只刷新失败的提示，避免弱网「刷新一次整帖变空白」。
      */
-    suspend fun load(targetPage: Int = page, keepOnError: Boolean = false) {
-        runCatching { repo.loadThreadDetail(tid, targetPage) }
+    suspend fun load(
+        targetPage: Int = page,
+        keepOnError: Boolean = false,
+        noCache: Boolean = false,
+    ) {
+        runCatching { repo.loadThreadDetail(tid, targetPage, noCache) }
             .onSuccess { d ->
                 cn.mce.starlight.data.FormhashStore.seed(d.formhash)
                 val existing = (state as? DetailState.Content)?.detail
@@ -265,11 +269,11 @@ fun ThreadDetailScreen(
      * - [scrollToBottom] = true：回帖成功后直接滚到最底层，方便看到自己刚发的回复；
      * - 否则保持当前滚动位置（赞赏/评分刷新不跳回顶部）。
      */
-    suspend fun reloadKeepScroll(scrollToBottom: Boolean = false) {
+    suspend fun reloadKeepScroll(scrollToBottom: Boolean = false, noCache: Boolean = false) {
         val keepIndex = detailListState.firstVisibleItemIndex
         val keepOffset = detailListState.firstVisibleItemScrollOffset
         page = 1
-        load(1, keepOnError = true)
+        load(1, keepOnError = true, noCache = noCache)
         loadRemainingPages()
         if (scrollToBottom) {
             val total = (state as? DetailState.Content)?.detail?.posts?.size ?: 0

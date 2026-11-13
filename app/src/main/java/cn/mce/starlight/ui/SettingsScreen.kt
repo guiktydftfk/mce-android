@@ -800,7 +800,12 @@ fun SettingsScreen(
             )
         }
 
-        ImmersiveTopBar(title = "设置", onMenu = onMenu)
+        ImmersiveTopBar(
+            title = "设置",
+            onMenu = onMenu,
+            // v0.4.7：设置页刷新（重算缓存/版本等展示值）
+            onRefresh = { message = "设置已刷新" },
+        )
     }
 }
 

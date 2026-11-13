@@ -31,6 +31,8 @@ fun ImmersiveTopBar(
     onMenu: (() -> Unit)? = null,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    /** v0.4.7：右上角刷新按钮（为 null 时不显示） */
+    onRefresh: (() -> Unit)? = null,
 ) {
     val surface = MaterialTheme.colorScheme.surface
     // v0.3.10：渐变画刷缓存，避免每次重组都新建 Brush（滚动/重组时可省一次分配）
@@ -65,9 +67,13 @@ fun ImmersiveTopBar(
                     .weight(1f)
                     .padding(start = if (onMenu == null) 12.dp else 0.dp),
             )
+            val refreshAction = onRefresh
+            if (refreshAction != null) {
+                androidx.compose.material3.TextButton(onClick = refreshAction) { Text("刷新") }
+            }
             if (actionLabel != null && onAction != null) {
                 TextButton(onClick = onAction) { Text(actionLabel) }
-            }
         }
     }
+}
 }
