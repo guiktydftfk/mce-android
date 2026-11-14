@@ -20,3 +20,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "MCE"
 include(":app")
+include(":baselineprofile")

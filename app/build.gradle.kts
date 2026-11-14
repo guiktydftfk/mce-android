@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("androidx.baselineprofile")
 }
 
 android {
@@ -91,6 +92,8 @@ dependencies {
     // 头像 / 附件图片加载
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    baselineProfile(project(":baselineprofile"))
+
     // v0.4.4：Baseline Profile 运行时安装器（让 ART 在首次启动时装下基线配置）
     implementation("androidx.profileinstaller:profileinstaller:1.3.1")
 
