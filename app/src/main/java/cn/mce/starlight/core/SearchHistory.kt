@@ -12,7 +12,7 @@ object SearchHistory {
     fun init(context: Context) { ctx = context.applicationContext }
 
     fun items(): List<String> {
-        val raw = ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.getString(KEY, null) ?: return emptyList()
+        val raw = ctx?.let { Prefs.of(it, PREFS) }?.getString(KEY, null) ?: return emptyList()
         return CryptoBox.decrypt(raw)?.split('\n')?.filter { it.isNotBlank() } ?: emptyList()
     }
 
@@ -20,14 +20,14 @@ object SearchHistory {
         val k = keyword.trim()
         if (k.isBlank()) return
         val list = (listOf(k) + items().filterNot { it == k }).take(MAX)
-        val prefs = ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE) ?: return
+        val prefs = ctx?.let { Prefs.of(it, PREFS) } ?: return
         prefs.edit().putString(KEY, CryptoBox.encrypt(list.joinToString("\n"))).apply()
     }
 
     /** v0.4.7：删除单条历史 */
     fun remove(keyword: String) {
         val list = items().filterNot { it == keyword }
-        val prefs = ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE) ?: return
+        val prefs = ctx?.let { Prefs.of(it, PREFS) } ?: return
         if (list.isEmpty()) {
             prefs.edit().remove(KEY).apply()
         } else {
@@ -36,6 +36,6 @@ object SearchHistory {
     }
 
     fun clear() {
-        ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()?.remove(KEY)?.apply()
+        ctx?.let { Prefs.of(it, PREFS) }?.edit()?.remove(KEY)?.apply()
     }
 }

@@ -82,7 +82,7 @@ fun TaskScreen(
 
             is TaskState.Content -> LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 64.dp, bottom = 110.dp),
+                contentPadding = PaddingValues(top = clampTopInset(topInset) + 64.dp, bottom = 110.dp),
             ) {
                 message?.let { msg ->
                     item {

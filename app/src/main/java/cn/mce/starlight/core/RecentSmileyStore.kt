@@ -18,7 +18,7 @@ object RecentSmileyStore {
     }
 
     fun recent(): List<SmileyClient.Smiley> {
-        val raw = ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.getString(KEY, null)
+        val raw = ctx?.let { Prefs.of(it, PREFS) }?.getString(KEY, null)
             ?: return emptyList()
         return raw.split('\n').mapNotNull { line ->
             val parts = line.split('|')
@@ -31,13 +31,13 @@ object RecentSmileyStore {
     fun record(smiley: SmileyClient.Smiley) {
         val existing = recent().filterNot { it.code == smiley.code }
         val list = (listOf(smiley) + existing).take(MAX)
-        ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        ctx?.let { Prefs.of(it, PREFS) }
             ?.edit()
             ?.putString(KEY, list.joinToString("\n") { "${it.code}|${it.url}" })
             ?.apply()
     }
 
     fun clear() {
-        ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()?.remove(KEY)?.apply()
+        ctx?.let { Prefs.of(it, PREFS) }?.edit()?.remove(KEY)?.apply()
     }
 }

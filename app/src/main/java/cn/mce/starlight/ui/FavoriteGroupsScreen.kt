@@ -46,7 +46,7 @@ fun FavoriteGroupsScreen(
     var manageMode by remember { mutableStateOf(false) }
     val selected = remember { androidx.compose.runtime.mutableStateListOf<Int>() }
     // v0.4.7：收藏分组备份 / 恢复（复制到剪贴板 / 从剪贴板导入）
-    Row(Modifier.fillMaxWidth().padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 8.dp, start = 12.dp, end = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth().padding(top = clampTopInset(topInset) + 8.dp, start = 12.dp, end = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         androidx.compose.material3.TextButton(onClick = {
             runCatching {
                 val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -83,7 +83,7 @@ fun FavoriteGroupsScreen(
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
-            contentPadding = PaddingValues(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 60.dp, bottom = 90.dp, start = 10.dp, end = 10.dp),
+            contentPadding = PaddingValues(top = clampTopInset(topInset) + 60.dp, bottom = 90.dp, start = 10.dp, end = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (items.isEmpty()) {

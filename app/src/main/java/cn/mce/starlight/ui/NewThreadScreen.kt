@@ -150,13 +150,6 @@ fun NewThreadScreen(
     val fid = selectedFid
     val pollChoices = pollOptions.split('\n').map { it.trim() }.filter { it.isNotBlank() }.distinct()
 
-    // 表情：完整表情集（含小红龙 reddragon 全套）
-    var showSmiley by remember { mutableStateOf(false) }
-    var smileySets by remember { mutableStateOf(emptyList<SmileyClient.SmileySet>()) }
-    var smileySetIndex by remember { mutableIntStateOf(0) }
-    LaunchedEffect(showSmiley) {
-        if (showSmiley && smileySets.isEmpty()) smileySets = SmileyClient.load(fid)
-    }
 
     // 从草稿箱恢复内容（只在首次组合时执行；之后用户可自由编辑）
     LaunchedEffect(initialDraft?.id) {
@@ -219,14 +212,6 @@ fun NewThreadScreen(
     }
 
 
-    // v0.4.7：本地自定义表情包
-    var customEmojis by remember { mutableStateOf(cn.mce.starlight.core.CustomEmojiStore.list()) }
-    val pickCustomEmoji = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            runCatching { cn.mce.starlight.core.CustomEmojiStore.add(uri) }
-            customEmojis = cn.mce.starlight.core.CustomEmojiStore.list()
-        }
-    }
     /** 删除一张已插入的图片（同时把正文里的 [attach] 标记去掉） */
     fun removeUploaded(item: Pair<Uri, String>) {
         uploaded.remove(item)
@@ -442,7 +427,7 @@ fun NewThreadScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(pageScroll)
-            .padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 64.dp, start = 14.dp, end = 14.dp),
+            .padding(top = clampTopInset(topInset) + 64.dp, start = 14.dp, end = 14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // 页签：发表帖子 / 发起投票

@@ -140,7 +140,7 @@ fun SearchScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 60.dp),
+                .padding(top = clampTopInset(topInset) + 60.dp),
         ) {
             // mode tabs
             Row(

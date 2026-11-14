@@ -91,7 +91,7 @@ fun RanklistScreen(
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .padding(top = topInset.coerceAtMost(androidx.compose.ui.unit.Dp(96f)) + 64.dp),
+                        .padding(top = clampTopInset(topInset) + 64.dp),
                 ) {
                     Row(
                         Modifier
