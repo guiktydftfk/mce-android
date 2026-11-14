@@ -164,11 +164,18 @@ fun MceApp() {
         }
     }
 
-    var dest by remember { mutableStateOf(Dest.Feed) }
+    // v0.4.7：旋转导致 Activity 重建时保持当前页面与导航栈（NavMemory 为进程内记忆）
+    var dest by remember { mutableStateOf(NavMemory.dest ?: Dest.Feed) }
     // v0.4.1：液态玻璃「高亮框」支持上下拖动切换——拖动时高亮跟随手指，松手后执行对应菜单项
     var drawerDragIndex by remember { mutableStateOf(-1) }
     val drawerItemBounds = remember { mutableStateMapOf<Int, ClosedFloatingPointRange<Float>>() }
-    var stack by remember { mutableStateOf(listOf<Route>()) }
+    var stack by remember { mutableStateOf(NavMemory.stack) }
+
+    // v0.4.7：把导航状态写入进程内记忆（旋转重建后可恢复）
+    LaunchedEffect(dest, stack) {
+        NavMemory.dest = dest
+        NavMemory.stack = stack
+    }
     // v0.4.1：类 iOS 页面滑动转场（进新页从右滑入 / 返回轻滑），配合左边缘右滑返回
     val pageSlide = remember { androidx.compose.animation.core.Animatable(0f) }
     val pageAlpha = remember { androidx.compose.animation.core.Animatable(1f) }
@@ -1109,4 +1116,14 @@ fun MceApp() {
             onDismiss = { updateRelease = null },
         )
     }
+}
+
+/**
+ * v0.4.7：进程内导航记忆。
+ * 旋转屏幕时 Activity 会重建（manifest 不再拦截 orientation），用它恢复当前页面与栈，
+ * 避免旋转后"回到首页/帖子丢失"，也保证宽屏判定使用重建后的真实窗口尺寸。
+ */
+private object NavMemory {
+    var dest: Dest? = null
+    var stack: List<Route> = emptyList()
 }
