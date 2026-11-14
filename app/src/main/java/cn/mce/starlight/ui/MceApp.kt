@@ -760,6 +760,19 @@ fun MceApp() {
                                     listStates = feedListStates,
                                 )
                             }
+                            // v0.4.7：左栏顶部提示当前正在阅读的帖子
+                            androidx.compose.material3.Surface(
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                                modifier = Modifier.fillMaxWidth().height(26.dp),
+                            ) {
+                                Text(
+                                    "正在阅读：" + current.title,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                                )
+                            }
                         }
                         androidx.compose.material3.VerticalDivider()
                         androidx.compose.foundation.layout.Box(Modifier.weight(0.58f)) {
