@@ -674,6 +674,22 @@ fun SettingsScreen(
 
             SectionTitle("诊断")
             Spacer(Modifier.height(8.dp))
+            // v0.4.7：布局诊断（窗口/配置 dp、是否双栏、旋转、密度），用于排查宽屏不生效
+            val cfgDiag = androidx.compose.ui.platform.LocalConfiguration.current
+            val viewDiag = androidx.compose.ui.platform.LocalView.current
+            val denDiag = androidx.compose.ui.platform.LocalDensity.current
+            val winW = with(denDiag) { viewDiag.width.toDp().value.toInt() }
+            val winH = with(denDiag) { viewDiag.height.toDp().value.toInt() }
+            val dualDiag = cn.mce.starlight.core.WindowLayout.isDualPane(winW, winH) ||
+                cn.mce.starlight.core.WindowLayout.isDualPane(cfgDiag.screenWidthDp, cfgDiag.screenHeightDp)
+            Text(
+                "布局诊断：窗口 ${winW}×${winH}dp · 配置 ${cfgDiag.screenWidthDp}×${cfgDiag.screenHeightDp}dp · 双栏 " +
+                    (if (dualDiag) "是" else "否") + " · 旋转 " + viewDiag.display?.rotation + " · 密度 " + denDiag.density,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 "自检报告（含图片自检，一键复制）",
                 style = MaterialTheme.typography.bodyLarge,

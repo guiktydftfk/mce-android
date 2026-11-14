@@ -184,5 +184,26 @@ if ($W2 -gt $H2) {
 $mem = (& $adb -s $s shell dumpsys meminfo cn.mce.starlight 2>&1 | Select-String "TOTAL PSS" | Select-Object -First 1).Line
 Write-Host ("INFO  " + $mem)
 
+
+# 旋转回归：竖屏→横屏应进入双栏，转回竖屏应恢复单栏
+$preRot = Dump
+$rotBtn = Node $preRot "分钟前|小时前|刚刚|昨天"
+if ($rotBtn) {
+    & $adb -s $s shell input tap $rotBtn.X ([int]($rotBtn.Y + 40)) | Out-Null
+    Start-Sleep -Seconds 8
+    $beforeRot = Dump
+    $isThread = ($beforeRot -match "只看楼主|共 \d+ 楼")
+    if ($isThread) {
+        & $adb -s $s shell settings put system accelerometer_rotation 0 | Out-Null
+        & $adb -s $s shell settings put system user_rotation 1 | Out-Null
+        Start-Sleep -Seconds 7
+        $land = Dump
+        Check "旋转后进入宽屏双栏" (($land -match "全部最新") -and ($land -match "只看楼主|共 \d+ 楼"))
+        & $adb -s $s shell settings put system user_rotation 0 | Out-Null
+        Start-Sleep -Seconds 6
+        $port = Dump
+        Check "转回竖屏恢复单栏" (-not (($port -match "全部最新") -and ($port -match "只看楼主|共 \d+ 楼")))
+    } else { Write-Host "INFO  旋转检查跳过（未进入帖子页）" }
+} else { Write-Host "INFO  旋转检查跳过（列表为空）" }
 Write-Host ("===== 冒烟结果: " + $(if ($fail -eq 0) { "全部通过" } else { "$fail 项失败" }) + " =====")
 exit $fail
