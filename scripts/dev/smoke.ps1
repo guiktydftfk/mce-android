@@ -52,6 +52,10 @@ function DrawerFind([string]$label, [int]$tries = 6) {
 }
 
 Check "设备已连接" ([bool]((& $adb devices 2>&1) -match "127\.0\.0\.1:7555\s+device"))
+# 固定竖屏，避免 MuMu 窗口旋转导致坐标错位
+& $adb -s $s shell settings put system accelerometer_rotation 0 | Out-Null
+& $adb -s $s shell settings put system user_rotation 0 | Out-Null
+Start-Sleep -Seconds 2
 $sizeOut = (& $adb -s $s shell dumpsys window displays 2>&1) -join " "
 $m = [regex]::Match($sizeOut, "mBounds=Rect\(0, 0 - (\d+), (\d+)\)")
 $W = if ($m.Success) { [int]$m.Groups[1].Value } else { 1440 }

@@ -125,8 +125,8 @@ internal fun DrawerSection(title: String) {
 internal fun DrawerItem(
     label: String,
     selected: Boolean,
-    sheen: Float = 0f,
     modifier: Modifier = Modifier,
+    sheen: Float = 0f,
     /** v0.4.1：拖动重点框时由浮层统一绘制高亮，条目自身不再画，避免重影 */
     showHighlight: Boolean = selected,
     /** v0.4.4：长按（侧栏板块用于收藏/取消收藏） */
