@@ -700,9 +700,8 @@ fun MceApp() {
         val current = stack.lastOrNull()
         when (current) {
             is Route.Thread -> {
-                // v0.4.7：平板/横屏双栏——左侧列表、右侧帖子
-                val cfg = androidx.compose.ui.platform.LocalConfiguration.current
-                val wide = cn.mce.starlight.core.WindowLayout.isDualPane(cfg.screenWidthDp, cfg.screenHeightDp)
+                // v0.4.7：宽屏判定使用真实窗口尺寸（MainActivity 提供），窗口旋转后立即生效
+                val wide = LocalWideLayout.current
                 if (wide) {
                     androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
                         androidx.compose.foundation.layout.Box(Modifier.weight(0.42f)) {

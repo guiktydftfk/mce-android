@@ -9,6 +9,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -79,7 +80,18 @@ class MainActivity : ComponentActivity() {
                 ),
             ) {
                 AppTheme(darkTheme = darkTheme) {
-                    cn.mce.starlight.ui.CustomSplashHost { MceApp() }
+                    // v0.4.7：按「真实窗口尺寸」判定宽屏，旋转/分屏/自由窗口都能正确进入双栏
+                    androidx.compose.foundation.layout.BoxWithConstraints(
+                        androidx.compose.ui.Modifier.fillMaxSize(),
+                    ) {
+                        val wide = cn.mce.starlight.core.WindowLayout.isDualPane(
+                            maxWidth.value.toInt(),
+                            maxHeight.value.toInt(),
+                        )
+                        CompositionLocalProvider(cn.mce.starlight.ui.LocalWideLayout provides wide) {
+                            cn.mce.starlight.ui.CustomSplashHost { MceApp() }
+                        }
+                    }
                 }
             }
         }
