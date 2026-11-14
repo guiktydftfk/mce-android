@@ -126,6 +126,9 @@ fun ThreadDetailScreen(
     var jumpText by remember { mutableStateOf("") }
     // v0.4.4：楼层长按菜单（复制链接 / 举报 / 编辑自己的帖子）
     var actionPost by remember { mutableStateOf<Post?>(null) }
+    // v0.4.7：原生举报表单（主题 / 楼层）
+    var reportForm by remember { mutableStateOf<cn.mce.starlight.data.ReportClient.ReportForm?>(null) }
+    var reportBusy by remember { mutableStateOf(false) }
     // v0.4.5：帖内搜索关键词
     var showSearch by remember { mutableStateOf(false) }
     // v0.4.6：原生编辑弹窗状态
@@ -144,6 +147,24 @@ fun ThreadDetailScreen(
     var replyTo by remember { mutableStateOf<Post?>(null) }
     var sending by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
+
+    // v0.4.7：原生举报弹窗（Dialog 独立窗口，放置位置不影响布局）
+    reportForm?.let { form ->
+        ReportDialog(
+            form = form,
+            busy = reportBusy,
+            onDismiss = { if (!reportBusy) reportForm = null },
+            onSubmit = { reason, msg ->
+                reportBusy = true
+                scope.launch {
+                    val r = cn.mce.starlight.data.ReportClient.submit(form, reason, msg)
+                    reportBusy = false
+                    reportForm = null
+                    toast = r.message ?: if (r.ok) "举报已提交" else "举报失败"
+                }
+            },
+        )
+    }
     // v0.3.9：屏内提示 2.6s 后自动消失（旧实现 toast 永不清空 → 小弹窗一直挂在界面上）
     LaunchedEffect(toast) {
         if (toast != null) {
@@ -204,6 +225,14 @@ fun ThreadDetailScreen(
                         posts = existing.posts + d.posts.filterNot { it.pid in seen },
                         page = d.page,
                         hasNextPage = d.hasNextPage,
+                    )
+                } else if (existing != null) {
+                    // v0.4.7：刷新（第 1 页重载）时保留手机模板不渲染的详情级字段，
+                    // 否则评分/赞赏卡片与阅读数会在下拉刷新后消失
+                    d.copy(
+                        ratings = d.ratings ?: existing.ratings,
+                        views = d.views ?: existing.views,
+                        rewardCount = d.rewardCount ?: existing.rewardCount,
                     )
                 } else {
                     d
@@ -281,6 +310,15 @@ fun ThreadDetailScreen(
             if (total > 0) runCatching { detailListState.scrollToItem(total - 1) }
         } else {
             runCatching { detailListState.scrollToItem(keepIndex, keepOffset) }
+        // v0.4.7：刷新后补拉评分/阅读数（手机模板不渲染这些字段，刷新会丢卡片）
+        if (cn.mce.starlight.core.SessionStore.isLoggedIn) {
+            runCatching { repo.loadRatings(tid, noCache = noCache) }.getOrNull()?.let { r ->
+                val now = (state as? DetailState.Content)?.detail
+                if (now != null) {
+                    state = DetailState.Content(now.copy(ratings = r, views = repo.viewsOf(tid) ?: now.views))
+                }
+            }
+        }
         }
     }
 
@@ -429,14 +467,9 @@ fun ThreadDetailScreen(
                             modifier = Modifier.padding(horizontal = 16.dp),
                         )
                     }
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            // v0.4.7：操作行可横向滚动，窄屏不再挤压换行（跳楼竖排/大空白）
-                            .horizontalScroll(androidx.compose.foundation.rememberScrollState())
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    // v0.4.7：操作行可横向滑动（右侧「›」渐隐提示，窄屏友好）
+                    ScrollableActionRow(
+                        horizontalPadding = 16,
                     ) {
                         TextButton(onClick = {
                             scope.launch {
@@ -460,10 +493,12 @@ fun ThreadDetailScreen(
                         TextButton(onClick = { showJump = true }) { Text("跳楼") }
                         TextButton(onClick = { showSearch = true }) { Text("搜索") }
                         TextButton(onClick = {
-                            onOpenPage(
-                                "${cn.mce.starlight.data.Net.BASE}/forum.php?mod=misc&action=report&tid=$tid&mobile=no",
-                                "举报主题",
-                            )
+                            // v0.4.7：原生举报（解析真实表单，避免空白页）
+                            scope.launch {
+                                val fid = (state as? DetailState.Content)?.detail?.fid
+                                val f = cn.mce.starlight.data.ReportClient.loadForm(tid, fid, null)
+                                if (f == null) toast = "打开举报失败，请检查网络或登录状态" else reportForm = f
+                            }
                         }) { Text("举报") }
 
 
@@ -605,9 +640,14 @@ fun ThreadDetailScreen(
                             tid = tid,
                             title = title,
                             onDismiss = { actionPost = null },
-                            onReport = { url, label ->
+                            onReport = { _url, _label ->
+                                // v0.4.7：楼层举报走原生表单（带 reppost）
                                 actionPost = null
-                                onOpenPage(url, label)
+                                scope.launch {
+                                    val fid = (state as? DetailState.Content)?.detail?.fid
+                                    val f = cn.mce.starlight.data.ReportClient.loadForm(tid, fid, post.pid)
+                                    if (f == null) toast = "打开举报失败，请检查网络或登录状态" else reportForm = f
+                                }
                             },
                             onEdit = { p2 ->
                                 actionPost = null
@@ -919,13 +959,9 @@ fun ThreadDetailScreen(
                         }
                     }
                 }
-                // v0.3.6：表情 / @ 工具栏（先收键盘再弹窗，避免弹窗被 IME 挤压）
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                // v0.3.6：表情 / @ 工具栏（先收键盘再弹窗，避免弹窗被 IME 挤压）；v0.4.7 支持横滑
+                ScrollableActionRow(
+                    horizontalPadding = 0,
                 ) {
                     TextButton(onClick = {
                         keyboard?.hide()
