@@ -541,19 +541,8 @@ fun MceApp() {
                                 .fillMaxSize()
                                 .verticalScroll(rememberScrollState()),
                         ) {
-                            Column(Modifier.padding(start = 20.dp, top = 28.dp, bottom = 10.dp)) {
-                                Text("MCE星光班", style = MaterialTheme.typography.titleLarge)
-                                Text(
-                                    if (SessionStore.isLoggedIn) {
-                                        "已登录 · ${SessionStore.username ?: "成员"}"
-                                    } else {
-                                        "未登录 · 打开即提示登录"
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                            // v0.4.7：抽屉头部抽到 DrawerContent.kt
+                            DrawerHeader(SessionStore.isLoggedIn, SessionStore.username)
 
                             DrawerSection("导航")
             DrawerEntry(0, "全部最新", dest == Dest.Feed && stack.isEmpty())
@@ -564,41 +553,21 @@ fun MceApp() {
                             DrawerEntry(3, "打Call", false)
 
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
-                            DrawerSection("板块")
-                            Boards.groups.forEach { (groupName, groupBoards) ->
-                                val expanded = groupName in expandedGroups
-                                DrawerItem(
-                                    label = (if (expanded) "\u25be " else "\u25b8 ") + groupName,
-                                    selected = false,
-                                    sheen = sheen,
-                                ) {
-                                    expandedGroups = if (expanded) expandedGroups - groupName
-                                    else expandedGroups + groupName
-                                }
-                                if (expanded) {
-                                    groupBoards.sortedByDescending {
-                                        cn.mce.starlight.core.BoardFavorites.isFavorite(it.fid)
-                                    }.forEach { board ->
-                                        val selected = dest == Dest.Feed && stack.firstOrNull()
-                                            ?.let { it is Route.Board && it.fid == board.fid } == true
-                                        val starred = cn.mce.starlight.core.BoardFavorites.isFavorite(board.fid)
-                                        DrawerItem(
-                                            label = (if (starred) "\u2605 " else "") + board.name,
-                                            selected = selected,
-                                            sheen = sheen,
-                                            // v0.4.7：三级板块（更小更淡、缩进）
-                                            secondary = true,
-                                            onLongClick = {
-                                                cn.mce.starlight.core.BoardFavorites.toggle(board.fid, board.name)
-                                            },
-                                        ) {
-                                            dest = Dest.Feed
-                                            stack = listOf(Route.Board(board.fid, board.name))
-                                            closeDrawer()
-                                        }
-                                    }
-                                }
-                            }
+                            // v0.4.7：板块分组抽到 DrawerContent.kt
+                            DrawerBoardsSection(
+                                groups = Boards.groups,
+                                expanded = expandedGroups,
+                                selectedFid = (stack.firstOrNull() as? Route.Board)?.fid,
+                                sheen = sheen,
+                                onToggle = { g ->
+                                    expandedGroups = if (g in expandedGroups) expandedGroups - g else expandedGroups + g
+                                },
+                                onSelect = { board ->
+                                    dest = Dest.Feed
+                                    stack = listOf(Route.Board(board.fid, board.name))
+                                    closeDrawer()
+                                },
+                            )
 
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
 

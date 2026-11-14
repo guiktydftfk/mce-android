@@ -827,159 +827,64 @@ fun ThreadDetailScreen(
             }
 
         // v0.3.10：赞赏（打赏楼主）从顶部按钮移到右下角悬浮按钮，拇指更容易点到
-        detail?.let { d ->
-            val opPid = d.posts.firstOrNull()?.pid
-            if (opPid != null) {
-                TextButton(
-                    onClick = {
-                        scope.launch {
-                            val r = RateClient.loadForm(tid, opPid)
-                            val f = r.form
-                            if (f == null) {
-                                toast = r.message ?: "赞赏表单加载失败（可能未登录）"
-                            } else {
-                                rateIsReward = true
-                                ratePid = opPid
-                                rateForm = f
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 14.dp, bottom = 128.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            RoundedCornerShape(20.dp),
-                        ),
-                ) {
-                    Text(
-                        "赞赏",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        style = MaterialTheme.typography.labelLarge,
-                    )
+        // v0.4.7：回帖发送逻辑（UI 已抽到 ReplyComposer）
+        fun sendReply() {
+            val d = detail ?: return
+            val fid = d.fid ?: return
+            sending = true
+            val aids = replyImages.map { it.second }
+            val message = buildString {
+                val body = replyText.text.trim()
+                replyTo?.let { target ->
+                    val quoteBody = target.contentText.trim().replace("\n", " ").take(300)
+                    val quoteTime = target.dateText ?: target.floorLabel ?: ""
+                    append("[quote][size=2][url=forum.php?mod=redirect&goto=findpost&pid=")
+                    append(target.pid)
+                    append("&ptid=").append(tid)
+                    append("][color=#999999]").append(target.author).append(" 发表于 ")
+                    append(quoteTime).append("[/color][/url][/size]")
+                    append(quoteBody).append("[/quote]\n")
+                }
+                if (body.isNotEmpty()) append(body)
+                aids.forEach { aid ->
+                    if (isNotEmpty()) append('\n')
+                    append("[attach]").append(aid).append("[/attach]")
+                }
+            }
+            scope.launch {
+                val r = PostActions.reply(tid, fid, message, replyTo?.pid, aids = aids)
+                sending = false
+                toast = r.message
+                if (r.ok) {
+                    replyText = TextFieldValue("")
+                    replyTo = null
+                    replyImages.clear()
+                    keyboard?.hide()
+                    focusManager.clearFocus()
+                    reloadKeepScroll(scrollToBottom = true)
                 }
             }
         }
 
+        // v0.4.7：回帖输入区（抽到 ui/ReplyComposer.kt）
         detail?.let { d ->
-            Column(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .imePadding()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = replyText,
-                        onValueChange = { replyText = it },
-                        placeholder = {
-                            Text(replyTo?.let { "回复 ${it.author}" } ?: "说点什么…")
-                        },
-                        maxLines = 4,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(
-                        enabled = !sending && (replyText.text.isNotBlank() || replyImages.isNotEmpty()) && d.fid != null,
-                        onClick = {
-                            val fid = d.fid ?: return@TextButton
-                            sending = true
-                            val aids = replyImages.map { it.second }
-                            // v0.3.8：图片用 [attach]aid[/attach] 内嵌到正文（只传 attachnew 会堆在楼末）
-                            val message = buildString {
-                                val body = replyText.text.trim()
-                                // v0.4.7：楼层回复像网页版一样引用原帖内容
-                                replyTo?.let { target ->
-                                    val quoteBody = target.contentText.trim()
-                                        .replace("\n", " ")
-                                        .take(300)
-                                    val quoteTime = target.dateText ?: target.floorLabel ?: ""
-                                    append("[quote][size=2][url=forum.php?mod=redirect&goto=findpost&pid=")
-                                    append(target.pid)
-                                    append("&ptid=").append(tid)
-                                    append("][color=#999999]").append(target.author).append(" 发表于 ")
-                                    append(quoteTime).append("[/color][/url][/size]")
-                                    append(quoteBody).append("[/quote]\n")
-                                }
-                                if (body.isNotEmpty()) append(body)
-                                aids.forEach { aid ->
-                                    if (isNotEmpty()) append('\n')
-                                    append("[attach]").append(aid).append("[/attach]")
-                                }
-                            }
-                            scope.launch {
-                                val r = PostActions.reply(tid, fid, message, replyTo?.pid, aids = aids)
-                                sending = false
-                                toast = r.message
-                                if (r.ok) {
-                                    replyText = TextFieldValue("")
-                                    replyTo = null
-                                    replyImages.clear()
-                                    // v0.4.0：回帖成功后自动收起输入法并把焦点移出输入框（不再一直挂着键盘）
-                                    keyboard?.hide()
-                                    focusManager.clearFocus()
-                                    // v0.4.7：回帖成功后刷新整帖，但保持当前滚动位置（不跳回顶部）
-                                    reloadKeepScroll(scrollToBottom = true)
-                                }
-                            }
-                        },
-                    ) { Text(if (sending) "发送中" else "回复") }
-                }
-                // v0.3.8：已上传的回帖图片预览（点 × 移除）
-                if (replyImages.isNotEmpty()) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(bottom = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        replyImages.forEach { (uri, aid) ->
-                            Box {
-                                AsyncImage(
-                                    model = uri,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(52.dp)
-                                        .clip(RoundedCornerShape(8.dp)),
-                                )
-                                Text(
-                                    "×",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .clickable { replyImages.remove(uri to aid) }
-                                        .padding(horizontal = 4.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-                // v0.3.6：表情 / @ 工具栏（先收键盘再弹窗，避免弹窗被 IME 挤压）；v0.4.7 支持横滑
-                ScrollableActionRow(
-                    horizontalPadding = 0,
-                ) {
-                    TextButton(onClick = {
-                        keyboard?.hide()
-                        showSmiley = true
-                    }) { Text("表情") }
-                    TextButton(onClick = {
-                        keyboard?.hide()
-                        showMention = true
-                    }) { Text("@ 提及") }
-                    TextButton(
-                        enabled = !uploadingImage,
-                        onClick = { pickReplyImages.launch("image/*") },
-                    ) { Text(if (uploadingImage) "上传中…" else "图片") }
-                    if (replyTo != null) {
-                        TextButton(onClick = { replyTo = null }) { Text("取消楼层回复") }
-                    }
-                }
-            }
+            ReplyComposer(
+                fid = d.fid,
+                replyText = replyText,
+                onReplyTextChange = { replyText = it },
+                replyToAuthor = replyTo?.author,
+                onCancelReply = { replyTo = null },
+                sending = sending,
+                canSend = replyText.text.isNotBlank() || replyImages.isNotEmpty(),
+                onSend = { sendReply() },
+                images = replyImages,
+                onRemoveImage = { replyImages.remove(it) },
+                uploadingImage = uploadingImage,
+                onPickImage = { pickReplyImages.launch("image/*") },
+                onOpenSmiley = { keyboard?.hide(); showSmiley = true },
+                onOpenMention = { keyboard?.hide(); showMention = true },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
 
         toast?.let { msg ->
