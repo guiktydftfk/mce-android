@@ -32,6 +32,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,7 +55,12 @@ fun MedalsScreen(
 ) {
     var medals by remember { mutableStateOf<List<SocialClient.Medal>?>(null) }
     var detail by remember { mutableStateOf<SocialClient.Medal?>(null) }
-    LaunchedEffect(Unit) { medals = SocialClient.loadMedals() }
+    // v0.4.8：勋章领取
+    var claiming by remember { mutableStateOf(false) }
+    var reloadKey by remember { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(reloadKey) { medals = SocialClient.loadMedals() }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     Box(Modifier.fillMaxSize()) {
@@ -126,6 +134,23 @@ fun MedalsScreen(
                 }
             },
             confirmButton = {
+                if (medal.claimable) {
+                    androidx.compose.material3.TextButton(
+                        enabled = !claiming,
+                        onClick = {
+                            claiming = true
+                            scope.launch {
+                                val r = SocialClient.claimMedal(medal)
+                                claiming = false
+                                android.widget.Toast.makeText(ctx, r.message ?: if (r.ok) "领取成功" else "领取失败", android.widget.Toast.LENGTH_SHORT).show()
+                                if (r.ok) {
+                                    detail = null
+                                    reloadKey++
+                                }
+                            }
+                        },
+                    ) { Text(if (claiming) "领取中…" else "领取") }
+                }
                 androidx.compose.material3.TextButton(onClick = { detail = null }) { Text("知道了") }
             },
         )

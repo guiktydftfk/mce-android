@@ -23,7 +23,25 @@ object SocialClient {
         val progress: String? = null,
         /** v0.4.1：条件已满足、可点「领取」（勋章中心里显示「领取」链接） */
         val claimable: Boolean = false,
+        /** v0.4.8：领取链接（勋章中心「领取」按钮的 href） */
+        val claimUrl: String? = null,
     )
+
+    /** v0.4.8：领取勋章（GET 领取链接，按 Discuz 响应判定结果） */
+    suspend fun claimMedal(medal: Medal): PostActions.Result = withContext(Dispatchers.IO) {
+        val url = medal.claimUrl
+            ?: return@withContext PostActions.Result(false, "该勋章暂不支持在客户端领取")
+        val html = runCatching {
+            GenericPageClient.get(url, retryOnFailure = false)
+        }.getOrNull()
+            ?: return@withContext PostActions.Result(false, "网络较弱，请稍后重试")
+        val ok = DiscuzResponse.isSuccess(html) || html.contains("领取成功")
+        if (ok) {
+            PostActions.Result(true, "领取成功")
+        } else {
+            PostActions.Result(false, DiscuzResponse.failureMessage(html) ?: "领取失败，可能条件还未满足")
+        }
+    }
 
     /** v0.4.1：好友增加在线状态（true=在线 / false=离线 / null=未知） */
     data class Friend(
@@ -100,7 +118,8 @@ object SocialClient {
             if (name.isBlank() || name.length > 20) return@mapNotNull null
             val statusText = li.select("p").map { it.text().trim() }.lastOrNull { it.length <= 8 && it != name }.orEmpty()
             val unlocked = statusText.contains("已领取") || statusText.contains("已获得")
-            val claimable = !unlocked && li.selectFirst("a[href*=action=confirm]") != null
+            val claimEl = li.selectFirst("a[href*=action=confirm], a[href*=op=apply], a[href*=op=claim]")
+            val claimable = !unlocked && claimEl != null
             val kind = li.selectFirst("div.tip p.mtn")?.text()?.trim()
             val desc = li.selectFirst("div.tip p:not(.mtn)")?.text()?.trim()
                 ?.takeIf { it.isNotBlank() && it != name && it.length <= 60 }
