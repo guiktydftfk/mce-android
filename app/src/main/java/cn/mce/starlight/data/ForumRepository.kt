@@ -99,6 +99,8 @@ data class ThreadDetail(
     val passwordRequired: Boolean = false,
     /** v0.4.8：密码表单（提交密码用） */
     val passwordForm: PageBlock.Form? = null,
+    /** v0.4.8：非图片附件（zip/pdf/apk 等，可点击下载） */
+    val attachments: List<Attachment> = emptyList(),
 )
 
 /** 帖子评分/打赏汇总 */
@@ -125,3 +127,10 @@ interface ForumRepository {
     suspend fun loadGuide(view: String = "newthread", page: Int = 1): ForumPage
     suspend fun loadThreadDetail(tid: Int, page: Int, noCache: Boolean = false): ThreadDetail
 }
+
+/** v0.4.8：帖子非图片附件 */
+data class Attachment(
+    val name: String,
+    val url: String,
+    val sizeText: String? = null,
+)

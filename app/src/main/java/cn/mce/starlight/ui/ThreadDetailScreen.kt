@@ -153,6 +153,8 @@ fun ThreadDetailScreen(
     // v0.4.8：需要密码的帖子
     var passwordInput by remember { mutableStateOf("") }
     var passwordBusy by remember { mutableStateOf(false) }
+    // v0.4.8：附件下载状态
+    var downloadingAttUrl by remember { mutableStateOf<String?>(null) }
 
     // v0.4.7：原生举报弹窗（Dialog 独立窗口，放置位置不影响布局）
     reportForm?.let { form ->
@@ -621,6 +623,71 @@ fun ThreadDetailScreen(
                             },
                         )
                         HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                    }
+                }
+                // v0.4.8：附件（非图片）列表，点击下载后用系统应用打开
+                s.detail.attachments.takeIf { it.isNotEmpty() }?.let { atts ->
+                    item {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                        ) {
+                            Text(
+                                "附件（${atts.size}）",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 4.dp),
+                            )
+                            atts.forEach { att ->
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            if (downloadingAttUrl != null) return@clickable
+                                            scope.launch {
+                                                downloadingAttUrl = att.url
+                                                runCatching {
+                                                    cn.mce.starlight.data.AttachmentDownloader.download(ctx, att.url, att.name)
+                                                }.onSuccess { file ->
+                                                    downloadingAttUrl = null
+                                                    runCatching { cn.mce.starlight.data.AttachmentDownloader.open(ctx, file) }
+                                                        .onFailure { toast = "没有可打开该附件的应用" }
+                                                }.onFailure { e ->
+                                                    downloadingAttUrl = null
+                                                    toast = e.message ?: "附件下载失败"
+                                                }
+                                            }
+                                        }
+                                        .padding(vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text("📎", style = MaterialTheme.typography.bodyLarge)
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            att.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        att.sizeText?.let { size ->
+                                            Text(
+                                                size,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        if (downloadingAttUrl == att.url) "下载中…" else "下载",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        }
+                        HorizontalDivider(Modifier.padding(top = 6.dp))
                     }
                 }
                 // v0.4.8：只看楼主 / 只看某作者 / 倒序浏览

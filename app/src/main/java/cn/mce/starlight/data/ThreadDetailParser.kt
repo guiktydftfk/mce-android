@@ -108,6 +108,8 @@ object ThreadDetailParser {
             formhash = Net.formhashOf(html),
             rewardCount = rewardCount,
             poll = parsePoll(doc),
+            // v0.4.8：非图片附件列表
+            attachments = parseAttachments(doc),
         ).also { parsed ->
             cn.mce.starlight.core.DiagStats.recordParse("帖子", "${parsed.posts.size} 楼 / 评分 ${parsed.ratings?.entries?.size ?: 0} 人")
         }
@@ -523,6 +525,25 @@ object ThreadDetailParser {
     }
 
     /** Split message HTML into ordered text/image blocks. */
+
+    private val imageExts = listOf(".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic")
+
+    /** v0.4.8：解析帖子附件（排除内联图片附件） */
+    private fun parseAttachments(doc: Document): List<Attachment> {
+        val out = mutableListOf<Attachment>()
+        doc.select("a[href*=mod=attachment]").forEach { a ->
+            val href = a.attr("href").replace("&amp;", "&")
+            if (href.isBlank() || href.contains("mod=image") || href.contains("size=")) return@forEach
+            val name = a.text().trim().ifBlank { a.attr("title").trim() }.ifBlank { "附件" }
+            if (name.length > 120) return@forEach
+            if (imageExts.any { name.lowercase().endsWith(it) }) return@forEach
+            val size = Regex("""(\d+(?:\.\d+)?\s*(?:KB|MB|GB|B))""", RegexOption.IGNORE_CASE)
+                .find(a.parent()?.text().orEmpty())?.groupValues?.get(1)
+            out.add(Attachment(name = name, url = Net.absolutize(href), sizeText = size))
+        }
+        return out.distinctBy { it.url }
+    }
+
     private fun parseBlocks(element: Element): List<ContentBlock> {
         val blocks = mutableListOf<ContentBlock>()
         val sb = StringBuilder()
