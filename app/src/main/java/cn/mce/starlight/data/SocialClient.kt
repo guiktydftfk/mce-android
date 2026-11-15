@@ -27,6 +27,16 @@ object SocialClient {
         val claimUrl: String? = null,
     )
 
+    /** v0.4.8：处理好友请求（同意 / 拒绝），传入提醒里解析出的链接 */
+    suspend fun respondFriendRequest(url: String): PostActions.Result = withContext(Dispatchers.IO) {
+        val html = runCatching {
+            GenericPageClient.get(url, retryOnFailure = false)
+        }.getOrNull()
+            ?: return@withContext PostActions.Result(false, "网络较弱，请稍后重试")
+        val ok = DiscuzResponse.isSuccess(html) || html.contains("成功")
+        PostActions.Result(ok, if (ok) "处理成功" else (DiscuzResponse.failureMessage(html) ?: "操作失败"))
+    }
+
     /** v0.4.8：领取勋章（GET 领取链接，按 Discuz 响应判定结果） */
     suspend fun claimMedal(medal: Medal): PostActions.Result = withContext(Dispatchers.IO) {
         val url = medal.claimUrl

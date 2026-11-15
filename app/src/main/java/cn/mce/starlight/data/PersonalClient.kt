@@ -52,6 +52,10 @@ object PersonalClient {
         val uid: Int? = null,
         /** v0.4.8：提醒对应楼层 pid（@ / 引用提醒可直达楼层） */
         val pid: Int? = null,
+        /** v0.4.8：好友请求提醒（同意 / 拒绝链接） */
+        val friendUid: Int? = null,
+        val acceptUrl: String? = null,
+        val ignoreUrl: String? = null,
     )
 
     /** 我的主题（沿用帖子列表模板） */
@@ -135,10 +139,20 @@ object PersonalClient {
     }
 
     /** 消息提醒：li.notice_item（v0.3.10：补 uid，翻页由 UI 逐页拉取合并） */
-    suspend fun loadNotices(page: Int): List<NoticeItem> = withContext(Dispatchers.IO) {
-        val url = "$BASE/home.php?mod=space&do=notice&page=$page"
+    /**
+     * 消息提醒：li.notice_item（v0.3.10：补 uid，翻页由 UI 逐页拉取合并）。
+     * v0.4.8：支持按分类筛选（view = system / post / user / app）。
+     */
+    suspend fun loadNotices(page: Int, view: String? = null): List<NoticeItem> = withContext(Dispatchers.IO) {
+        val viewParam = if (!view.isNullOrBlank()) "&view=$view" else ""
+        val url = "$BASE/home.php?mod=space&do=notice&page=$page$viewParam"
         val doc = Jsoup.parse(GenericPageClient.get(url), url)
-        doc.select("li.notice_item, li[class*=notice_item]").map { li ->
+        parseNoticeItems(doc)
+    }
+
+    /** v0.4.8：提醒条目解析（提取为可测试函数） */
+    internal fun parseNoticeItems(doc: org.jsoup.nodes.Document): List<NoticeItem> {
+        return doc.select("li.notice_item, li[class*=notice_item]").map { li ->
             val avatarLink = li.selectFirst("a.avatars, a[href*=space][href*=uid=]")
             val avatar = li.selectFirst("img[src*=avatar.php]")?.attr("src")
                 ?.takeIf { it.isNotBlank() }?.let(::absolutize)
@@ -157,7 +171,18 @@ object PersonalClient {
             val pid = linkEl?.attr("href")?.let { href ->
                 pidRegex.find(href)?.groupValues?.get(1)?.toIntOrNull()
             }
-            NoticeItem(avatar, author, time, note, tid, uid, pid)
+            // v0.4.8：好友请求提醒（同意 / 拒绝链接）
+            val friendLinks = li.select("a[href*=ac=friend]").map { it.attr("href").replace("&amp;", "&") }
+            val acceptUrl = friendLinks
+                .firstOrNull { it.contains("op=add") || it.contains("op=confirm") || it.contains("op=accept") }
+                ?.let(::absolutize)
+            val ignoreUrl = friendLinks
+                .firstOrNull { it.contains("op=ignore") || it.contains("op=del") || it.contains("op=refuse") }
+                ?.let(::absolutize)
+            val friendUid = friendLinks.firstOrNull()
+                ?.let { uidRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() }
+                ?: uid
+            NoticeItem(avatar, author, time, note, tid, uid, pid, friendUid, acceptUrl, ignoreUrl)
         }
     }
 

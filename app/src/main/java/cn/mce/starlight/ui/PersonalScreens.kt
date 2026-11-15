@@ -287,13 +287,17 @@ fun NoticesScreen(
     var tab by remember { mutableStateOf(noticeTabIndex) } // 0 = 提醒，1 = 私信
     var noticeState by remember { mutableStateOf<PState<PersonalClient.NoticeItem>>(PState.Loading) }
     var pmState by remember { mutableStateOf<PState<PersonalClient.PmItem>>(PState.Loading) }
+    // v0.4.8：提醒分类（全部 / 系统 / 帖子 / 用户 / 应用）+ 好友请求处理中标记
+    var noticeView by remember { mutableStateOf<String?>(null) }
+    var friendHandlingUrl by remember { mutableStateOf<String?>(null) }
+    val friendCtx = androidx.compose.ui.platform.LocalContext.current
 
     suspend fun loadNotices() {
         // v0.3.10：消息提醒逐页拉取合并（每次 30 条）—— 旧实现只看第 1 页，
         // 较早的「打赏/评分」提醒会整批消失（用户反馈"部分打赏不显示"）。
         val merged = LinkedHashMap<String, PersonalClient.NoticeItem>()
         for (page in 1..4) {
-            val items = runCatching { PersonalClient.loadNotices(page) }.getOrNull()
+            val items = runCatching { PersonalClient.loadNotices(page, noticeView) }.getOrNull()
             if (items == null) {
                 if (page == 1) {
                     noticeState = PState.Error("加载失败")
