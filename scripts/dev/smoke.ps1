@@ -37,16 +37,26 @@ function Swipe([double]$x1, [double]$y1, [double]$x2, [double]$y2) {
     & $adb -s $s shell input swipe ([int]$x1) ([int]$y1) ([int]$x2) ([int]$y2) 350 | Out-Null
     Start-Sleep -Milliseconds 900
 }
+function WinNow() {
+    $o = (& $adb -s $s shell dumpsys window displays 2>&1) -join ' '
+    $m = [regex]::Match($o, 'mBounds=Rect\(0, 0 - (\d+), (\d+)\)')
+    if ($m.Success) { return @([int]$m.Groups[1].Value, [int]$m.Groups[2].Value) }
+    return @($script:W, $script:H)
+}
 function Back { & $adb -s $s shell input keyevent 4 | Out-Null; Start-Sleep -Milliseconds 900 }
 
 # 抽屉内向下滚动查找目标文本，返回最后一次 dump
 function DrawerFind([string]$label, [int]$tries = 6) {
-    & $adb -s $s shell input tap 63 113 | Out-Null
+    $wn0 = WinNow
+    & $adb -s $s shell input tap ([int]($wn0[0] * 0.04)) ([int]($wn0[1] * 0.06)) | Out-Null
     Start-Sleep -Seconds 2
+    # 抽屉未打开则重点一次（旋转动画/首点被吞）
+    if ((Dump) -notmatch "导航|全部最新|我的") { & $adb -s $s shell input tap 63 113 | Out-Null; Start-Sleep -Seconds 2 }
     for ($i = 0; $i -lt $tries; $i++) {
         $d = Dump
         if ($d -match [regex]::Escape($label)) { return $d }
-        Swipe ($W * 0.5) ($H * 0.82) ($W * 0.5) ($H * 0.30)
+        $wn = WinNow
+        Swipe ($wn[0] * 0.28) ($wn[1] * 0.75) ($wn[0] * 0.28) ($wn[1] * 0.32)
     }
     return (Dump)
 }
@@ -56,12 +66,22 @@ Check "设备已连接" ([bool]((& $adb devices 2>&1) -match "127\.0\.0\.1:7555\
 & $adb -s $s shell settings put system accelerometer_rotation 0 | Out-Null
 & $adb -s $s shell settings put system user_rotation 0 | Out-Null
 Start-Sleep -Seconds 2
-$sizeOut = (& $adb -s $s shell dumpsys window displays 2>&1) -join " "
-$m = [regex]::Match($sizeOut, "mBounds=Rect\(0, 0 - (\d+), (\d+)\)")
-$W = if ($m.Success) { [int]$m.Groups[1].Value } else { 1440 }
-$H = if ($m.Success) { [int]$m.Groups[2].Value } else { 2560 }
-$landscape = $W -gt $H
-Write-Host ("INFO  屏幕: ${W}x${H} land=${landscape}")
+# v0.4.8：稳健读取屏幕尺寸——用 wm size + SurfaceOrientation 轮询，避免旋转动画期间读到旧尺寸
+$physOut = (& $adb -s $s shell wm size 2>&1) -join " "
+$pm = [regex]::Match($physOut, "Physical size: (\d+)x(\d+)")
+$pw = if ($pm.Success) { [int]$pm.Groups[1].Value } else { 1440 }
+$ph = if ($pm.Success) { [int]$pm.Groups[2].Value } else { 2560 }
+$rotation = 0
+for ($ri = 0; $ri -lt 10; $ri++) {
+    $inputOut = (& $adb -s $s shell dumpsys input 2>&1) -join " "
+    $rm = [regex]::Match($inputOut, "SurfaceOrientation: (\d)")
+    if ($rm.Success) { $rotation = [int]$rm.Groups[1].Value }
+    if ($rotation -eq 0 -or $rotation -eq 2) { break }
+    Start-Sleep -Milliseconds 800
+}
+$landscape = ($rotation -eq 1 -or $rotation -eq 3)
+if ($landscape) { $W = [Math]::Max($pw, $ph); $H = [Math]::Min($pw, $ph) } else { $W = [Math]::Min($pw, $ph); $H = [Math]::Max($pw, $ph) }
+Write-Host ("INFO  屏幕: ${W}x${H} land=${landscape} rotation=${rotation}")
 
 if (Test-Path $Apk) {
     & $adb -s $s install -r $Apk 2>&1 | Out-Null
@@ -88,13 +108,16 @@ if ($n) {
     $tp = Dump
     Check "帖子详情加载" ($tp -match "只看楼主|共 \d+ 楼|回复")
     Check "帖子详情含回复框" ($tp -match "说点什么|发表回复")
+Check "帖子详情含赞赏按钮" ($tp -match "赞赏")
     Back
     Start-Sleep -Seconds 2
 } else { Check "打开帖子" $false }
 
 # 抽屉：我的
-& $adb -s $s shell input tap 63 113 | Out-Null
-Start-Sleep -Seconds 2
+    & $adb -s $s shell input tap 63 113 | Out-Null
+    Start-Sleep -Seconds 2
+    # 抽屉未打开则重点一次（旋转动画/首点被吞）
+    if ((Dump) -notmatch "导航|全部最新|我的") { & $adb -s $s shell input tap 63 113 | Out-Null; Start-Sleep -Seconds 2 }
 $dx = Dump
 Check "抽屉可打开（含我的）" ($dx -match '"我的"')
 if (TapNode (Node $dx "^我的$")) {

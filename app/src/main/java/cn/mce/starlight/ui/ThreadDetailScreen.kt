@@ -826,7 +826,40 @@ fun ThreadDetailScreen(
                 ImageViewerDialog(urls = viewerList, startIndex = viewerIndex) { viewerList = emptyList() }
             }
 
-        // v0.3.10：赞赏（打赏楼主）从顶部按钮移到右下角悬浮按钮，拇指更容易点到
+        // v0.4.7.1 紧急修复：右下角「赞赏」悬浮按钮（v0.4.7 重构回帖区时被误删）
+        detail?.let { d ->
+            val opPid = d.posts.firstOrNull()?.pid
+            if (opPid != null) {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            val r = RateClient.loadForm(tid, opPid)
+                            val f = r.form
+                            if (f == null) {
+                                toast = r.message ?: "赞赏表单加载失败（可能未登录）"
+                            } else {
+                                rateIsReward = true
+                                ratePid = opPid
+                                rateForm = f
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 14.dp, bottom = 128.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            RoundedCornerShape(20.dp),
+                        ),
+                ) {
+                    Text(
+                        "赞赏",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
         // v0.4.7：回帖发送逻辑（UI 已抽到 ReplyComposer）
         fun sendReply() {
             val d = detail ?: return
