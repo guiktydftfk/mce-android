@@ -17,6 +17,7 @@ object PersonalClient {
     private val tidRegex = Regex("""(?:ptid|tid)=(\d+)""")
     private val viewTidRegex = Regex("""tid=(\d+)""")
     private val uidRegex = Regex("""uid=(\d+)""")
+    private val pidRegex = Regex("""pid=(\d+)""")
     private val dateRegex = Regex("""\d{4}-\d{1,2}-\d{1,2}[^\s<]{0,10}""")
     private val shortTextRegex = Regex("""[^<]{4,30}""")
 
@@ -49,6 +50,8 @@ object PersonalClient {
         val note: String?,
         val tid: Int?,
         val uid: Int? = null,
+        /** v0.4.8：提醒对应楼层 pid（@ / 引用提醒可直达楼层） */
+        val pid: Int? = null,
     )
 
     /** 我的主题（沿用帖子列表模板） */
@@ -151,7 +154,10 @@ object PersonalClient {
             val author = noteBlock?.selectFirst("a[href*=space]")?.text()?.trim()
             val uid = uidRegex.find(avatarLink?.attr("href").orEmpty())
                 ?.groupValues?.get(1)?.toIntOrNull()
-            NoticeItem(avatar, author, time, note, tid, uid)
+            val pid = linkEl?.attr("href")?.let { href ->
+                pidRegex.find(href)?.groupValues?.get(1)?.toIntOrNull()
+            }
+            NoticeItem(avatar, author, time, note, tid, uid, pid)
         }
     }
 

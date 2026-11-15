@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.ui
+package cn.mce.starlight.ui
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
@@ -24,6 +24,8 @@ fun PostActionDialog(
     onReport: (String, String) -> Unit,
     onEdit: (Post) -> Unit,
     onDelete: (Post) -> Unit,
+    /** v0.4.8：只看该作者 */
+    onOnlyAuthor: (Post) -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val isMine = post.uid != null && post.uid == SessionStore.uid
@@ -50,6 +52,7 @@ fun PostActionDialog(
                         "举报",
                     )
                 }) { Text("举报") }
+                TextButton(onClick = { onOnlyAuthor(post) }) { Text("只看该作者") }
                 if (isMine) {
                     TextButton(onClick = { onEdit(post) }) { Text("编辑") }
                     TextButton(onClick = { onDelete(post) }) { Text("删除") }

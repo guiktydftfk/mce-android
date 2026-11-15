@@ -122,6 +122,9 @@ fun ThreadDetailScreen(
     }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var opOnly by remember { mutableStateOf(false) }
+    // v0.4.8：倒序浏览 / 只看某作者
+    var reverseOrder by remember { mutableStateOf(false) }
+    var onlyAuthor by remember { mutableStateOf<String?>(null) }
     var showJump by remember { mutableStateOf(false) }
     var jumpText by remember { mutableStateOf("") }
     // v0.4.4：楼层长按菜单（复制链接 / 举报 / 编辑自己的帖子）
@@ -490,6 +493,12 @@ fun ThreadDetailScreen(
                             val opCount = s.detail.posts.count { it.isOp }
                             Text(if (opOnly) "看全部（只看楼主 $opCount 楼）" else "只看楼主")
                         }
+                        TextButton(onClick = { reverseOrder = !reverseOrder }) {
+                            Text(if (reverseOrder) "正序" else "倒序")
+                        }
+                        onlyAuthor?.let { a ->
+                            TextButton(onClick = { onlyAuthor = null }) { Text("取消作者过滤（$a）") }
+                        }
                         TextButton(onClick = { showJump = true }) { Text("跳楼") }
                         TextButton(onClick = { showSearch = true }) { Text("搜索") }
                         TextButton(onClick = {
@@ -552,7 +561,11 @@ fun ThreadDetailScreen(
                         HorizontalDivider(Modifier.padding(vertical = 4.dp))
                     }
                 }
-                val shownPosts = if (opOnly) s.detail.posts.filter { it.isOp } else s.detail.posts
+                // v0.4.8：只看楼主 / 只看某作者 / 倒序浏览
+                var shownPosts = s.detail.posts
+                if (opOnly) shownPosts = shownPosts.filter { it.isOp }
+                onlyAuthor?.let { a -> shownPosts = shownPosts.filter { it.author == a } }
+                if (reverseOrder) shownPosts = shownPosts.reversed()
                 items(shownPosts, key = { it.pid }) { post ->
                     PostItem(
                         post = post,
@@ -661,6 +674,10 @@ fun ThreadDetailScreen(
                                         editBody = f.message
                                     }
                                 }
+                            },
+                            onOnlyAuthor = { p2 ->
+                                onlyAuthor = p2.author
+                                actionPost = null
                             },
                             onDelete = { p2 ->
                                 actionPost = null
@@ -826,7 +843,40 @@ fun ThreadDetailScreen(
                 ImageViewerDialog(urls = viewerList, startIndex = viewerIndex) { viewerList = emptyList() }
             }
 
-        // v0.3.10：赞赏（打赏楼主）从顶部按钮移到右下角悬浮按钮，拇指更容易点到
+        // v0.3.10：赞赏（打赏楼主）右下角悬浮按钮；v0.4.8 修复抽取回帖区时被误删
+        detail?.let { d ->
+            val opPid = d.posts.firstOrNull()?.pid
+            if (opPid != null) {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            val r = RateClient.loadForm(tid, opPid)
+                            val f = r.form
+                            if (f == null) {
+                                toast = r.message ?: "赞赏表单加载失败（可能未登录）"
+                            } else {
+                                rateIsReward = true
+                                ratePid = opPid
+                                rateForm = f
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 14.dp, bottom = 128.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            RoundedCornerShape(20.dp),
+                        ),
+                ) {
+                    Text(
+                        "赞赏",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
         // v0.4.7：回帖发送逻辑（UI 已抽到 ReplyComposer）
         fun sendReply() {
             val d = detail ?: return
