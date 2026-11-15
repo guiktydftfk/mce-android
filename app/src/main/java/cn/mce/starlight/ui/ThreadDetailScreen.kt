@@ -335,6 +335,19 @@ fun ThreadDetailScreen(
         // 避免「自己刚发的图/回复在最后一页，重新进来又回第 1 页以为没发出去」
         page = 1
         load(1, keepOnError = hadContent)
+        // v0.4.8：从提醒点进来时直达对应楼层（@ / 引用提醒）
+        loadRemainingPages()
+        val pendingFloorPid = cn.mce.starlight.core.PendingNav.floorPid
+        if (pendingFloorPid > 0) {
+            cn.mce.starlight.core.PendingNav.floorPid = 0
+            val allPosts = (state as? DetailState.Content)?.detail?.posts.orEmpty()
+            val floorIndex = allPosts.indexOfFirst { it.pid == pendingFloorPid }
+            if (floorIndex >= 0) {
+                kotlinx.coroutines.delay(350)
+                runCatching { detailListState.scrollToItem(floorIndex) }
+                toast = "已定位到对应楼层"
+            }
+        }
         // 流水式阅读：进来后自动把后续页追加到同一列表
         loadRemainingPages()
         // v0.4.6：内容渲染完成后再拉评分（电脑版页面），避免和图片抢带宽
