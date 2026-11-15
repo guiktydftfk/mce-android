@@ -95,6 +95,10 @@ data class ThreadDetail(
     val ratings: ThreadRatings? = null,
     /** v0.4.7：帖子阅读数（页头「查看 N」） */
     val views: Int? = null,
+    /** v0.4.8：帖子需要密码才能查看（服务端返回密码表单） */
+    val passwordRequired: Boolean = false,
+    /** v0.4.8：密码表单（提交密码用） */
+    val passwordForm: PageBlock.Form? = null,
 )
 
 /** 帖子评分/打赏汇总 */

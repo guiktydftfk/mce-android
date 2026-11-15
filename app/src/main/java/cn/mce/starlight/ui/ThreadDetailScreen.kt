@@ -150,6 +150,9 @@ fun ThreadDetailScreen(
     var replyTo by remember { mutableStateOf<Post?>(null) }
     var sending by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
+    // v0.4.8：需要密码的帖子
+    var passwordInput by remember { mutableStateOf("") }
+    var passwordBusy by remember { mutableStateOf(false) }
 
     // v0.4.7：原生举报弹窗（Dialog 独立窗口，放置位置不影响布局）
     reportForm?.let { form ->
@@ -168,6 +171,52 @@ fun ThreadDetailScreen(
             },
         )
     }
+    // v0.4.8：需要密码的帖子 → 输入密码后提交解锁
+    (state as? DetailState.Content)?.detail
+        ?.takeIf { it.passwordRequired && it.passwordForm != null }
+        ?.let { d ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = {},
+                title = { Text("该帖子需要密码") },
+                text = {
+                    Column {
+                        Text("请输入帖子密码后查看内容")
+                        androidx.compose.material3.OutlinedTextField(
+                            value = passwordInput,
+                            onValueChange = { passwordInput = it },
+                            singleLine = true,
+                            label = { Text("帖子密码") },
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = !passwordBusy && passwordInput.isNotBlank(),
+                        onClick = {
+                            passwordBusy = true
+                            scope.launch {
+                                val r = runCatching {
+                                    repo.submitThreadPassword(tid, d.passwordForm!!, passwordInput)
+                                }
+                                passwordBusy = false
+                                r.onSuccess { nd ->
+                                    if (nd.passwordRequired) {
+                                        toast = "密码不正确，请重新输入"
+                                    } else {
+                                        state = DetailState.Content(nd)
+                                        passwordInput = ""
+                                        toast = "密码正确，已解锁"
+                                    }
+                                }.onFailure { e ->
+                                    toast = e.message ?: "密码提交失败，请重试"
+                                }
+                            }
+                        },
+                    ) { Text(if (passwordBusy) "提交中" else "确定") }
+                },
+                dismissButton = null,
+            )
+        }
     // v0.3.9：屏内提示 2.6s 后自动消失（旧实现 toast 永不清空 → 小弹窗一直挂在界面上）
     LaunchedEffect(toast) {
         if (toast != null) {

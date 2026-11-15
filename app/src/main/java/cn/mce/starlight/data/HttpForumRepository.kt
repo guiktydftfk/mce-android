@@ -109,6 +109,26 @@ class HttpForumRepository(
                 }
             }
 
+    /**
+     * v0.4.8：提交「需要密码」帖子的密码。
+     * 论坛把密码校验绑定在 viewthread 表单里，提交成功后返回的 HTML 就是正文页面。
+     */
+    suspend fun submitThreadPassword(
+        tid: Int,
+        form: PageBlock.Form,
+        password: String,
+    ): ThreadDetail = withContext(Dispatchers.IO) {
+        val fields = form.fields.map { (k, v) ->
+            if (k == "password") k to password else k to v
+        }.filter { (k, v) -> k != "password" || v.isNotBlank() }.distinctBy { it.first }
+        val html = GenericPageClient.submit(form.copy(fields = fields))
+            ?: throw IOException("密码提交失败，请检查网络后重试")
+        val url = "$baseHost/forum.php?mod=viewthread&tid=$tid"
+        val detail = ThreadDetailParser.parse(html, url, tid, 1)
+        if (!detail.passwordRequired) putDetail(tid, detail)
+        detail
+    }
+
     /** v0.4.6：评分卡片所需的电脑版页面单独加载（延迟到内容渲染后，避免和图片抢带宽） */
     suspend fun loadRatings(tid: Int, noCache: Boolean = false): ThreadRatings? = withContext(Dispatchers.IO) {
         val (hit, cached) = if (noCache) false to null else cachedRatings(tid)

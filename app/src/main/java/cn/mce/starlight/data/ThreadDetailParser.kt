@@ -59,6 +59,22 @@ object ThreadDetailParser {
 
         val posts = blocks.mapNotNull { block -> parsePost(block, blocks.indexOf(block), page) }
 
+        // v0.4.8：需要密码的帖子——服务端返回密码表单、正文为空，交给 UI 弹窗输入密码
+        parsePasswordForm(doc)?.let { form ->
+            if (posts.isEmpty()) {
+                return ThreadDetail(
+                    tid = tid,
+                    title = title,
+                    replies = null,
+                    posts = emptyList(),
+                    page = page,
+                    hasNextPage = false,
+                    passwordRequired = true,
+                    passwordForm = form,
+                )
+            }
+        }
+
         // v0.4.7：部分页面没有 action=reply&fid= 链接 → 用面包屑 forumdisplay&fid= 兜底，
         // 否则 fid 为空会导致回帖按钮被禁用（表现为「无法回复楼层」）
         val fid = fidRegex.find(html)?.groupValues?.get(1)?.toIntOrNull()
@@ -480,6 +496,30 @@ object ThreadDetailParser {
             t.contains("密码") || t.contains("密碼") -> HiddenKind.Password
             else -> HiddenKind.Other
         }
+    }
+
+    /**
+     * v0.4.8：解析「需要密码」页面的表单。
+     * 论坛对需要密码的帖子会返回只含密码输入框的表单页（无正文楼层）。
+     */
+    private fun parsePasswordForm(doc: Document): PageBlock.Form? {
+        val form = doc.select("form").firstOrNull { f ->
+            f.select("input[name=password], input[type=password]").isNotEmpty()
+        } ?: return null
+        val action = Net.absolutize(form.attr("action").ifBlank { doc.location() })
+        val method = form.attr("method").ifBlank { "post" }
+        val fields = form.select("input, select, textarea").mapNotNull { el ->
+            val name = el.attr("name").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val type = el.attr("type").lowercase()
+            if (type == "submit" || type == "button" || type == "reset") return@mapNotNull null
+            name to el.attr("value")
+        }.distinctBy { it.first }
+        return PageBlock.Form(
+            action = action,
+            method = method,
+            fields = fields,
+            submitLabel = "提交",
+        )
     }
 
     /** Split message HTML into ordered text/image blocks. */
