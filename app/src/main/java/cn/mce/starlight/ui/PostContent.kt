@@ -71,6 +71,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
+import cn.mce.starlight.data.HiddenKind
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import cn.mce.starlight.data.TextKind
@@ -184,6 +185,7 @@ internal fun PostItem(
             post.blocks.forEach { block ->
                 when (block) {
                     is ContentBlock.Text -> PostTextBlock(block)
+                    is ContentBlock.Hidden -> PostHiddenBlock(block)
                     is ContentBlock.Table -> PostTableBlock(block)
                     is ContentBlock.Image -> if (block.url.contains("/smiley/")) {
                         // 正文表情（小红龙等）：按原尺寸小图显示，不要拉满整行
@@ -363,3 +365,48 @@ internal fun PostTableBlock(table: ContentBlock.Table) {
     }
 }
 
+/**
+ * v0.4.8：隐藏内容提示卡片。
+ * 论坛对无权限用户只返回一句提示文字（回复可见 / 登录可见 / 积分购买可见 / 需要密码），
+ * 单独渲染成醒目卡片，提示用户如何查看。
+ */
+@Composable
+internal fun PostHiddenBlock(block: ContentBlock.Hidden) {
+    val label = when (block.kind) {
+        HiddenKind.Reply -> "回复后可见"
+        HiddenKind.Login -> "登录后可见"
+        HiddenKind.Points -> "需积分 / 购买后可见"
+        HiddenKind.Password -> "需要密码查看"
+        HiddenKind.Other -> "隐藏内容"
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant,
+                RoundedCornerShape(10.dp),
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "🔒",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (block.text.isNotBlank()) {
+                Text(
+                    block.text,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}

@@ -312,6 +312,8 @@ object ThreadDetailParser {
                     is ContentBlock.Image -> "i:" + block.url
                     // v0.4.0：表格去重 key（行内容哈希）
                     is ContentBlock.Table -> "tb:" + block.rows.hashCode() + "|" + block.hasHeader
+                    // v0.4.8：隐藏内容提示（同一帖多楼相同提示不重复）
+                    is ContentBlock.Hidden -> "h:" + block.kind + "|" + block.text
                 }
             }
 
@@ -459,6 +461,27 @@ object ThreadDetailParser {
     private val STYLE_COLOR_REGEX = Regex("""color\s*:\s*([#\w(),. ]+)""")
     private val FONT_SIZE_EM = floatArrayOf(0.7f, 0.85f, 1.0f, 1.15f, 1.3f, 1.5f, 1.8f)
 
+    // v0.4.8：隐藏内容识别 ————
+    private val hiddenNoticeRegex = Regex("""(?:回复|回覆|登录|登錄|浏览|瀏覽|购买|購買|积分|積分|支付|密码|密碼)[^。\n]{0,30}?(?:后|後|才能|方可|即可)[^。\n]{0,10}?(?:可见|可見|查看|浏览|瀏覽)""")
+
+    private fun isHiddenContainer(node: Element): Boolean =
+        node.classNames().any { it.contains("showhide") || it == "locked" || it == "hidecontent" } ||
+            node.id().lowercase().contains("hide")
+
+    /** 根据提示文案推断可见条件；不是隐藏提示则返回 null */
+    internal fun hiddenKindOf(text: String): HiddenKind? {
+        val t = text.trim()
+        if (t.isEmpty() || t.length > 160) return null
+        if (!hiddenNoticeRegex.containsMatchIn(t)) return null
+        return when {
+            t.contains("登录") || t.contains("登錄") -> HiddenKind.Login
+            t.contains("回复") || t.contains("回覆") -> HiddenKind.Reply
+            t.contains("积分") || t.contains("積分") || t.contains("购买") || t.contains("購買") || t.contains("金币") -> HiddenKind.Points
+            t.contains("密码") || t.contains("密碼") -> HiddenKind.Password
+            else -> HiddenKind.Other
+        }
+    }
+
     /** Split message HTML into ordered text/image blocks. */
     private fun parseBlocks(element: Element): List<ContentBlock> {
         val blocks = mutableListOf<ContentBlock>()
@@ -531,6 +554,11 @@ object ThreadDetailParser {
                         ),
                     )
                 }
+                // v0.4.8：纯文案形式的隐藏提示（服务端只给一句通知）
+                hiddenKindOf(text)?.let { hk ->
+                    blocks.add(ContentBlock.Hidden(hk, text))
+                    return@runCatching
+                }
                 blocks.add(
                     ContentBlock.Text(
                         text = text,
@@ -570,6 +598,22 @@ object ThreadDetailParser {
                                 it == "polls" || it == "poll_list"
                         }
                     ) {
+                        return
+                    }
+                    // v0.4.8：隐藏内容（回复/登录/积分/购买可见）单独成块，避免空白或误判
+                    if (isHiddenContainer(node)) {
+                        flush()
+                        val noticeEl = node.selectFirst(".showhide_title, .locked, .showhide") ?: node
+                        val notice = noticeEl.ownText().ifBlank { noticeEl.text() }.trim()
+                        if (notice.isNotEmpty()) {
+                            blocks.add(ContentBlock.Hidden(hiddenKindOf(notice) ?: HiddenKind.Other, notice))
+                        }
+                        // 个别模板容器里还有真实正文（仅标题被锁）：其余子节点继续按正文渲染
+                        node.childNodes().forEach { child ->
+                            if (child is Element && child.classNames().any { it.contains("title") || it == "locked" }) return@forEach
+                            walk(child, style.mergeFrom(node))
+                        }
+                        flush()
                         return
                     }
                     val next = style.mergeFrom(node)

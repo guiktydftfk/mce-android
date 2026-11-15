@@ -22,6 +22,16 @@ sealed interface ContentBlock {
         val rows: List<List<String>>,
         val hasHeader: Boolean = true,
     ) : ContentBlock
+
+    /**
+     * v0.4.8：隐藏内容提示（回复可见 / 登录可见 / 积分或购买可见 / 需要密码）。
+     * 论坛服务端对无权限用户只返回提示文字，旧实现会把它当普通正文或直接丢失；
+     * 现在单独成块并用醒目卡片提示，避免读者以为帖子没内容。
+     */
+    data class Hidden(
+        val kind: HiddenKind,
+        val text: String,
+    ) : ContentBlock
 }
 
 /** 正文超链接区间：[start, end) 是链接文字，[url] 是跳转地址（绝对地址） */
@@ -29,3 +39,6 @@ data class TextLink(val start: Int, val end: Int, val url: String)
 
 /** 正文段落类型（v0.3.8） */
 enum class TextKind { Paragraph, Quote }
+
+/** v0.4.8：隐藏内容的可见条件 */
+enum class HiddenKind { Reply, Login, Points, Password, Other }
