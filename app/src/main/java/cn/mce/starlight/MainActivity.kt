@@ -88,7 +88,10 @@ class MainActivity : ComponentActivity() {
                             maxWidth.value.toInt(),
                             maxHeight.value.toInt(),
                         )
-                        CompositionLocalProvider(cn.mce.starlight.ui.LocalWideLayout provides wide) {
+                        CompositionLocalProvider(
+                            cn.mce.starlight.ui.LocalWideLayout provides wide,
+                            cn.mce.starlight.ui.LocalWindowWidthDp provides maxWidth.value.toInt(),
+                        ) {
                             cn.mce.starlight.ui.CustomSplashHost { MceApp() }
                         }
                     }

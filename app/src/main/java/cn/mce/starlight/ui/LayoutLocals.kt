@@ -9,3 +9,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * LocalConfiguration.screenWidthDp（部分模拟器/自由窗口下该值不随窗口变化）。
  */
 val LocalWideLayout = staticCompositionLocalOf { false }
+
+/** v0.4.8：真实窗口宽度（dp），三栏判定用 */
+val LocalWindowWidthDp = staticCompositionLocalOf { 0 }

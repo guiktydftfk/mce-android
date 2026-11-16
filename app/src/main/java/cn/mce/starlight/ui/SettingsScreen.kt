@@ -132,6 +132,42 @@ fun SettingsScreen(
                 .padding(top = 100.dp, start = 20.dp, end = 20.dp, bottom = 40.dp),
         ) {
             SectionTitle("外观")
+            Spacer(Modifier.height(8.dp))
+            // v0.4.8：平板/横屏布局模式（自动 / 双栏 / 三栏）
+            Text("大屏布局", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "平板 / 横屏时使用双栏（列表+帖子）或三栏（列表+帖子+目录）",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                listOf(
+                    "auto" to "自动",
+                    "dual" to "双栏",
+                    "triple" to "三栏",
+                ).forEach { (value, label) ->
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (SettingsStore.layoutMode == value) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (SettingsStore.layoutMode == value) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            .clickable { SettingsStore.updateLayoutMode(value) }
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(10.dp))
 
             // v0.3.7：明暗模式三态（浅色 / 深色 / 跟随系统）
             Text("明暗模式", style = MaterialTheme.typography.bodyLarge)

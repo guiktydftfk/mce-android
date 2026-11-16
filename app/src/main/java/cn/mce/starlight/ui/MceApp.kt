@@ -116,6 +116,8 @@ sealed interface Route {
     data object Security : Route
     /** v0.4.8：缓存管理 */
     data object CacheManager : Route
+    /** v0.4.8：关注板块聚合页 */
+    data object FavFeed : Route
     /** v0.4.8：在线会员 / 在线统计 */
     data object Online : Route
     /** v0.4.1：道具中心专用页 */
@@ -614,6 +616,12 @@ fun MceApp() {
                                 stack = listOf(Route.RecentThreads)
                                 closeDrawer()
                             }
+                            // v0.4.8：关注板块聚合（收藏板块新帖）
+                            DrawerItem(label = "关注板块", selected = false, sheen = sheen) {
+                                dest = Dest.Feed
+                                stack = listOf(Route.FavFeed)
+                                closeDrawer()
+                            }
                             DrawerSection("更多")
                             DrawerEntry(8, "搜索", dest == Dest.Search)
                             DrawerEntry(9, "排行榜", dest == Dest.Ranklist)
@@ -723,9 +731,11 @@ fun MceApp() {
             is Route.Thread -> {
                 // v0.4.7：宽屏判定使用真实窗口尺寸（MainActivity 提供），窗口旋转后立即生效
                 val wide = LocalWideLayout.current
+                // v0.4.8：大屏三栏（列表 / 帖子 / 目录），设置里可选双栏或三栏
+                val triple = wide && SettingsStore.layoutMode == "triple" && LocalWindowWidthDp.current >= 840
                 if (wide) {
                     androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
-                        androidx.compose.foundation.layout.Box(Modifier.weight(0.42f)) {
+                        androidx.compose.foundation.layout.Box(Modifier.weight(if (triple) 0.24f else 0.42f)) {
                             // v0.4.7：左栏显示「来源列表」——从板块进入就显示板块列表
                             val prev = stack.dropLast(1).lastOrNull()
                             if (prev is Route.Board) {
@@ -764,7 +774,7 @@ fun MceApp() {
                             }
                         }
                         androidx.compose.material3.VerticalDivider()
-                        androidx.compose.foundation.layout.Box(Modifier.weight(0.58f)) {
+                        androidx.compose.foundation.layout.Box(Modifier.weight(if (triple) 0.50f else 0.58f)) {
                             ThreadDetailScreen(
                     tid = current.tid,
                     fallbackTitle = current.title,
@@ -789,6 +799,10 @@ fun MceApp() {
                                         .padding(horizontal = 10.dp, vertical = 2.dp),
                                 )
                             }
+                        }
+                        if (triple) {
+                            androidx.compose.material3.VerticalDivider()
+                            ThreadTocPane(Modifier.weight(0.26f))
                         }
                     }
                 } else {
@@ -908,6 +922,10 @@ fun MceApp() {
             )
 
             is Route.Medals -> MedalsScreen(onMenu = ::openDrawer)
+            is Route.FavFeed -> FavoritesFeedScreen(
+                onMenu = ::openDrawer,
+                onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
+            )
             is Route.CacheManager -> CacheManagerScreen(onMenu = ::openDrawer)
             is Route.Security -> AccountSecurityScreen(onMenu = ::openDrawer)
             is Route.Space -> SpaceScreen(

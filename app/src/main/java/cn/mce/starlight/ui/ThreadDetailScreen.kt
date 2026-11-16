@@ -388,6 +388,20 @@ fun ThreadDetailScreen(
         // 避免「自己刚发的图/回复在最后一页，重新进来又回第 1 页以为没发出去」
         page = 1
         load(1, keepOnError = hadContent)
+        // v0.4.8：把楼层列表同步给大屏三栏的目录栏
+        cn.mce.starlight.core.ThreadTocState.posts =
+            (state as? DetailState.Content)?.detail?.posts.orEmpty()
+        // v0.4.8：三栏目录点击 → 滚动到对应楼层
+        val tocRequestPid = cn.mce.starlight.core.ThreadScrollRequest.pid
+        if (tocRequestPid > 0) {
+            cn.mce.starlight.core.ThreadScrollRequest.pid = 0
+            val tocPosts = (state as? DetailState.Content)?.detail?.posts.orEmpty()
+            val tocIndex = tocPosts.indexOfFirst { it.pid == tocRequestPid }
+            if (tocIndex >= 0) {
+                kotlinx.coroutines.delay(120)
+                runCatching { detailListState.scrollToItem(tocIndex) }
+            }
+        }
         // v0.4.8：从提醒点进来时直达对应楼层（@ / 引用提醒）
         loadRemainingPages()
         val pendingFloorPid = cn.mce.starlight.core.PendingNav.floorPid
