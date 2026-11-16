@@ -39,8 +39,15 @@ param(
 $ErrorActionPreference = "Stop"
 $here = $PSScriptRoot
 # 兼容两种位置：仓库内 scripts/dev/ 或 .diagnostics/（同级多一个 mce-android-v034 目录）
-$candidate = Join-Path (Split-Path $here -Parent) "mce-android-v034"
-$repo = if (Test-Path (Join-Path $candidate "app")) { $candidate } else { Split-Path $here -Parent }
+$parent = Split-Path $here -Parent
+# 兼容两种位置：仓库内 scripts/dev/ 或 .diagnostics/（旁边是 mce-android-v034 目录）
+$candidates = @(
+    (Split-Path $parent -Parent),                 # scripts/dev -> 仓库根
+    (Join-Path $parent "mce-android-v034"),       # .diagnostics -> ../mce-android-v034
+    $parent
+)
+$repo = $candidates | Where-Object { (Test-Path (Join-Path $_ "app")) -and (Test-Path (Join-Path $_ "version.json")) } | Select-Object -First 1
+if (-not $repo) { Write-Host "[release-channel] 失败: 找不到仓库根目录"; exit 1 }
 $versionJson = Join-Path $repo "version.json"
 $releaseDir = Join-Path $repo "release"
 
