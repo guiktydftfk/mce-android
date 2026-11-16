@@ -126,6 +126,8 @@ fun ThreadDetailScreen(
     var reverseOrder by remember { mutableStateOf(false) }
     var onlyAuthor by remember { mutableStateOf<String?>(null) }
     var showJump by remember { mutableStateOf(false) }
+    // v0.4.8：帖子目录（楼层大纲）
+    var showToc by remember { mutableStateOf(false) }
     var jumpText by remember { mutableStateOf("") }
     // v0.4.4：楼层长按菜单（复制链接 / 举报 / 编辑自己的帖子）
     var actionPost by remember { mutableStateOf<Post?>(null) }
@@ -563,6 +565,9 @@ fun ThreadDetailScreen(
                         onlyAuthor?.let { a ->
                             TextButton(onClick = { onlyAuthor = null }) { Text("取消作者过滤（$a）") }
                         }
+                        s.detail.posts.takeIf { it.size > 5 }?.let {
+                            TextButton(onClick = { showToc = true }) { Text("目录") }
+                        }
                         TextButton(onClick = { showJump = true }) { Text("跳楼") }
                         TextButton(onClick = { showSearch = true }) { Text("搜索") }
                         TextButton(onClick = {
@@ -762,6 +767,48 @@ fun ThreadDetailScreen(
 
         // v0.4.4：楼层跳转
                     // v0.4.6：跳楼对话框已拆到 ui/ThreadDetailDialogs.kt
+            // v0.4.8：帖子目录弹窗
+            val tocDetail = (state as? DetailState.Content)?.detail
+            if (showToc && tocDetail != null) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showToc = false },
+                    title = { Text("帖子目录（${tocDetail.posts.size} 楼）") },
+                    text = {
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            Modifier.heightIn(max = 420.dp),
+                        ) {
+                            items(tocDetail.posts.size, key = { i -> tocDetail.posts[i].pid }) { i ->
+                                val post = tocDetail.posts[i]
+                                Column(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            showToc = false
+                                            scope.launch { runCatching { detailListState.scrollToItem(i) } }
+                                        }
+                                        .padding(vertical = 6.dp),
+                                ) {
+                                    Text(
+                                        "${post.floorLabel ?: "楼主"} · ${post.author}",
+                                        style = MaterialTheme.typography.labelLarge,
+                                    )
+                                    Text(
+                                        post.contentText.replace("\n", " ").take(48),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(onClick = { showToc = false }) { Text("关闭") }
+                    },
+                )
+            }
                     if (showJump) {
                         JumpToFloorDialog(
                             total = (state as? DetailState.Content)?.detail?.posts?.size ?: 0,

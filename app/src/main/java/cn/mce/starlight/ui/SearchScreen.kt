@@ -89,6 +89,8 @@ fun SearchScreen(
     var daysExpanded by remember { mutableStateOf(false) }
     var orderIndex by remember { mutableStateOf(0) }
     var orderExpanded by remember { mutableStateOf(false) }
+    // v0.4.8：结果内筛选（在已加载结果里按关键词再筛）
+    var resultFilter by remember { mutableStateOf("") }
 
     val dayOptions = listOf(null to "不限时间", 7 to "最近 7 天", 30 to "最近 30 天", 365 to "最近一年")
     val orderOptions = listOf("lastpost" to "按回复时间", "dateline" to "按发表时间", "replies" to "按回复数")
@@ -400,8 +402,51 @@ fun SearchScreen(
                     state = remember { cn.mce.starlight.core.ListStateCache.get("search_results") },
                     contentPadding = PaddingValues(bottom = 120.dp),
                 ) {
-                    if (mode == "thread") {
-                        items(threads, key = { it.tid }) { hit ->
+                if (mode == "thread") {
+                    // v0.4.8：结果内筛选 + 排序切换（排序会按服务端重新搜索）
+                    if (threads.isNotEmpty()) {
+                        item {
+                            Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                                OutlinedTextField(
+                                    value = resultFilter,
+                                    onValueChange = { resultFilter = it },
+                                    placeholder = { Text("在结果中筛选标题…") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    orderOptions.forEachIndexed { idx, (_, label) ->
+                                        Text(
+                                            label,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (orderIndex == idx) MaterialTheme.colorScheme.onPrimaryContainer
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(
+                                                    if (orderIndex == idx) MaterialTheme.colorScheme.primaryContainer
+                                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                                )
+                                                .clickable {
+                                                    if (orderIndex != idx) { orderIndex = idx; doSearch() }
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                                        )
+                                    }
+                                    Spacer(Modifier.weight(1f))
+                                    val shownCount = if (resultFilter.isBlank()) threads.size else threads.count { it.title.contains(resultFilter, true) }
+                                    Text("共 $shownCount 条", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                    val shownThreads = if (resultFilter.isBlank()) threads else threads.filter { it.title.contains(resultFilter, true) }
+                    items(shownThreads, key = { it.tid }) { hit ->
                             // v0.4.7：搜索结果改成卡片式（与首页信息流一致）
                             Box(
                                 Modifier
