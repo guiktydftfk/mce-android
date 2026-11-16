@@ -110,6 +110,8 @@ sealed interface Route {
     data class Pm(val touid: Int, val name: String) : Route
     data object Scan : Route
     data class GenericList(val title: String, val path: String) : Route
+    /** v0.4.8：个人空间扩展（日志/相册/留言板/访客） */
+    data class Space(val uid: Int?, val name: String) : Route
     /** v0.4.8：在线会员 / 在线统计 */
     data object Online : Route
     /** v0.4.1：道具中心专用页 */
@@ -894,6 +896,7 @@ fun MceApp() {
 
             is Route.User -> UserProfileScreen(
                 onOpenUserThreads = { uid, name -> push(Route.UserThreads(uid, name)) },
+                onOpenSpace = { uid, name -> push(Route.Space(uid, name)) },
                 uid = current.uid,
                 onMenu = ::openDrawer,
                 onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
@@ -901,6 +904,13 @@ fun MceApp() {
             )
 
             is Route.Medals -> MedalsScreen(onMenu = ::openDrawer)
+            is Route.Space -> SpaceScreen(
+                uid = current.uid,
+                name = current.name,
+                onMenu = ::openDrawer,
+                onOpenPage = { url, title -> push(Route.Page(url, title)) },
+                onOpenUser = { uid, name -> push(Route.User(uid, name)) },
+            )
             is Route.Online -> OnlineMembersScreen(
                 onMenu = ::openDrawer,
                 onOpenUser = { uid, name -> push(Route.User(uid, name)) },

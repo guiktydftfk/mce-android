@@ -59,6 +59,8 @@ fun UserProfileScreen(
     onOpenPage: (String, String) -> Unit,
     /** v0.4.3：点「主题」→ TA 的全部主题（按作者搜索） */
     onOpenUserThreads: (Int, String) -> Unit = { _, _ -> },
+    /** v0.4.8：打开 TA 的空间（日志/相册/留言板/访客） */
+    onOpenSpace: (Int, String) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
     var state by remember(uid) { mutableStateOf<UState>(UState.Loading) }
@@ -311,6 +313,7 @@ fun UserProfileScreen(
                                     "加好友",
                                 )
                             }) { Text("加好友") }
+                            TextButton(onClick = { onOpenSpace(p.uid, p.name) }) { Text("空间") }
                 TextButton(onClick = {
                     // v0.4.5：举报用户
                     onOpenPage(
