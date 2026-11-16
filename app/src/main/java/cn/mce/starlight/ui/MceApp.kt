@@ -110,6 +110,8 @@ sealed interface Route {
     data class Pm(val touid: Int, val name: String) : Route
     data object Scan : Route
     data class GenericList(val title: String, val path: String) : Route
+    /** v0.4.8：在线会员 / 在线统计 */
+    data object Online : Route
     /** v0.4.1：道具中心专用页 */
     data object Magic : Route
 }
@@ -609,6 +611,12 @@ fun MceApp() {
                             DrawerSection("更多")
                             DrawerEntry(8, "搜索", dest == Dest.Search)
                             DrawerEntry(9, "排行榜", dest == Dest.Ranklist)
+                            // v0.4.8：在线会员
+                            DrawerItem(label = "在线会员", selected = false, sheen = sheen) {
+                                dest = Dest.Feed
+                                stack = listOf(Route.Online)
+                                closeDrawer()
+                            }
                             DrawerEntry(10, "消息提醒", dest == Dest.Notice)
                             DrawerEntry(11, "设置", dest == Dest.Settings)
                         }
@@ -893,6 +901,10 @@ fun MceApp() {
             )
 
             is Route.Medals -> MedalsScreen(onMenu = ::openDrawer)
+            is Route.Online -> OnlineMembersScreen(
+                onMenu = ::openDrawer,
+                onOpenUser = { uid, name -> push(Route.User(uid, name)) },
+            )
 
             is Route.Friends -> FriendsScreen(
                 onMenu = ::openDrawer,
