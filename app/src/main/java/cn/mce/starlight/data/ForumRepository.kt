@@ -101,6 +101,8 @@ data class ThreadDetail(
     val passwordForm: PageBlock.Form? = null,
     /** v0.4.8：非图片附件（zip/pdf/apk 等，可点击下载） */
     val attachments: List<Attachment> = emptyList(),
+    /** v0.4.8：活动 / 悬赏 / 交易等特殊帖信息（只读展示 + 网页参与兜底） */
+    val special: SpecialThread? = null,
 )
 
 /** 帖子评分/打赏汇总 */
@@ -133,4 +135,16 @@ data class Attachment(
     val name: String,
     val url: String,
     val sizeText: String? = null,
+)
+
+/** v0.4.8：特殊帖类型 */
+enum class SpecialKind { Activity, Bounty, Trade }
+
+/** v0.4.8：特殊帖展示信息 */
+data class SpecialThread(
+    val kind: SpecialKind,
+    /** 关键信息行（时间/地点/人数/悬赏金额等） */
+    val lines: List<String>,
+    /** 网页参与地址（报名 / 出价 / 查看详情） */
+    val actionUrl: String?,
 )

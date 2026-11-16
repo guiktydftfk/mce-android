@@ -615,6 +615,43 @@ fun ThreadDetailScreen(
                     }
                     HorizontalDivider(Modifier.padding(top = 8.dp))
                 }
+                // v0.4.8：活动 / 悬赏 / 交易帖信息卡片（只读展示 + 网页参与兜底）
+                s.detail.special?.let { special ->
+                    item {
+                        val label = when (special.kind) {
+                            cn.mce.starlight.data.SpecialKind.Activity -> "活动报名"
+                            cn.mce.starlight.data.SpecialKind.Bounty -> "悬赏帖"
+                            cn.mce.starlight.data.SpecialKind.Trade -> "交易帖"
+                        }
+                        val action = when (special.kind) {
+                            cn.mce.starlight.data.SpecialKind.Activity -> "在网页中报名"
+                            cn.mce.starlight.data.SpecialKind.Bounty -> "在网页中查看/回答"
+                            cn.mce.starlight.data.SpecialKind.Trade -> "在网页中查看交易"
+                        }
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                                    RoundedCornerShape(12.dp),
+                                )
+                                .padding(12.dp),
+                        ) {
+                            Text(label, style = MaterialTheme.typography.labelLarge)
+                            special.lines.forEach { line ->
+                                Text(
+                                    line,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            special.actionUrl?.let { url ->
+                                TextButton(onClick = { onOpenPage(url, label) }) { Text(action) }
+                            }
+                        }
+                    }
+                }
                 // 投票贴：直接在帖子内参与投票（v0.3.3）
                 s.detail.poll?.let { poll ->
                     item {

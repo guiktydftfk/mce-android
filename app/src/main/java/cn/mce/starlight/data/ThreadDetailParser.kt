@@ -108,6 +108,8 @@ object ThreadDetailParser {
             formhash = Net.formhashOf(html),
             rewardCount = rewardCount,
             poll = parsePoll(doc),
+            // v0.4.8：活动/悬赏/交易帖信息
+            special = parseSpecial(doc, baseUrl),
             // v0.4.8：非图片附件列表
             attachments = parseAttachments(doc),
         ).also { parsed ->
@@ -520,6 +522,51 @@ object ThreadDetailParser {
      * v0.4.8：解析「需要密码」页面的表单。
      * 论坛对需要密码的帖子会返回只含密码输入框的表单页（无正文楼层）。
      */
+    /**
+     * v0.4.8：活动 / 悬赏 / 交易帖识别（只读展示关键信息 + 网页参与兜底）。
+     * 判断依据：页面文本关键词 + 常见插件容器 class。
+     */
+    private fun parseSpecial(doc: Document, baseUrl: String): SpecialThread? {
+        val text = doc.text()
+        val links = doc.select("a[href]").map { it.attr("href").replace("&amp;", "&") }
+        fun firstLink(patterns: List<String>): String? =
+            links.firstOrNull { href -> patterns.any { href.contains(it, ignoreCase = true) } }
+                ?.let { absolutize(it) }
+
+        // 活动报名
+        val isActivity = text.contains("活动时间") || text.contains("报名") ||
+            text.contains("活动地点") || doc.selectFirst("div[class*=activity], div[class*=act_]") != null
+        if (isActivity && (text.contains("活动") && (text.contains("报名") || text.contains("已参加")))) {
+            val lines = mutableListOf<String>()
+            listOf("活动时间", "活动地点", "报名截止", "已报名", "已参加", "活动人数").forEach { key ->
+                val idx = text.indexOf(key)
+                if (idx >= 0) {
+                    lines.add(text.substring(idx, (idx + 40).coerceAtMost(text.length)).trim())
+                }
+            }
+            val action = firstLink(listOf("ac=activity", "mod=activity", "activity")) ?: "$baseUrl"
+            return SpecialThread(SpecialKind.Activity, lines.distinct().take(6), action)
+        }
+        // 悬赏
+        if (text.contains("悬赏") && (text.contains("最佳答案") || text.contains("已解决") || text.contains("未解决") || doc.selectFirst("div[class*=reward]") != null)) {
+            val lines = mutableListOf<String>()
+            Regex("""悬赏[^\\n。]{0,20}""").find(text)?.value?.let { lines.add(it.trim()) }
+            Regex("""(?:已解决|未解决)[^\\n。]{0,12}""").find(text)?.value?.let { lines.add(it.trim()) }
+            return SpecialThread(SpecialKind.Bounty, lines.distinct().take(4), "$baseUrl")
+        }
+        // 交易
+        if (((text.contains("出售") || text.contains("求购")) &&
+                (text.contains("价格") || text.contains("售价") || text.contains("交易"))) ||
+            doc.selectFirst("div[class*=trade]") != null
+        ) {
+            val lines = mutableListOf<String>()
+            Regex("""(?:出售|求购)[^\\n。]{0,24}""").find(text)?.value?.let { lines.add(it.trim()) }
+            Regex("""(?:价格|售价)[:：][^\\n。]{0,16}""").find(text)?.value?.let { lines.add(it.trim()) }
+            return SpecialThread(SpecialKind.Trade, lines.distinct().take(4), "$baseUrl")
+        }
+        return null
+    }
+
     private fun parsePasswordForm(doc: Document): PageBlock.Form? {
         val form = doc.select("form").firstOrNull { f ->
             f.select("input[name=password], input[type=password]").isNotEmpty()
