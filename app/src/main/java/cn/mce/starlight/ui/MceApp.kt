@@ -114,6 +114,8 @@ sealed interface Route {
     data class Space(val uid: Int?, val name: String) : Route
     /** v0.4.8：账号安全（修改密码 / 邮箱 / 安全问题） */
     data object Security : Route
+    /** v0.4.8：缓存管理 */
+    data object CacheManager : Route
     /** v0.4.8：在线会员 / 在线统计 */
     data object Online : Route
     /** v0.4.1：道具中心专用页 */
@@ -906,6 +908,7 @@ fun MceApp() {
             )
 
             is Route.Medals -> MedalsScreen(onMenu = ::openDrawer)
+            is Route.CacheManager -> CacheManagerScreen(onMenu = ::openDrawer)
             is Route.Security -> AccountSecurityScreen(onMenu = ::openDrawer)
             is Route.Space -> SpaceScreen(
                 uid = current.uid,
@@ -1032,6 +1035,7 @@ fun MceApp() {
                 Dest.Settings -> SettingsScreen(
                     onMenu = ::openDrawer,
                     onCheckUpdate = { checkUpdate(silent = false) },
+                    onOpenCacheManager = { push(Route.CacheManager) },
                     onLogin = { showLogin = true },
                     onLogout = {
                         scope.launch {

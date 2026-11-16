@@ -26,6 +26,57 @@ object CacheManager {
         return total
     }
 
+    /** v0.4.8：分类占用（缓存管理页用） */
+    data class Breakdown(
+        val imageBytes: Long,
+        val threadBytes: Long,
+        val feedBytes: Long,
+        val otherBytes: Long,
+    ) {
+        val total: Long get() = imageBytes + threadBytes + feedBytes + otherBytes
+    }
+
+    fun breakdown(context: Context): Breakdown {
+        val image = runCatching { coil.Coil.imageLoader(context).diskCache?.size ?: 0L }.getOrDefault(0L) +
+            dirSize(File(context.filesDir, "image_cache"))
+        val thread = runCatching { ThreadHtmlCache.sizeBytes() }.getOrDefault(0L)
+        val feed = runCatching {
+            context.filesDir.listFiles()?.filter { it.isFile && it.name.startsWith("feed_cache") }?.sumOf { it.length() } ?: 0L
+        }.getOrDefault(0L)
+        val other = (dirSize(context.cacheDir) - image).coerceAtLeast(0L)
+        return Breakdown(image, thread, feed, other)
+    }
+
+    fun clearImages(context: Context): Long {
+        val before = runCatching { coil.Coil.imageLoader(context).diskCache?.size ?: 0L }.getOrDefault(0L) +
+            dirSize(File(context.filesDir, "image_cache"))
+        runCatching {
+            val loader = coil.Coil.imageLoader(context)
+            loader.diskCache?.clear()
+            loader.memoryCache?.trimMemory(ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
+        }
+        runCatching { ThreadImageCache.trimMemory() }
+        runCatching { File(context.filesDir, "image_cache").deleteRecursively() }
+        return before
+    }
+
+    fun clearThreads(): Long {
+        val before = runCatching { ThreadHtmlCache.sizeBytes() }.getOrDefault(0L)
+        runCatching { ThreadHtmlCache.clear() }
+        return before
+    }
+
+    fun clearFeedFiles(context: Context): Long {
+        var before = 0L
+        runCatching {
+            context.filesDir.listFiles()?.forEach { f ->
+                if (f.isFile && f.name.startsWith("feed_cache")) { before += f.length(); f.delete() }
+            }
+        }
+        runCatching { FeedCache.clear() }
+        return before
+    }
+
     /** 清理缓存，返回清理前占用（字节） */
     fun clear(context: Context): Long {
         val before = sizeBytes(context)

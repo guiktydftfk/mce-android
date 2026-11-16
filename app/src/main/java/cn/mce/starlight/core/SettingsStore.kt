@@ -68,6 +68,7 @@ object SettingsStore {
     private const val KEY_LOW_DATA = "low_data_mode"
     private const val KEY_URGENT_CODE = "urgent_handled_code"
     private const val KEY_NOTIFY_UNREAD = "notify_unread"
+    private const val KEY_NOTIFY_NOTICE = "notify_notice"
     private const val KEY_NOTIFY_QUIET = "notify_quiet"
     private const val KEY_DARK_START = "dark_start_hour"
     private const val KEY_DARK_END = "dark_end_hour"
@@ -134,6 +135,8 @@ object SettingsStore {
     var urgentHandledCode by mutableIntStateOf(0)
     // v0.4.5：未读私信通知 / 免打扰 / 定时深色时段
     var notifyUnreadEnabled by mutableStateOf(true)
+    /** v0.4.8：提醒通知（@ / 回复 / 系统），与私信通知分开控制 */
+    var notifyNoticeEnabled by mutableStateOf(true)
     var notifyQuietEnabled by mutableStateOf(false)
     var darkStartHour by mutableIntStateOf(19)
     var darkEndHour by mutableIntStateOf(7)
@@ -181,6 +184,7 @@ object SettingsStore {
         lowDataMode = prefs.getBoolean(KEY_LOW_DATA, false)
         urgentHandledCode = prefs.getInt(KEY_URGENT_CODE, 0)
         notifyUnreadEnabled = prefs.getBoolean(KEY_NOTIFY_UNREAD, true)
+        notifyNoticeEnabled = prefs.getBoolean(KEY_NOTIFY_NOTICE, true)
         notifyQuietEnabled = prefs.getBoolean(KEY_NOTIFY_QUIET, false)
         darkStartHour = prefs.getInt(KEY_DARK_START, 19).coerceIn(0, 23)
         darkEndHour = prefs.getInt(KEY_DARK_END, 7).coerceIn(0, 23)
@@ -317,6 +321,11 @@ object SettingsStore {
     fun updateNotifyUnread(enabled: Boolean) {
         notifyUnreadEnabled = enabled
         prefs()?.edit()?.putBoolean(KEY_NOTIFY_UNREAD, enabled)?.apply()
+    }
+
+    fun updateNotifyNotice(enabled: Boolean) {
+        notifyNoticeEnabled = enabled
+        prefs()?.edit()?.putBoolean(KEY_NOTIFY_NOTICE, enabled)?.apply()
     }
 
     fun updateNotifyQuiet(enabled: Boolean) {

@@ -1,4 +1,4 @@
-﻿package cn.mce.starlight.core
+package cn.mce.starlight.core
 
 import android.content.Context
 import java.io.File
@@ -31,6 +31,11 @@ object ThreadHtmlCache {
         val f = File(d, "${tid}_$page.html")
         return runCatching { if (f.isFile && f.length() > 0) f.readText() else null }.getOrNull()
     }
+
+    /** v0.4.8：离线帖子缓存占用（字节） */
+    fun sizeBytes(): Long = runCatching {
+        dir()?.walkTopDown()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L
+    }.getOrDefault(0L)
 
     fun clear() {
         dir()?.listFiles()?.forEach { it.delete() }

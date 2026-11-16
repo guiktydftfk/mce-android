@@ -350,7 +350,8 @@ fun NewThreadScreen(
     }
 
     /** 存草稿：只存本地（Discuz 手机模板没有草稿箱），不会发布 */
-    fun saveDraft() {
+    /** v0.4.8：silent=true 时不显示提示（自动保存用） */
+    fun saveDraftInternal(silent: Boolean = false) {
         if (subject.isBlank() && contentField.text.isBlank()) {
             error = "标题和内容不能都为空"
             return
@@ -374,10 +375,25 @@ fun NewThreadScreen(
         )
         draftId = id
         error = null
-        draftTip = "已保存到草稿箱（抽屉 → 草稿箱 可找到）"
-        onDraftSaved()
+        if (!silent) draftTip = "已保存到草稿箱（抽屉 → 草稿箱 可找到）"
+        if (!silent) onDraftSaved()
     }
 
+
+    fun saveDraft() = saveDraftInternal(silent = false)
+
+    // v0.4.8：自动保存草稿（有改动时每 15 秒静默保存一次，防误退出丢内容）
+    var lastAutoSaved by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(15_000)
+            if (sending) continue
+            val snapshot = subject.trim() + "|" + contentField.text + "|" + pollOptions
+            if ((subject.isBlank() && contentField.text.isBlank()) || snapshot == lastAutoSaved) continue
+            runCatching { saveDraftInternal(silent = true) }
+            lastAutoSaved = snapshot
+        }
+    }
     suspend fun submit(draft: Boolean) {
         sending = true
         error = null

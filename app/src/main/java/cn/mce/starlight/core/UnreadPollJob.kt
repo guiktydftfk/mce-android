@@ -11,6 +11,9 @@ import kotlinx.coroutines.runBlocking
 /**
  * v0.4.4：后台每 15 分钟检查一次未读私信，有未读就发系统通知。
  * 只在已登录时发；读取时套用本地已读账本（避免已读会话又提醒）。
+ *
+ * v0.4.8：增加「提醒通知」（@ / 回复 / 系统），与私信通知分开开关；
+ * 用最近一条提醒的内容+作者做去重键，避免同一提醒反复通知。
  */
 class UnreadPollJob : JobService() {
     override fun onStartJob(params: JobParameters?): Boolean {
@@ -18,16 +21,33 @@ class UnreadPollJob : JobService() {
         Thread {
             runCatching {
                 if (SessionStore.isLoggedIn) {
+                    val quiet = SettingsStore.notifyQuietEnabled && notifyQuietNow()
+
+                    // 私信未读
                     val items = runBlocking { cn.mce.starlight.data.PersonalClient.loadPm(1) }
                     val effective = PmReadStore.overlay(items)
                     val unread = effective.sumOf { it.unread.coerceAtLeast(0) }
                     MceWidgetProvider.updateUnread(ctx, unread)
-                    val quiet = SettingsStore.notifyQuietEnabled && notifyQuietNow()
                     if (unread > 0 && SettingsStore.notifyUnreadEnabled && !quiet) {
                         val first = effective.firstOrNull { it.unread > 0 }
                         NotifyHelper.notifyUnread(ctx, unread, first?.touid)
                     } else {
                         NotifyHelper.cancel(ctx)
+                    }
+
+                    // v0.4.8：提醒通知（@ / 回复 / 系统）
+                    if (SettingsStore.notifyNoticeEnabled && !quiet) {
+                        val notices = runCatching {
+                            runBlocking { cn.mce.starlight.data.PersonalClient.loadNotices(1) }
+                        }.getOrNull()
+                        val top = notices?.firstOrNull()
+                        val key = top?.let { (it.note ?: "") + "|" + (it.author ?: "") }.orEmpty()
+                        val prefs = ctx.getSharedPreferences("mce_unread", Context.MODE_PRIVATE)
+                        val saved = prefs.getString("notice_key", null)
+                        if (key.isNotBlank() && key != saved) {
+                            NotifyHelper.notifyNotice(ctx, 1, top?.note?.take(60))
+                            prefs.edit().putString("notice_key", key).apply()
+                        }
                     }
                 }
             }

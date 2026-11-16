@@ -61,6 +61,8 @@ fun SettingsScreen(
     onLogin: () -> Unit,
     onLogout: () -> Unit,
     onCheckUpdate: () -> Unit = {},
+    /** v0.4.8：打开缓存管理页 */
+    onOpenCacheManager: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -485,6 +487,16 @@ fun SettingsScreen(
                     },
                 ) { Text(if (clearingCache) "清理中…" else "清理缓存") }
             }
+            // v0.4.8：缓存管理页（分类查看/清理）
+            Text(
+                "缓存管理（分类查看与清理）",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenCacheManager() }
+                    .padding(vertical = 10.dp),
+            )
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             SectionTitle("更新")
@@ -637,6 +649,7 @@ fun SettingsScreen(
 
             SectionTitle("通知")
             Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -651,6 +664,22 @@ fun SettingsScreen(
                 }
                 Switch(checked = SettingsStore.notifyUnreadEnabled, onCheckedChange = {
                     SettingsStore.updateNotifyUnread(it)
+                })
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("提醒通知（@ / 回复 / 系统）", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "后台巡检到新提醒时单独发通知，与私信通知互不影响",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = SettingsStore.notifyNoticeEnabled, onCheckedChange = {
+                    SettingsStore.updateNotifyNotice(it)
                 })
             }
             Row(

@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 object NotifyHelper {
     private const val CHANNEL_ID = "mce_unread"
     private const val NOTIFY_ID = 1001
+    private const val NOTIFY_ID_NOTICE = 1002
 
     fun init(context: Context) {
         if (Build.VERSION.SDK_INT >= 26) {
@@ -53,6 +54,32 @@ object NotifyHelper {
         runCatching {
             context.getSystemService(NotificationManager::class.java)?.notify(NOTIFY_ID, notification)
         }
+    }
+
+    /** v0.4.8：提醒通知（@ / 回复 / 系统），与私信通知分开的开关 */
+    fun notifyNotice(context: Context, count: Int, preview: String? = null) {
+        if (count <= 0 || !canNotify(context) || !SettingsStore.notifyNoticeEnabled) return
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        launch.putExtra("mce_open_notice", true)
+        val pending = PendingIntent.getActivity(
+            context, 1, launch,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("MCE 星光班 · 新提醒")
+            .setContentText(preview ?: "你有 $count 条新提醒（@ / 回复 / 系统）")
+            .setNumber(count)
+            .setAutoCancel(true)
+            .setContentIntent(pending)
+            .build()
+        runCatching {
+            context.getSystemService(NotificationManager::class.java)?.notify(NOTIFY_ID_NOTICE, notification)
+        }
+    }
+
+    fun cancelNotice(context: Context) {
+        runCatching { context.getSystemService(NotificationManager::class.java)?.cancel(NOTIFY_ID_NOTICE) }
     }
 
     fun cancel(context: Context) {
