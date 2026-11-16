@@ -63,6 +63,8 @@ fun SettingsScreen(
     onCheckUpdate: () -> Unit = {},
     /** v0.4.8：打开缓存管理页 */
     onOpenCacheManager: () -> Unit = {},
+    /** v0.4.8：打开崩溃日志页 */
+    onOpenCrashLogs: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -735,9 +737,42 @@ fun SettingsScreen(
                 })
             }
 
+            // v0.4.8：应用锁（使用系统锁屏凭据）
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("应用锁", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "开启后，打开应用 / 从后台回来需验证系统锁屏；不会保存密码",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = SettingsStore.appLockEnabled, onCheckedChange = { on ->
+                    if (on && !cn.mce.starlight.core.AppLock.isDeviceSecure(context)) {
+                        message = "请先在系统设置里设置锁屏密码 / 指纹后再开启应用锁"
+                    } else {
+                        SettingsStore.updateAppLock(on)
+                        message = if (on) "应用锁已开启" else "应用锁已关闭"
+                    }
+                })
+            }
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             SectionTitle("诊断")
+            Spacer(Modifier.height(8.dp))
+            // v0.4.8：崩溃日志（本地滚动归档）
+            Text(
+                "崩溃日志（查看 / 复制 / 清空）",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenCrashLogs() }
+                    .padding(vertical = 8.dp),
+            )
             Spacer(Modifier.height(8.dp))
             // v0.4.7：布局诊断（窗口/配置 dp、是否双栏、旋转、密度），用于排查宽屏不生效
             val cfgDiag = androidx.compose.ui.platform.LocalConfiguration.current

@@ -118,6 +118,8 @@ sealed interface Route {
     data object CacheManager : Route
     /** v0.4.8：关注板块聚合页 */
     data object FavFeed : Route
+    /** v0.4.8：崩溃日志 */
+    data object CrashLogs : Route
     /** v0.4.8：在线会员 / 在线统计 */
     data object Online : Route
     /** v0.4.1：道具中心专用页 */
@@ -922,6 +924,7 @@ fun MceApp() {
             )
 
             is Route.Medals -> MedalsScreen(onMenu = ::openDrawer)
+            is Route.CrashLogs -> CrashLogsScreen(onMenu = ::openDrawer)
             is Route.FavFeed -> FavoritesFeedScreen(
                 onMenu = ::openDrawer,
                 onOpenThread = { tid, title -> push(Route.Thread(tid, title)) },
@@ -1054,6 +1057,7 @@ fun MceApp() {
                     onMenu = ::openDrawer,
                     onCheckUpdate = { checkUpdate(silent = false) },
                     onOpenCacheManager = { push(Route.CacheManager) },
+                    onOpenCrashLogs = { push(Route.CrashLogs) },
                     onLogin = { showLogin = true },
                     onLogout = {
                         scope.launch {

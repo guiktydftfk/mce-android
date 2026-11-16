@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
                             cn.mce.starlight.ui.LocalWideLayout provides wide,
                             cn.mce.starlight.ui.LocalWindowWidthDp provides maxWidth.value.toInt(),
                         ) {
-                            cn.mce.starlight.ui.CustomSplashHost { MceApp() }
+                            cn.mce.starlight.ui.CustomSplashHost { cn.mce.starlight.ui.LockGate { MceApp() } }
                         }
                     }
                 }
