@@ -311,6 +311,7 @@ fun ProfileScreen(
                                 "\u6211\u7684\u597d\u53cb" to "do=friend",
                                 "\u9053\u5177\u4e2d\u5fc3" to "mod=magic",
                                 "\u7f16\u8f91\u8d44\u6599" to "spacecp&ac=profile",
+                                "\u8d26\u53f7\u5b89\u5168" to "spacecp&ac=password",
                             ).forEach { (label, path) ->
                                 Text(
                                     label,

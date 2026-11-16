@@ -112,6 +112,8 @@ sealed interface Route {
     data class GenericList(val title: String, val path: String) : Route
     /** v0.4.8：个人空间扩展（日志/相册/留言板/访客） */
     data class Space(val uid: Int?, val name: String) : Route
+    /** v0.4.8：账号安全（修改密码 / 邮箱 / 安全问题） */
+    data object Security : Route
     /** v0.4.8：在线会员 / 在线统计 */
     data object Online : Route
     /** v0.4.1：道具中心专用页 */
@@ -904,6 +906,7 @@ fun MceApp() {
             )
 
             is Route.Medals -> MedalsScreen(onMenu = ::openDrawer)
+            is Route.Security -> AccountSecurityScreen(onMenu = ::openDrawer)
             is Route.Space -> SpaceScreen(
                 uid = current.uid,
                 name = current.name,
@@ -991,6 +994,7 @@ fun MceApp() {
                             url.contains("do=notice") -> push(Route.Notices)
                             url.contains("spacecp") && url.contains("ac=profile") -> push(Route.ProfileEdit)
                             url.contains("do=medal") -> push(Route.Medals)
+                url.contains("ac=password") -> push(Route.Security)
                             url.contains("do=friend") -> push(Route.Friends)
                             url.contains("mod=magic") -> push(Route.Magic)
                             else -> push(Route.Page(url, url))
