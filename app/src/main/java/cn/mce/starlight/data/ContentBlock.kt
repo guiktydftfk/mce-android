@@ -32,6 +32,15 @@ sealed interface ContentBlock {
         val kind: HiddenKind,
         val text: String,
     ) : ContentBlock
+
+    /**
+     * v0.4.8：媒体内容（视频 / 音频 / 其他嵌入），来自 BBCode [media]/[audio]/[video]/[flash]
+     * 或模板渲染出的 iframe/video/audio。点击用系统播放器 / 浏览器打开。
+     */
+    data class Media(
+        val url: String,
+        val kind: MediaKind = MediaKind.Other,
+    ) : ContentBlock
 }
 
 /** 正文超链接区间：[start, end) 是链接文字，[url] 是跳转地址（绝对地址） */
@@ -42,3 +51,6 @@ enum class TextKind { Paragraph, Quote }
 
 /** v0.4.8：隐藏内容的可见条件 */
 enum class HiddenKind { Reply, Login, Points, Password, Other }
+
+/** v0.4.8：媒体类型 */
+enum class MediaKind { Video, Audio, Other }

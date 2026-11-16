@@ -72,6 +72,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import cn.mce.starlight.data.HiddenKind
+import cn.mce.starlight.data.MediaKind
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import cn.mce.starlight.data.TextKind
@@ -186,6 +187,7 @@ internal fun PostItem(
                 when (block) {
                     is ContentBlock.Text -> PostTextBlock(block)
                     is ContentBlock.Hidden -> PostHiddenBlock(block)
+                    is ContentBlock.Media -> PostMediaBlock(block)
                     is ContentBlock.Table -> PostTableBlock(block)
                     is ContentBlock.Image -> if (block.url.contains("/smiley/")) {
                         // 正文表情（小红龙等）：按原尺寸小图显示，不要拉满整行
@@ -408,5 +410,56 @@ internal fun PostHiddenBlock(block: ContentBlock.Hidden) {
                 )
             }
         }
+    }
+}
+
+/**
+ * v0.4.8：媒体块（视频 / 音频 / 嵌入链接）。
+ * 应用内不内嵌播放器，点击用系统播放器或浏览器打开，避免额外依赖与版权问题。
+ */
+@Composable
+internal fun PostMediaBlock(block: ContentBlock.Media) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val label = when (block.kind) {
+        MediaKind.Video -> "视频"
+        MediaKind.Audio -> "音频"
+        MediaKind.Other -> "媒体"
+    }
+    val icon = when (block.kind) {
+        MediaKind.Audio -> "🎵"
+        else -> "🎬"
+    }
+    val host = runCatching { android.net.Uri.parse(block.url).host }.getOrNull() ?: block.url
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+            .clickable {
+                runCatching {
+                    ctx.startActivity(
+                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(block.url)),
+                    )
+                }
+            }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(icon, style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                label + " · " + host,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                block.url,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text("打开", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
     }
 }

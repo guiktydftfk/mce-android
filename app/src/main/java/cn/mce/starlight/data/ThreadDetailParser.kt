@@ -332,6 +332,8 @@ object ThreadDetailParser {
                     is ContentBlock.Table -> "tb:" + block.rows.hashCode() + "|" + block.hasHeader
                     // v0.4.8：隐藏内容提示（同一帖多楼相同提示不重复）
                     is ContentBlock.Hidden -> "h:" + block.kind + "|" + block.text
+                    // v0.4.8：媒体块去重
+                    is ContentBlock.Media -> "m:" + block.url
                 }
             }
 
@@ -487,6 +489,20 @@ object ThreadDetailParser {
             node.id().lowercase().contains("hide")
 
     /** 根据提示文案推断可见条件；不是隐藏提示则返回 null */
+    private val mediaBbcodeRegex = Regex("""\[(?:media|audio|video|flash)(?:=[^\]]*)?\](https?://[^\[\s]+)\[/(?:media|audio|video|flash)\]""")
+
+    /** v0.4.8：按 URL 推断媒体类型 */
+    internal fun mediaKindOf(url: String): MediaKind {
+        val u = url.lowercase()
+        return when {
+            u.contains(".mp3") || u.contains(".m4a") || u.contains(".aac") || u.contains("audio") -> MediaKind.Audio
+            u.contains(".mp4") || u.contains(".m3u8") || u.contains(".flv") || u.contains(".webm") ||
+                u.contains("video") || u.contains("youtube") || u.contains("bilibili") ||
+                u.contains("v.qq.com") || u.contains("youku") -> MediaKind.Video
+            else -> MediaKind.Other
+        }
+    }
+
     internal fun hiddenKindOf(text: String): HiddenKind? {
         val t = text.trim()
         if (t.isEmpty() || t.length > 160) return null
@@ -587,7 +603,7 @@ object ThreadDetailParser {
                 var end = clean.length
                 while (start < end && clean[start].isWhitespace()) start++
                 while (end > start && clean[end - 1].isWhitespace()) end--
-                val text = clean.substring(start, end)
+                var text = clean.substring(start, end)
                 if (text.isEmpty()) return@runCatching
                 // 3) 重新映射样式区间，丢弃空区间并合并相邻同样式
                 val spans = mutableListOf<TextSpan>()
@@ -616,6 +632,18 @@ object ThreadDetailParser {
                     )
                 }
                 // v0.4.8：纯文案形式的隐藏提示（服务端只给一句通知）
+                // v0.4.8：正文里残留的媒体 BBCode（模板未渲染时）
+                val mediaMatched = mediaBbcodeRegex.containsMatchIn(text)
+                mediaBbcodeRegex.findAll(text).forEach { m ->
+                    val murl = m.groupValues[1].trim()
+                    if (murl.startsWith("http")) {
+                        blocks.add(ContentBlock.Media(murl, mediaKindOf(murl)))
+                    }
+                }
+                // 媒体 BBCode 已单独成块 → 从正文文字里去掉，避免重复显示
+                if (mediaMatched) {
+                    text = mediaBbcodeRegex.replace(text, "").trim()
+                }
                 hiddenKindOf(text)?.let { hk ->
                     blocks.add(ContentBlock.Hidden(hk, text))
                     return@runCatching
@@ -691,6 +719,24 @@ object ThreadDetailParser {
                         return
                     }
                     when (node.tagName().lowercase()) {
+                        // v0.4.8：嵌入媒体（iframe/video/audio/embed）
+                        "iframe", "embed" -> {
+                            val src = node.attr("src").ifBlank { node.attr("data-src") }
+                            if (src.isNotBlank()) {
+                                flush()
+                                blocks.add(ContentBlock.Media(absolutize(src), mediaKindOf(src)))
+                            }
+                            return
+                        }
+                        "video", "audio" -> {
+                            val src = node.attr("src").ifBlank { node.selectFirst("source")?.attr("src").orEmpty() }
+                            if (src.isNotBlank()) {
+                                flush()
+                                val kind = if (node.tagName().lowercase() == "audio") MediaKind.Audio else MediaKind.Video
+                                blocks.add(ContentBlock.Media(absolutize(src), kind))
+                            }
+                            return
+                        }
                         // v0.4.0：表格单独成块（按行/列解析），不再把 td/tr 摊平成普通文字
                         "table" -> {
                             flush()
