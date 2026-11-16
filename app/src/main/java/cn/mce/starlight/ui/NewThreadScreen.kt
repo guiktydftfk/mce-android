@@ -189,7 +189,9 @@ fun NewThreadScreen(
             var inserted = 0
             uris.forEach { uri ->
                 runCatching {
-                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    // v0.4.8：先压缩再上传（最长边 1600 / JPEG 85），弱网更快
+                    val bytes = cn.mce.starlight.core.ImageCompressor.compress(context, uri)
+                        ?: return@runCatching
                         ?: return@runCatching
                     val name = "image_${System.currentTimeMillis()}.jpg"
                     val aid = PostActions.uploadImage(fid, null, bytes, name)
@@ -408,7 +410,8 @@ fun NewThreadScreen(
         } else {
             null
         }
-        val r = PostActions.newThread(
+        // v0.4.8：弱网发布失败自动重试一次（仅网络类错误）
+        var r = PostActions.newThread(
             fid = fid,
             subject = subject.trim(),
             message = contentField.text.trim(),
@@ -427,6 +430,29 @@ fun NewThreadScreen(
             ),
             poll = poll,
         )
+        if (!r.ok && cn.mce.starlight.core.RetryPolicy.shouldRetry(r.message)) {
+            draftTip = "网络较弱，正在重试…"
+            kotlinx.coroutines.delay(900)
+            r = PostActions.newThread(
+                fid = fid,
+                subject = subject.trim(),
+                message = contentField.text.trim(),
+                typeid = selectedCategory?.id,
+                aids = uploaded.map { it.second },
+                options = PostActions.Options(
+                    hiddenReplies = hiddenReplies,
+                    orderType = orderType,
+                    noticeAuthor = noticeAuthor,
+                    useSign = useSign,
+                    disableSmiley = disableSmiley,
+                    parseUrlOff = parseUrlOff,
+                    replyCreditTimes = creditTimes,
+                    replyCreditValue = creditValue,
+                    draft = draft,
+                ),
+                poll = poll,
+            )
+        }
         sending = false
         if (r.ok) {
             draftId?.let { DraftStore.delete(it) }

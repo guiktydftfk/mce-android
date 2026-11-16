@@ -474,7 +474,9 @@ fun ThreadDetailScreen(
             uploadingImage = true
             uris.forEach { uri ->
                 runCatching {
-                    val bytes = pickContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    // v0.4.8：先压缩再上传（最长边 1600 / JPEG 85）
+                    val bytes = cn.mce.starlight.core.ImageCompressor.compress(pickContext, uri)
+                        ?: return@runCatching
                         ?: return@runCatching
                     val name = "reply_${System.currentTimeMillis()}.jpg"
                     val aid = PostActions.uploadImage(uploadFid, tid, bytes, name)
@@ -1092,7 +1094,13 @@ fun ThreadDetailScreen(
                 }
             }
             scope.launch {
-                val r = PostActions.reply(tid, fid, message, replyTo?.pid, aids = aids)
+                // v0.4.8：弱网失败自动重试一次（仅网络类错误）
+                var r = PostActions.reply(tid, fid, message, replyTo?.pid, aids = aids)
+                if (!r.ok && cn.mce.starlight.core.RetryPolicy.shouldRetry(r.message)) {
+                    toast = "网络较弱，正在重试…"
+                    kotlinx.coroutines.delay(900)
+                    r = PostActions.reply(tid, fid, message, replyTo?.pid, aids = aids)
+                }
                 sending = false
                 toast = r.message
                 if (r.ok) {
