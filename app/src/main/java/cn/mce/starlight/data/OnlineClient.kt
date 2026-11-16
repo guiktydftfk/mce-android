@@ -9,7 +9,7 @@ import org.jsoup.Jsoup
  *
  * 手机模板没有在线会员页，这里走电脑版页面：
  *   `forum.php?mod=online&mobile=no`
- * 解析「共 N 人在线 - N 会员, N 位游客」与会员列表（uid + 昵称）。
+ * 解析「共 N 人在线 - N 会员(0 隐身), N 位游客」与会员列表（uid + 昵称）。
  */
 object OnlineClient {
 
@@ -31,8 +31,8 @@ object OnlineClient {
 
     suspend fun load(): OnlinePage = withContext(Dispatchers.IO) {
         val urls = listOf(
-            "$BASE_NET/forum.php?mod=online&mobile=no",
-            "$BASE_NET/forum.php?mod=online",
+            "${Net.BASE}/forum.php?mod=online&mobile=no",
+            "${Net.BASE}/forum.php?mod=online",
         )
         for (url in urls) {
             val html = runCatching {
@@ -44,19 +44,28 @@ object OnlineClient {
         OnlinePage("在线会员", null, null, null, emptyList())
     }
 
-    private const val BASE_NET = Net.BASE
-
     /** 解析在线会员页（提取为可测试函数） */
     internal fun parse(html: String, baseUrl: String): OnlinePage {
         val doc = Jsoup.parse(html, baseUrl)
-        val text = doc.text()
-        val total = Regex("""(\d+)\s*人在线""").find(text)?.groupValues?.get(1)?.toIntOrNull()
-        val memberCount = Regex("""(\d+)\s*(?:位)?会员""").find(text)?.groupValues?.get(1)?.toIntOrNull()
-        val guestCount = Regex("""(\d+)\s*(?:位)?游客""").find(text)?.groupValues?.get(1)?.toIntOrNull()
+        // v0.4.8：统计数字只在「在线会员」标题行里找，
+        // 避免页脚「会员总数: 469764」被当成在线会员数。
         val caption = doc.selectFirst("h1, h2")
             ?.text()?.trim()
             ?.takeIf { it.contains("在线") }
             ?: "在线会员"
+        // v0.4.8：统计行可能不在标题里（部分模板把「共 N 人在线」放在 bm 子标题），
+        // 全文档找第一条包含「人在线」的短文本行。
+        val statsLine = doc.select("h1, h2, p, div").map { it.text().trim() }
+            .filter { it.contains("人在线") && it.length <= 200 }
+            .maxByOrNull { it.length }
+            ?: doc.text().lineSequence().firstOrNull { it.contains("人在线") }
+            ?: ""
+        val total = Regex("""共\s*(\d+)\s*人在线""").find(statsLine)?.groupValues?.get(1)?.toIntOrNull()
+            ?: Regex("""(\d+)\s*人在线""").find(statsLine)?.groupValues?.get(1)?.toIntOrNull()
+        val memberCount = Regex("""(\d+)\s*(?:位)?会员\s*\(\s*(\d+)\s*隐身""")
+            .find(statsLine)?.groupValues?.get(1)?.toIntOrNull()
+            ?: Regex("""(\d+)\s*(?:位)?会员""").find(statsLine)?.groupValues?.get(1)?.toIntOrNull()
+        val guestCount = Regex("""(\d+)\s*位游客""").find(statsLine)?.groupValues?.get(1)?.toIntOrNull()
         // 优先专用容器；找不到就退化为全页 uid 链接（不同模板结构差异大）
         val scope = doc.selectFirst("div.onlinelist, ul.onlinelist, div#onlinelist, div.bm, div#ct")
             ?: doc.body()
@@ -64,13 +73,13 @@ object OnlineClient {
             val href = a.attr("href")
             val uid = Regex("""uid=(\d+)""").find(href)?.groupValues?.get(1)?.toIntOrNull()
                 ?: return@mapNotNull null
-            val name = a.text().trim()
+            val name = a.text().trim().trim('[', ']', ' ', '\u3000')
             if (name.isBlank() || name.length > 24) return@mapNotNull null
             if (name in setOf("登录", "注册", "找回密码", "退出")) return@mapNotNull null
             Member(
                 name = name,
                 uid = uid,
-                avatar = "$BASE_NET/uc_server/avatar.php?uid=$uid&size=small",
+                avatar = "${Net.BASE}/uc_server/avatar.php?uid=$uid&size=small",
             )
         }.distinctBy { it.uid }.take(200)
         return OnlinePage(caption, total, memberCount, guestCount, members)
