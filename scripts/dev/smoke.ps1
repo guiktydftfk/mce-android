@@ -37,18 +37,26 @@ function Swipe([double]$x1, [double]$y1, [double]$x2, [double]$y2) {
     & $adb -s $s shell input swipe ([int]$x1) ([int]$y1) ([int]$x2) ([int]$y2) 350 | Out-Null
     Start-Sleep -Milliseconds 900
 }
+function WinNow() {
+    $o = (& $adb -s $s shell dumpsys window displays 2>&1) -join ' '
+    $m = [regex]::Match($o, 'mBounds=Rect\(0, 0 - (\d+), (\d+)\)')
+    if ($m.Success) { return @([int]$m.Groups[1].Value, [int]$m.Groups[2].Value) }
+    return @($script:W, $script:H)
+}
 function Back { & $adb -s $s shell input keyevent 4 | Out-Null; Start-Sleep -Milliseconds 900 }
 
 # 抽屉内向下滚动查找目标文本，返回最后一次 dump
 function DrawerFind([string]$label, [int]$tries = 6) {
-    & $adb -s $s shell input tap 63 113 | Out-Null
+    $wn0 = WinNow
+    & $adb -s $s shell input tap ([int]($wn0[0] * 0.04)) ([int]($wn0[1] * 0.06)) | Out-Null
     Start-Sleep -Seconds 2
     # 抽屉未打开则重点一次（旋转动画/首点被吞）
     if ((Dump) -notmatch "导航|全部最新|我的") { & $adb -s $s shell input tap 63 113 | Out-Null; Start-Sleep -Seconds 2 }
     for ($i = 0; $i -lt $tries; $i++) {
         $d = Dump
         if ($d -match [regex]::Escape($label)) { return $d }
-        Swipe ($W * 0.5) ($H * 0.82) ($W * 0.5) ($H * 0.30)
+        $wn = WinNow
+        Swipe ($wn[0] * 0.28) ($wn[1] * 0.75) ($wn[0] * 0.28) ($wn[1] * 0.32)
     }
     return (Dump)
 }
@@ -195,6 +203,83 @@ if ($W2 -gt $H2) {
 } else {
     Write-Host "INFO  当前为竖屏，跳过双栏检查"
 }
+
+
+# ---- v0.4.8 新功能回归 ----
+function NodeDesc([string]$x, [string]$pat) {
+    $m = [regex]::Matches($x, '<node[^>]*content-desc="([^"]*)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"') |
+        Where-Object { $_.Groups[1].Value -match $pat } | Select-Object -First 1
+    if (-not $m) { return $null }
+    $g = $m.Groups
+    return [pscustomobject]@{ X = [int](([int]$g[2].Value + [int]$g[4].Value) / 2); Y = [int](([int]$g[3].Value + [int]$g[5].Value) / 2) }
+}
+
+& $adb -s $s shell am force-stop cn.mce.starlight | Out-Null
+& $adb -s $s shell am start -n cn.mce.starlight/.MainActivity | Out-Null
+Start-Sleep -Seconds 9
+
+# 抽屉新增入口
+$drawerNew = DrawerFind "关注板块" 8
+Check "抽屉含关注板块入口" ($drawerNew -match "关注板块")
+Check "抽屉含在线会员入口" ($drawerNew -match "在线会员")
+$onlineNode = Node $drawerNew "^在线会员$"
+if ($onlineNode) { TapNode $onlineNode | Out-Null; Start-Sleep -Seconds 9 }
+$onlinePage = Dump
+Check "在线会员页加载" ($onlinePage -match "在线会员")
+Check "在线会员有统计行" ($onlinePage -match "人在线")
+Back
+
+# 设置页：布局模式 / 应用锁 / 缓存管理 / 崩溃日志
+& $adb -s $s shell input tap 63 113 | Out-Null
+Start-Sleep -Seconds 2
+$setNode = $null
+for ($i = 0; $i -lt 5; $i++) {
+    $dd = Dump
+    $setNode = Node $dd "^设置$"
+    if ($setNode) { break }
+    Swipe 300 1800 300 1000
+}
+if ($setNode) { TapNode $setNode | Out-Null; Start-Sleep -Seconds 6 }
+$settingsTop = Dump
+for ($i = 0; $i -lt 3; $i++) { Swipe 720 900 720 2000; $settingsTop = Dump }
+Check "设置含大屏布局（双栏/三栏）" (($settingsTop -match "大屏布局") -and ($settingsTop -match "三栏"))
+$settingsAll = ""
+$hitLock = $false; $hitCache = $false; $hitCrash = $false
+for ($i = 0; $i -lt 8; $i++) {
+    $pp = Dump
+    if ($pp -match "应用锁") { $hitLock = $true }
+    if ($pp -match "缓存管理") { $hitCache = $true }
+    if ($pp -match "崩溃日志") { $hitCrash = $true; break }
+    Swipe 720 1900 720 900
+}
+Check "设置含应用锁开关" $hitLock
+Check "设置含缓存管理入口" $hitCache
+$crashNode = Node (Dump) "崩溃日志"
+if ($crashNode) { TapNode $crashNode | Out-Null; Start-Sleep -Seconds 6 }
+$crashPage = Dump
+Check "崩溃日志页加载" ($crashPage -match "崩溃日志")
+Back
+
+# 搜索筛选条
+& $adb -s $s shell input tap 63 113 | Out-Null
+Start-Sleep -Seconds 2
+$searchNode = $null
+for ($i = 0; $i -lt 5; $i++) {
+    $dd = Dump
+    $searchNode = Node $dd "^搜索$"
+    if ($searchNode) { break }
+    Swipe 300 1800 300 1000
+}
+if ($searchNode) { TapNode $searchNode | Out-Null; Start-Sleep -Seconds 5 }
+$searchPage = Dump
+$kwNode = Node $searchPage "关键词（匹配标题与正文）"
+if ($kwNode) { TapNode $kwNode | Out-Null; Start-Sleep -Milliseconds 800; & $adb -s $s shell input text "星光" | Out-Null; Start-Sleep -Milliseconds 600 }
+& $adb -s $s shell input keyevent 4 | Out-Null
+Start-Sleep -Milliseconds 800
+$goNode = NodeDesc (Dump) "搜索"
+if ($goNode) { & $adb -s $s shell input tap $goNode.X $goNode.Y | Out-Null; Start-Sleep -Seconds 10 }
+$resultPage = Dump
+Check "搜索结果含筛选条" ($resultPage -match "在结果中筛选")
 
 $mem = (& $adb -s $s shell dumpsys meminfo cn.mce.starlight 2>&1 | Select-String "TOTAL PSS" | Select-Object -First 1).Line
 Write-Host ("INFO  " + $mem)
