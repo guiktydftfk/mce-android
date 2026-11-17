@@ -138,6 +138,8 @@ fun NewThreadScreen(
     var showExitConfirm by remember { mutableStateOf(false) }
     // v0.4.0：独立的发帖预览页（非实时）
     var showPreview by remember { mutableStateOf(false) }
+    // v0.4.8：新版发帖页——发布设置默认折叠（板块/分类等）
+    var showPublishSettings by remember { mutableStateOf(false) }
     // v0.4.0：选区跟踪（工具栏/弹窗失焦后仍能作用于原选区）+ 视频插入
     var lastSelection by remember { mutableStateOf(androidx.compose.ui.text.TextRange(0, 0)) }
     var lastSelectionTextLen by remember { mutableStateOf(-1) }
@@ -472,16 +474,66 @@ fun NewThreadScreen(
             .padding(top = clampTopInset(topInset) + 64.dp, start = 14.dp, end = 14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        // 页签：发表帖子 / 发起投票
+        // v0.4.8：新版发帖头部（页签 / 草稿 / 发布设置）
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ModeTab("\u53d1\u8868\u5e16\u5b50", !pollMode) { pollMode = false }
             ModeTab("\u53d1\u8d77\u6295\u7968", pollMode) { pollMode = true }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = { saveDraft() }) { Text("草稿") }
+            TextButton(onClick = { showPublishSettings = !showPublishSettings }) {
+                Text(if (showPublishSettings) "收起设置" else "发布设置")
+            }
         }
         HorizontalDivider()
 
+        // v0.4.8：首图位（仅视觉预览，发布后按正文内联图片展示）
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { pickImages.launch("image/*") },
+                contentAlignment = Alignment.Center,
+            ) {
+                val first = uploaded.firstOrNull()
+                if (first != null) {
+                    AsyncImage(
+                        model = first.first,
+                        contentDescription = "首图",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Text("+", style = MaterialTheme.typography.headlineMedium)
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("添加首图", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "可选 · 仅用于列表预览效果，正文里仍按图片位置展示",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        // v0.4.8：必选分类但还没选时提示入口
+        if (!showPublishSettings && categories.isNotEmpty() && selectedCategory == null) {
+            Text(
+                "该板块需要选择主题分类：点右上「发布设置」选择",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        // v0.4.8：板块 / 主题分类收进「发布设置」
+        if (showPublishSettings) {
         // board selector
         ExposedDropdownMenuBox(expanded = boardExpanded, onExpandedChange = { boardExpanded = !boardExpanded }) {
             OutlinedTextField(
@@ -559,10 +611,13 @@ fun NewThreadScreen(
             Text("正在加载表单…", style = MaterialTheme.typography.bodySmall)
         }
 
+        }
         OutlinedTextField(
             value = subject,
-            onValueChange = { subject = it },
-            label = { Text("标题") },
+            // v0.4.8：标题按 Discuz 上限 80 字截断，并显示字数
+            onValueChange = { subject = it.take(80) },
+            label = { Text("填写标题") },
+            supportingText = { Text("${subject.length}/80", style = MaterialTheme.typography.labelSmall) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -613,11 +668,12 @@ fun NewThreadScreen(
                     lastCursor = it.selection.start
                 }
             },
-            label = { Text("内容（选中文字后可加粗/颜色/斜体/下划线，效果直接在框内显示）") },
+            label = { Text("正文") },
+            placeholder = { Text("添加正文…（可插入图片、视频、引用等）") },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 240.dp),
             minLines = if (pollMode) 4 else 8,
     // v0.4.0：编辑框内直接预览 BBCode 样式（加粗/斜体/下划线/颜色/链接），不用去预览页确认
     visualTransformation = BbcodeVisualTransformation(),
-    modifier = Modifier.fillMaxWidth(),
         )
 
         // v0.4.0：预览改为独立页面（点按钮才生成一次），编辑区不再实时预览
@@ -641,7 +697,6 @@ fun NewThreadScreen(
                 label = { Text("投票选项（每行 1 个，2~${PostActions.Poll.MAX_CHOICES} 项）") },
                 placeholder = { Text("选项一\n选项二\n选项三") },
                 minLines = 4,
-                modifier = Modifier.fillMaxWidth(),
             )
             if (pollChoices.isNotEmpty()) {
                 Text(
@@ -830,7 +885,6 @@ fun NewThreadScreen(
                         label = { Text("视频地址") },
                         placeholder = { Text("https://www.bilibili.com/video/BV…") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             },
