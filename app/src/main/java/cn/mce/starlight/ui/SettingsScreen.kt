@@ -916,19 +916,6 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Spacer(Modifier.height(12.dp))
-            Text("免责声明", style = MaterialTheme.typography.bodyLarge)
-            Text(
-                "1. 本应用为第三方非官方客户端，与 MCE星光班、微星科技（MSI）及论坛管理团队无隶属或授权关系，" +
-                    "名称与图标仅用于标识所访问的论坛社区。\n" +
-                    "2. 应用内展示的帖子、图片、评论等内容版权归原作者及论坛所有，本应用仅做展示与转发，不对内容真实性、合法性负责。\n" +
-                    "3. 本应用按「现状」提供，不附带任何明示或暗示的担保；因使用本应用造成的任何直接或间接损失，" +
-                    "开发者不承担责任，使用风险由使用者自行承担。\n" +
-                    "4. 本应用仅供学习交流与非商业用途，禁止用于任何商业目的；请遵守论坛规则及当地法律法规。\n" +
-                    "5. 如权利人认为内容侵权，请联系开发者删除。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
 
         ImmersiveTopBar(

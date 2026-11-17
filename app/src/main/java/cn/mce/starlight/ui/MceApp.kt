@@ -120,8 +120,6 @@ sealed interface Route {
     data object FavFeed : Route
     /** v0.4.8：崩溃日志 */
     data object CrashLogs : Route
-    /** v0.4.8：空间发布（日志） */
-    data object SpaceCompose : Route
     /** v0.4.8：在线会员 / 在线统计 */
     data object Online : Route
     /** v0.4.1：道具中心专用页 */
@@ -600,13 +598,6 @@ fun MceApp() {
                                 false,
                             )
                             DrawerEntry(6, "任务中心", dest == Dest.Tasks)
-                            // v0.4.8：空间发布（日志/相册）
-                            DrawerItem(label = "空间发布", selected = false, sheen = sheen) {
-                                dest = Dest.Feed
-                                stack = listOf(Route.SpaceCompose)
-                                closeDrawer()
-                            }
-                            // v0.4.1：常用表单汇总（任务中心下面）
                             DrawerEntry(7, "常用表单汇总", false)
                             // v0.4.5：收藏板块管理
                             // v0.4.6：收藏分组/备注
@@ -932,10 +923,6 @@ fun MceApp() {
             )
 
             is Route.Medals -> MedalsScreen(onMenu = ::openDrawer)
-            is Route.SpaceCompose -> SpaceComposeScreen(
-                onMenu = ::openDrawer,
-                onOpenPage = { url, title -> push(Route.Page(url, title)) },
-            )
             is Route.CrashLogs -> CrashLogsScreen(onMenu = ::openDrawer)
             is Route.FavFeed -> FavoritesFeedScreen(
                 onMenu = ::openDrawer,
