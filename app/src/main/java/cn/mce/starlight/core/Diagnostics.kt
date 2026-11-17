@@ -40,7 +40,7 @@ object Diagnostics {
         sb.appendLine("硬件：${Build.HARDWARE} / 主板 ${Build.BOARD}")
         sb.appendLine("系统：Android ${Build.VERSION.RELEASE}（API ${Build.VERSION.SDK_INT}）")
         sb.appendLine("系统版本号：${Build.DISPLAY}")
-        if (Build.VERSION.SDK_INT >= 23) sb.appendLine("安全补丁：${Build.VERSION.SECURITY_PATCH}")
+        sb.appendLine("安全补丁：${Build.VERSION.SECURITY_PATCH}")
         sb.appendLine("内核：${System.getProperty("os.version") ?: "?"}")
         sb.appendLine("ABI：${Build.SUPPORTED_ABIS.joinToString(",")}")
         sb.appendLine("语言/地区：${java.util.Locale.getDefault()}")

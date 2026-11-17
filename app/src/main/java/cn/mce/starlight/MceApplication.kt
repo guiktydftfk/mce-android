@@ -113,7 +113,10 @@ class MceApplication : Application(), ImageLoaderFactory {
             .okHttpClient(client)
             .crossfade(true)
             .memoryCache {
-                coil.memory.MemoryCache.Builder(this).maxSizePercent(0.25).build()
+                // v0.4.8：低内存设备降低图片内存缓存上限，减少被系统杀进程
+                val am = getSystemService(android.app.ActivityManager::class.java)
+                val lowRam = am?.isLowRamDevice == true || (am?.memoryClass ?: 256) <= 192
+                coil.memory.MemoryCache.Builder(this).maxSizePercent(if (lowRam) 0.15 else 0.25).build()
             }
             .diskCache {
                 coil.disk.DiskCache.Builder()

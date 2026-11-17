@@ -490,38 +490,6 @@ fun NewThreadScreen(
         }
         HorizontalDivider()
 
-        // v0.4.8：首图位（仅视觉预览，发布后按正文内联图片展示）
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(96.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { pickImages.launch("image/*") },
-                contentAlignment = Alignment.Center,
-            ) {
-                val first = uploaded.firstOrNull()
-                if (first != null) {
-                    AsyncImage(
-                        model = first.first,
-                        contentDescription = "首图",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Text("+", style = MaterialTheme.typography.headlineMedium)
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text("添加首图", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    "可选 · 仅用于列表预览效果，正文里仍按图片位置展示",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
 
         // v0.4.8：必选分类但还没选时提示入口
         if (!showPublishSettings && categories.isNotEmpty() && selectedCategory == null) {

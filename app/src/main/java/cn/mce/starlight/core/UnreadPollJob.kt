@@ -20,6 +20,11 @@ class UnreadPollJob : JobService() {
         val ctx = applicationContext
         Thread {
             runCatching {
+                    // v0.4.8：两个通知开关都关时不必联网轮询，省电
+                    if (!SettingsStore.notifyUnreadEnabled && !SettingsStore.notifyNoticeEnabled) {
+                        jobFinished(params, false)
+                        return@runCatching
+                    }
                 if (SessionStore.isLoggedIn) {
                     val quiet = SettingsStore.notifyQuietEnabled && notifyQuietNow()
 
