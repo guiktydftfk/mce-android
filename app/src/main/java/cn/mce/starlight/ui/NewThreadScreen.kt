@@ -83,6 +83,8 @@ fun NewThreadScreen(
     onMenu: () -> Unit,
     initialFid: Int? = null,
     initialDraft: Draft? = null,
+    /** v0.4.8：草稿 id（从草稿箱进入时传；用于 initialDraft 未及时取到时兜底） */
+    initialDraftId: Long? = null,
     onDraftSaved: () -> Unit = {},
     onPosted: () -> Unit,
     /** v0.3.10：退出编辑页（存草稿 / 放弃修改后由 MceApp 出栈） */
@@ -91,15 +93,17 @@ fun NewThreadScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pageScroll = rememberScrollState()
+    // v0.4.8：兜底解析草稿（initialDraft 由 MceApp 传入；id 再查一次防止时序问题）
+    val draft: Draft? = initialDraft ?: initialDraftId?.let { cn.mce.starlight.core.DraftStore.get(it) }
 
     // 发帖默认板块固定为「综合交流」；从板块页进入时用传入的 fid
-    var selectedFid by remember { mutableStateOf(initialFid ?: Boards.default.fid) }
+    var selectedFid by remember { mutableStateOf(draft?.fid ?: initialFid ?: Boards.default.fid) }
     var expandedBoardGroups by remember { mutableStateOf(setOf("全国交流")) }
     var boardExpanded by remember { mutableStateOf(false) }
     var categoryExpanded by remember { mutableStateOf(false) }
 
     // 页签：帖子 / 投票
-    var pollMode by remember { mutableStateOf(false) }
+    var pollMode by remember { mutableStateOf(draft?.pollMode ?: false) }
 
     var categories by remember { mutableStateOf(emptyList<PostActions.Category>()) }
     var selectedCategory by remember { mutableStateOf<PostActions.Category?>(null) }
@@ -107,17 +111,17 @@ fun NewThreadScreen(
     var reloadTick by remember { mutableStateOf(0) }
     var formError by remember { mutableStateOf<String?>(null) }
 
-    var subject by remember { mutableStateOf("") }
-    var contentField by remember { mutableStateOf(TextFieldValue("")) }
+    var subject by remember { mutableStateOf(draft?.title ?: "") }
+    var contentField by remember { mutableStateOf(TextFieldValue(draft?.content ?: "")) }
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
     // 投票字段
-    var pollOptions by remember { mutableStateOf("") }
-    var maxChoices by remember { mutableStateOf("") }
-    var expireDays by remember { mutableStateOf("") }
-    var resultVisible by remember { mutableStateOf(false) }
-    var publicVoters by remember { mutableStateOf(false) }
+    var pollOptions by remember { mutableStateOf(draft?.pollOptions ?: "") }
+    var maxChoices by remember { mutableStateOf(draft?.maxChoices ?: "") }
+    var expireDays by remember { mutableStateOf(draft?.expireDays ?: "") }
+    var resultVisible by remember { mutableStateOf(draft?.resultVisible ?: false) }
+    var publicVoters by remember { mutableStateOf(draft?.publicVoters ?: false) }
 
     // extra options
     var hiddenReplies by remember { mutableStateOf(false) }
@@ -130,7 +134,7 @@ fun NewThreadScreen(
     var creditValue by remember { mutableStateOf("") }
     var showOptions by remember { mutableStateOf(false) }
     // 草稿 id：从草稿箱进入时带上，发布成功或重新保存时复用
-    var draftId by remember { mutableStateOf(initialDraft?.id) }
+    var draftId by remember { mutableStateOf(draft?.id) }
     var draftTip by remember { mutableStateOf<String?>(null) }
 
     // uploaded attachments (local uri + remote aid)
@@ -159,8 +163,8 @@ fun NewThreadScreen(
 
 
     // 从草稿箱恢复内容（只在首次组合时执行；之后用户可自由编辑）
-    LaunchedEffect(initialDraft?.id) {
-        val d = initialDraft ?: return@LaunchedEffect
+    LaunchedEffect(draft?.id) {
+        val d = draft ?: return@LaunchedEffect
         selectedFid = d.fid
         subject = d.title
         contentField = TextFieldValue(d.content)

@@ -28,7 +28,13 @@ class BbcodeVisualTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val raw = text.text
         if (!raw.contains('[')) return TransformedText(text, OffsetMapping.Identity)
-        val tags = tagRegex.findAll(raw).map { it.range.first to it.range.last + 1 }.toList()
+        // v0.4.8 修复：只隐藏「已知且结构完整」的 BBCode 标签。
+        // 旧实现把所有 [xx...] 都当标签隐藏，遇到未闭合/畸形标签（如 [color=#E64346）会把后面整段文字一起吞掉，
+        // 表现为草稿箱里的草稿打开后正文一片空白。
+        val tags = tagRegex.findAll(raw)
+            .map { it.range.first to it.range.last + 1 }
+            .filter { (start, end) -> isKnownTag(raw.substring(start, end)) }
+            .toList()
         if (tags.isEmpty()) return TransformedText(text, OffsetMapping.Identity)
 
         val display = buildDisplay(raw, tags)
@@ -153,5 +159,19 @@ class BbcodeVisualTransformation : VisualTransformation {
 
     private companion object {
         val tagRegex = Regex("""\[(/?)([a-zA-Z]+)([^\]]*)]""")
+
+        /** 支持的 BBCode 标签白名单（未知标签/畸形标签保持原文显示，不吞文字） */
+        val knownTags = setOf(
+            "b", "i", "u", "color", "url", "align", "center", "right", "left",
+            "size", "font", "quote", "code", "img", "attach", "hide", "media",
+            "audio", "video", "flash", "free", "email", "table", "tr", "td", "hr",
+        )
+
+        /** 标签文本形如 [tag]、[/tag]、[tag=xxx]；且不能嵌套其它 '[' */
+        fun isKnownTag(tagText: String): Boolean {
+            if (tagText.count { it == '[' } != 1) return false
+            val m = tagRegex.matchEntire(tagText) ?: return false
+            return m.groupValues[2].lowercase() in knownTags
+        }
     }
 }
