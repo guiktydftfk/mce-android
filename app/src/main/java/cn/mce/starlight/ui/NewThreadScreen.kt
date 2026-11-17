@@ -37,6 +37,9 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -469,12 +472,12 @@ fun NewThreadScreen(
         (categories.isEmpty() || selectedCategory != null) &&
         (!pollMode || pollChoices.size >= 2)
 
+    Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(pageScroll)
-            .padding(top = clampTopInset(topInset) + 64.dp, start = 14.dp, end = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(top = clampTopInset(topInset) + 64.dp, start = 14.dp, end = 14.dp, bottom = 210.dp),
     ) {
         // v0.4.8：新版发帖头部（页签 / 草稿 / 发布设置）
         Row(
@@ -673,53 +676,6 @@ fun NewThreadScreen(
             HorizontalDivider()
         }
 
-        // v0.4.8：底部快捷工具栏（图片 / @ / 视频 / 引用 / 更多工具 / 发布设置）
-        HorizontalDivider(Modifier.padding(vertical = 6.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            ToolButton("图片") { pickImages.launch("image/*") }
-            ToolButton("@") { insertText("@") }
-            ToolButton("视频") { videoUrl = ""; showVideoDialog = true }
-            ToolButton("引用") { wrap("[quote]", "[/quote]", "引用内容") }
-            ToolButton("B") { styleSelection("[b]", "[/b]", "加粗") }
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = { showMoreTools = !showMoreTools }) {
-                Text(if (showMoreTools) "收起工具" else "更多工具")
-            }
-            TextButton(onClick = { showPublishSettings = !showPublishSettings }) {
-                Text("设置")
-            }
-        }
-        // 更多工具：颜色 / 对齐 / 链接 / 代码 / 隐藏 / 全选
-        if (showMoreTools) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                ToolButton("I") { styleSelection("[i]", "[/i]", "斜体") }
-                ToolButton("U") { styleSelection("[u]", "[/u]", "下划线") }
-                ToolButton("颜色") { openColorPicker() }
-                ToolButton("左对齐") { applyAlign("left") }
-                ToolButton("居中") { applyAlign("center") }
-                ToolButton("右对齐") { applyAlign("right") }
-                ToolButton("链接") { wrap("[url]", "[/url]", "https://") }
-                ToolButton("图链") { wrap("[img]", "[/img]", "图片链接") }
-                ToolButton("代码") { wrap("[code]", "[/code]", "代码") }
-                ToolButton("隐藏") { wrap("[hide]", "[/hide]", "隐藏内容（回复可见）") }
-                ToolButton("全选") {
-                    val all = androidx.compose.ui.text.TextRange(0, contentField.text.length)
-                    contentField = contentField.copy(selection = all)
-                    lastSelection = all
-                    lastSelectionTextLen = contentField.text.length
-                }
-            }
-        }
-        HorizontalDivider(Modifier.padding(vertical = 6.dp))
         if (uploaded.isNotEmpty()) {
             Row(
                 Modifier
@@ -759,7 +715,7 @@ fun NewThreadScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "附加选项" + if (showOptions) " ▲" else " ▼",
+                "可见性与附加选项" + if (showOptions) " ▲" else " ▼",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -767,9 +723,33 @@ fun NewThreadScreen(
 
         if (showOptions) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                // v0.4.8：可见性与附加选项（Discuz 阅读权限由论坛设置控制，这里映射可用的可见性开关）
+                Text(
+                    "可见性（阅读权限由论坛控制）",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 OptionRow("回帖仅作者可见", hiddenReplies) { hiddenReplies = it }
-                OptionRow("回帖倒序排列", orderType) { orderType = it }
+                Text(
+                    "开启后，其他用户看不到本主题的回帖内容",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+                )
                 OptionRow("接收回复通知", noticeAuthor) { noticeAuthor = it }
+                Text(
+                    "有人回复本主题时通过站内提醒通知你",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+                )
+                Text(
+                    "其它选项",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                OptionRow("回帖倒序排列", orderType) { orderType = it }
                 OptionRow("使用个人签名", useSign) { useSign = it }
                 OptionRow("禁用表情", disableSmiley) { disableSmiley = it }
                 OptionRow("禁用链接识别", parseUrlOff) { parseUrlOff = it }
@@ -802,34 +782,96 @@ fun NewThreadScreen(
             }
         }
 
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                enabled = canSubmit,
-                onClick = { scope.launch { submit(false) } },
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(
-                    when {
-                        sending -> "提交中…"
-                        pollMode -> "发布投票"
-                        else -> "发布"
-                    },
-                )
-            }
 
-            TextButton(
-                enabled = !sending && (subject.isNotBlank() || contentField.text.isNotBlank()),
-                onClick = { saveDraft() },
-            ) { Text(if (draftId != null) "更新草稿" else "存草稿") }
-        }
-
-        draftTip?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-        }
 
         Spacer(Modifier.height(8.dp))
         HorizontalDivider()
         Spacer(Modifier.height(24.dp))
+    }
+
+    // v0.4.8：底部悬浮工具栏（随键盘上移，滚动内容不再挤压工具条）
+    Surface(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding(),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 3.dp,
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    // v0.4.8：底部快捷工具栏（图片 / @ / 视频 / 引用 / 更多工具 / 发布设置）
+                    HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        ToolButton("图片") { pickImages.launch("image/*") }
+                        ToolButton("@") { insertText("@") }
+                        ToolButton("视频") { videoUrl = ""; showVideoDialog = true }
+                        ToolButton("引用") { wrap("[quote]", "[/quote]", "引用内容") }
+                        ToolButton("B") { styleSelection("[b]", "[/b]", "加粗") }
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick = { showMoreTools = !showMoreTools }) {
+                            Text(if (showMoreTools) "收起工具" else "更多工具")
+                        }
+                        TextButton(onClick = { showPublishSettings = !showPublishSettings }) {
+                            Text("设置")
+                        }
+                    }
+                    // 更多工具：颜色 / 对齐 / 链接 / 代码 / 隐藏 / 全选
+                    if (showMoreTools) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            ToolButton("I") { styleSelection("[i]", "[/i]", "斜体") }
+                            ToolButton("U") { styleSelection("[u]", "[/u]", "下划线") }
+                            ToolButton("颜色") { openColorPicker() }
+                            ToolButton("左对齐") { applyAlign("left") }
+                            ToolButton("居中") { applyAlign("center") }
+                            ToolButton("右对齐") { applyAlign("right") }
+                            ToolButton("链接") { wrap("[url]", "[/url]", "https://") }
+                            ToolButton("图链") { wrap("[img]", "[/img]", "图片链接") }
+                            ToolButton("代码") { wrap("[code]", "[/code]", "代码") }
+                            ToolButton("隐藏") { wrap("[hide]", "[/hide]", "隐藏内容（回复可见）") }
+                            ToolButton("全选") {
+                                val all = androidx.compose.ui.text.TextRange(0, contentField.text.length)
+                                contentField = contentField.copy(selection = all)
+                                lastSelection = all
+                                lastSelectionTextLen = contentField.text.length
+                            }
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            enabled = canSubmit,
+                            onClick = { scope.launch { submit(false) } },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(
+                                when {
+                                    sending -> "提交中…"
+                                    pollMode -> "发布投票"
+                                    else -> "发布"
+                                },
+                            )
+                        }
+            
+                        TextButton(
+                            enabled = !sending && (subject.isNotBlank() || contentField.text.isNotBlank()),
+                            onClick = { saveDraft() },
+                        ) { Text(if (draftId != null) "更新草稿" else "存草稿") }
+                    }
+                    draftTip?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    }
+        }
+    }
     }
 
     if (showColorPicker) {
