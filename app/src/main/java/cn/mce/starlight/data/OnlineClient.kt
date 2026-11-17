@@ -28,6 +28,13 @@ object OnlineClient {
         val guestCount: Int?,
         val members: List<Member>,
         /** v0.4.8：页面原始统计行 */
+        /** v0.4.8：隐身会员数 */
+        val hiddenCount: Int? = null,
+        /** v0.4.8：历史最高在线人数与日期 */
+        val maxOnline: Int? = null,
+        val maxOnlineDate: String? = null,
+        /** v0.4.8：用户组图例（管理员 / 超级版主 / 版主 / 会员…） */
+        val legend: List<String> = emptyList(),
         val rawStats: String? = null,
     )
 
@@ -68,6 +75,13 @@ object OnlineClient {
             .find(statsLine)?.groupValues?.get(1)?.toIntOrNull()
             ?: Regex("""(\d+)\s*(?:位)?会员""").find(statsLine)?.groupValues?.get(1)?.toIntOrNull()
         val guestCount = Regex("""(\d+)\s*位游客""").find(statsLine)?.groupValues?.get(1)?.toIntOrNull()
+        val hiddenCount = Regex("""(\d+)\s*会员\s*\(\s*(\d+)\s*隐身""")
+            .find(statsLine)?.groupValues?.get(2)?.toIntOrNull()
+        val maxOnline = Regex("""最高记录是\s*(\d+)""").find(statsLine)?.groupValues?.get(1)?.toIntOrNull()
+        val maxOnlineDate = Regex("""于\s*(\d{4}-[\d\-/]+)""").find(statsLine)?.groupValues?.get(1)?.trim()
+        // 图例：Discuz 在线页固定组名，按出现顺序保留
+        val legend = listOf("管理员", "超级版主", "版主", "会员", "禁止发言", "游客")
+            .filter { statsLine.contains(it) }
         // 优先专用容器；找不到就退化为全页 uid 链接（不同模板结构差异大）
         val scope = doc.selectFirst("div.onlinelist, ul.onlinelist, div#onlinelist, div.bm, div#ct")
             ?: doc.body()
@@ -84,6 +98,17 @@ object OnlineClient {
                 avatar = "${Net.BASE}/uc_server/avatar.php?uid=$uid&size=small",
             )
         }.distinctBy { it.uid }.take(200)
-        return OnlinePage(caption, total, memberCount, guestCount, members, statsLine.takeIf { it.isNotBlank() })
+        return OnlinePage(
+            caption = caption,
+            total = total,
+            memberCount = memberCount,
+            guestCount = guestCount,
+            members = members,
+            rawStats = statsLine.takeIf { it.isNotBlank() },
+            hiddenCount = hiddenCount,
+            maxOnline = maxOnline,
+            maxOnlineDate = maxOnlineDate,
+            legend = legend,
+        )
     }
 }

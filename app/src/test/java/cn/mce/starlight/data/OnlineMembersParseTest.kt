@@ -10,6 +10,27 @@ import org.junit.Test
  */
 class OnlineMembersParseTest {
 
+    private val fullStatsHtml = """
+        <html><body><div id="ct">
+          <h2>在线会员 - 448 人在线 - 6 会员(0 隐身), 442 位游客 - 最高记录是 13225 于 2026-8-14.</h2>
+          管理员 超级版主 版主 会员
+          <div class="onlinelist"><a href="home.php?mod=space&amp;uid=4146">流云闲鹿</a></div>
+        </div></body></html>
+    """.trimIndent()
+
+    @Test
+    fun fullStatsLine_parsedIntoStructuredFields() {
+        val page = OnlineClient.parse(fullStatsHtml, "https://mce.msi.cn/forum.php?mod=online")
+        assertEquals(448, page.total)
+        assertEquals(6, page.memberCount)
+        assertEquals(442, page.guestCount)
+        assertEquals(0, page.hiddenCount)
+        assertEquals(13225, page.maxOnline)
+        assertEquals("2026-8-14", page.maxOnlineDate)
+        assertTrue("应识别用户组图例", page.legend.contains("管理员") && page.legend.contains("版主"))
+    }
+
+
     private val html = """
         <html><body>
           <div id="ct">

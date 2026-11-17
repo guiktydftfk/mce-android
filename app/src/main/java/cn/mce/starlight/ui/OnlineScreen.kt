@@ -23,6 +23,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -76,12 +77,17 @@ fun OnlineMembersScreen(
             state == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             else -> {
                 val page = state!!
-                // v0.4.8：页面展示原始统计行（含会员/游客数），缺失时用解析值兜底
-                val statsLine = page.rawStats?.takeIf { it.isNotBlank() } ?: buildString {
-                    page.total?.let { append("共 $it 人在线") }
-                    page.memberCount?.let { append(" · $it 位会员") }
-                    page.guestCount?.let { append(" · $it 位游客") }
-                    if (isEmpty()) append(page.caption)
+                // v0.4.8：结构化统计行（不再原样展示图例+昵称长串）
+                val statsLine = buildString {
+                    page.total?.let { append("$it 人在线") }
+                    page.memberCount?.let { append(" · $it 会员") }
+                    page.hiddenCount?.takeIf { it > 0 }?.let { append("（$it 隐身）") }
+                    page.guestCount?.let { append(" · $it 游客") }
+                    page.maxOnline?.let {
+                        append(" · 最高 $it")
+                        page.maxOnlineDate?.let { d -> append("（$d）") }
+                    }
+                    if (isEmpty()) append(page.rawStats ?: page.caption)
                 }
                 LazyColumn(
                     contentPadding = PaddingValues(
@@ -99,6 +105,27 @@ fun OnlineMembersScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            // v0.4.8：用户组图例单独一行
+                            if (page.legend.isNotEmpty()) {
+                                Row(
+                                    Modifier.padding(top = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    page.legend.forEach { label ->
+                                        Text(
+                                            label,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier
+                                                .background(
+                                                    MaterialTheme.colorScheme.surfaceVariant,
+                                                    RoundedCornerShape(8.dp),
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                     if (page.members.isEmpty()) {
