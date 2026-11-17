@@ -27,6 +27,8 @@ object OnlineClient {
         val memberCount: Int?,
         val guestCount: Int?,
         val members: List<Member>,
+        /** v0.4.8：页面原始统计行 */
+        val rawStats: String? = null,
     )
 
     suspend fun load(): OnlinePage = withContext(Dispatchers.IO) {
@@ -82,6 +84,6 @@ object OnlineClient {
                 avatar = "${Net.BASE}/uc_server/avatar.php?uid=$uid&size=small",
             )
         }.distinctBy { it.uid }.take(200)
-        return OnlinePage(caption, total, memberCount, guestCount, members)
+        return OnlinePage(caption, total, memberCount, guestCount, members, statsLine.takeIf { it.isNotBlank() })
     }
 }

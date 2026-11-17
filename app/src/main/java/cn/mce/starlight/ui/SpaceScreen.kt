@@ -109,6 +109,18 @@ fun SpaceScreen(
                     )
                 }
             }
+            // v0.4.8：空间各标签支持手动刷新
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(
+                    enabled = !loading,
+                    onClick = { scope.launch { load(tabs[tabIndex].second) } },
+                ) { Text(if (loading) "刷新中…" else "刷新") }
+            }
             if (loading) {
                 Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             } else if (error != null) {

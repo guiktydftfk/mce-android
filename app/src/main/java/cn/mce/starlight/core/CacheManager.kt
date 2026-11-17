@@ -32,8 +32,10 @@ object CacheManager {
         val threadBytes: Long,
         val feedBytes: Long,
         val otherBytes: Long,
+        /** v0.4.8：已下载附件 */
+        val attachmentsBytes: Long,
     ) {
-        val total: Long get() = imageBytes + threadBytes + feedBytes + otherBytes
+        val total: Long get() = imageBytes + threadBytes + feedBytes + otherBytes + attachmentsBytes
     }
 
     fun breakdown(context: Context): Breakdown {
@@ -44,7 +46,16 @@ object CacheManager {
             context.filesDir.listFiles()?.filter { it.isFile && it.name.startsWith("feed_cache") }?.sumOf { it.length() } ?: 0L
         }.getOrDefault(0L)
         val other = (dirSize(context.cacheDir) - image).coerceAtLeast(0L)
-        return Breakdown(image, thread, feed, other)
+        val attachments = dirSize(File(context.filesDir, "attachments"))
+        return Breakdown(image, thread, feed, other, attachments)
+    }
+
+    /** v0.4.8：已下载附件（打开过的 zip/pdf 等） */
+    fun clearAttachments(context: Context): Long {
+        val dir = File(context.filesDir, "attachments")
+        val before = dirSize(dir)
+        runCatching { dir.deleteRecursively() }
+        return before
     }
 
     fun clearImages(context: Context): Long {

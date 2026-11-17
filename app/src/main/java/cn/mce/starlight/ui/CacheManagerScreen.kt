@@ -125,6 +125,19 @@ fun CacheManagerScreen(
                         }
                     }
                     CacheRow(
+                        title = "已下载附件",
+                        subtitle = "帖子附件（zip / pdf 等，打开后保存在本机）",
+                        size = b?.attachmentsBytes,
+                        actionLabel = "清理附件",
+                        enabled = !loading,
+                    ) {
+                        scope.launch {
+                            val before = withContext(Dispatchers.IO) { CacheManager.clearAttachments(ctx) }
+                            refresh()
+                            toast = "已清理附件 ${CacheManager.format(before)}"
+                        }
+                    }
+                    CacheRow(
                         title = "其他临时文件",
                         subtitle = "分享卡片 / 更新包等临时文件",
                         size = b?.otherBytes,

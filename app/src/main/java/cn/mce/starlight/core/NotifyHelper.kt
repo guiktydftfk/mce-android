@@ -10,7 +10,8 @@ import androidx.core.app.NotificationCompat
 
 /** v0.4.4：未读提醒通知（系统通知 + 角标） */
 object NotifyHelper {
-    private const val CHANNEL_ID = "mce_unread"
+    private const val CHANNEL_ID = "mce_pm"
+    private const val CHANNEL_ID_NOTICE = "mce_notice"
     private const val NOTIFY_ID = 1001
     private const val NOTIFY_ID_NOTICE = 1002
 
@@ -19,8 +20,16 @@ object NotifyHelper {
             val mgr = context.getSystemService(NotificationManager::class.java)
             if (mgr?.getNotificationChannel(CHANNEL_ID) == null) {
                 mgr?.createNotificationChannel(
-                    NotificationChannel(CHANNEL_ID, "未读消息提醒", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                        description = "新私信 / 回复提醒"
+                    NotificationChannel(CHANNEL_ID, "未读私信", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                        description = "新私信提醒"
+                    },
+                )
+            }
+            // v0.4.8：提醒（@ / 回复 / 系统）独立频道，可在系统设置里单独静音
+            if (mgr?.getNotificationChannel(CHANNEL_ID_NOTICE) == null) {
+                mgr?.createNotificationChannel(
+                    NotificationChannel(CHANNEL_ID_NOTICE, "新提醒（@ / 回复 / 系统）", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                        description = "帖子回复、@ 提及与系统提醒"
                     },
                 )
             }

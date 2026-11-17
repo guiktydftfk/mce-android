@@ -43,10 +43,11 @@ class UnreadPollJob : JobService() {
                         val top = notices?.firstOrNull()
                         val key = top?.let { (it.note ?: "") + "|" + (it.author ?: "") }.orEmpty()
                         val prefs = ctx.getSharedPreferences("mce_unread", Context.MODE_PRIVATE)
-                        val saved = prefs.getString("notice_key", null)
+                        val savedRaw = prefs.getString("notice_key", null)
+                        val saved = CryptoBox.decrypt(savedRaw) ?: savedRaw
                         if (key.isNotBlank() && key != saved) {
                             NotifyHelper.notifyNotice(ctx, 1, top?.note?.take(60))
-                            prefs.edit().putString("notice_key", key).apply()
+                            prefs.edit().putString("notice_key", CryptoBox.encrypt(key)).apply()
                         }
                     }
                 }

@@ -76,7 +76,8 @@ fun OnlineMembersScreen(
             state == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             else -> {
                 val page = state!!
-                val statsLine = buildString {
+                // v0.4.8：页面展示原始统计行（含会员/游客数），缺失时用解析值兜底
+                val statsLine = page.rawStats?.takeIf { it.isNotBlank() } ?: buildString {
                     page.total?.let { append("共 $it 人在线") }
                     page.memberCount?.let { append(" · $it 位会员") }
                     page.guestCount?.let { append(" · $it 位游客") }

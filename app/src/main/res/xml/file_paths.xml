@@ -2,5 +2,6 @@
 <paths>
     <cache-path name="updates" path="updates/" />
     <cache-path name="share" path="share/" />
-    <files-path name="files" path="." />
+    <!-- v0.4.8：仅暴露下载附件目录，避免把草稿/缓存等整个 filesDir 暴露给外部应用 -->
+    <files-path name="attachments" path="attachments/" />
 </paths>
