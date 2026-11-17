@@ -140,6 +140,8 @@ fun NewThreadScreen(
     var showPreview by remember { mutableStateOf(false) }
     // v0.4.8：新版发帖页——发布设置默认折叠（板块/分类等）
     var showPublishSettings by remember { mutableStateOf(false) }
+    // v0.4.8：底部「更多工具」展开状态
+    var showMoreTools by remember { mutableStateOf(false) }
     // v0.4.0：选区跟踪（工具栏/弹窗失焦后仍能作用于原选区）+ 视频插入
     var lastSelection by remember { mutableStateOf(androidx.compose.ui.text.TextRange(0, 0)) }
     var lastSelectionTextLen by remember { mutableStateOf(-1) }
@@ -590,40 +592,6 @@ fun NewThreadScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        // BBCode toolbar
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            ToolButton("B") { styleSelection("[b]", "[/b]", "加粗") }
-            ToolButton("I") { styleSelection("[i]", "[/i]", "斜体") }
-            ToolButton("U") { styleSelection("[u]", "[/u]", "下划线") }
-            // v0.4.0：颜色只对选中文字生效（弹窗会记住选区），没选中只提示
-            ToolButton("颜色") { openColorPicker() }
-            // v0.4.0：对齐（有选中包选中，没选中包当前行）
-            ToolButton("左对齐") { applyAlign("left") }
-            ToolButton("居中") { applyAlign("center") }
-            ToolButton("右对齐") { applyAlign("right") }
-            ToolButton("链接") { wrap("[url]", "[/url]", "https://") }
-            ToolButton("图片") { pickImages.launch("image/*") }
-            ToolButton("图链") { wrap("[img]", "[/img]", "图片链接") }
-            // v0.4.0：插入视频（Discuz [media] BBCode）
-            ToolButton("视频") { videoUrl = ""; showVideoDialog = true }
-            ToolButton("引用") { wrap("[quote]", "[/quote]", "引用内容") }
-            ToolButton("代码") { wrap("[code]", "[/code]", "代码") }
-            ToolButton("隐藏") { wrap("[hide]", "[/hide]", "隐藏内容（回复可见）") }
-            // v0.4.0：一键全选（配合颜色/加粗等只对选区生效的功能）
-            ToolButton("全选") {
-                val all = androidx.compose.ui.text.TextRange(0, contentField.text.length)
-                contentField = contentField.copy(selection = all)
-                lastSelection = all
-                lastSelectionTextLen = contentField.text.length
-            }
-            ToolButton("@") { insertText("@") }
-        }
-
         OutlinedTextField(
             value = contentField,
             onValueChange = {
@@ -705,18 +673,53 @@ fun NewThreadScreen(
             HorizontalDivider()
         }
 
-        // v0.3.10：图片改为「选完即插入光标处」，不需要先上传再手动插入
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(
-                enabled = !uploading,
-                onClick = { pickImages.launch("image/*") },
-            ) { Text(if (uploading) "插入中…" else "＋ 插入图片") }
-            Text(
-                "选图后自动插到光标处，可和文字混排",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        // v0.4.8：底部快捷工具栏（图片 / @ / 视频 / 引用 / 更多工具 / 发布设置）
+        HorizontalDivider(Modifier.padding(vertical = 6.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            ToolButton("图片") { pickImages.launch("image/*") }
+            ToolButton("@") { insertText("@") }
+            ToolButton("视频") { videoUrl = ""; showVideoDialog = true }
+            ToolButton("引用") { wrap("[quote]", "[/quote]", "引用内容") }
+            ToolButton("B") { styleSelection("[b]", "[/b]", "加粗") }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = { showMoreTools = !showMoreTools }) {
+                Text(if (showMoreTools) "收起工具" else "更多工具")
+            }
+            TextButton(onClick = { showPublishSettings = !showPublishSettings }) {
+                Text("设置")
+            }
         }
+        // 更多工具：颜色 / 对齐 / 链接 / 代码 / 隐藏 / 全选
+        if (showMoreTools) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                ToolButton("I") { styleSelection("[i]", "[/i]", "斜体") }
+                ToolButton("U") { styleSelection("[u]", "[/u]", "下划线") }
+                ToolButton("颜色") { openColorPicker() }
+                ToolButton("左对齐") { applyAlign("left") }
+                ToolButton("居中") { applyAlign("center") }
+                ToolButton("右对齐") { applyAlign("right") }
+                ToolButton("链接") { wrap("[url]", "[/url]", "https://") }
+                ToolButton("图链") { wrap("[img]", "[/img]", "图片链接") }
+                ToolButton("代码") { wrap("[code]", "[/code]", "代码") }
+                ToolButton("隐藏") { wrap("[hide]", "[/hide]", "隐藏内容（回复可见）") }
+                ToolButton("全选") {
+                    val all = androidx.compose.ui.text.TextRange(0, contentField.text.length)
+                    contentField = contentField.copy(selection = all)
+                    lastSelection = all
+                    lastSelectionTextLen = contentField.text.length
+                }
+            }
+        }
+        HorizontalDivider(Modifier.padding(vertical = 6.dp))
         if (uploaded.isNotEmpty()) {
             Row(
                 Modifier
