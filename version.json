@@ -5,15 +5,15 @@
     "emergency":  true,
     "apk":  "https://gh-proxy.com/https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/MCE-latest.apk",
     "canary":  {
-                   "versionName":  "0.4.7-beta",
-                   "versionCode":  52,
+                   "versionName":  "0.4.8-beta",
+                   "versionCode":  55,
                    "uids":  [
                                 2549,
                                 3303,
                                 4146,
                                 2782
                             ],
-                   "notes":  "0.4.7-beta 更新内容（灰度测试）：\\n- 表情：全新仿微信/QQ 底部表情面板（分类标签 / 最近使用 / 8列大网格 / 自定义导入与管理）\\n- 帖子：楼层引用回复（引用原帖内容）、回复后滚到底部、赞赏保持位置、修复无法回复楼层\\n- 阅读：帖子详情显示阅读数（电脑版解析+缓存兜底）\\n- 交互：设置/签到/我的/帖子页支持下拉刷新；侧栏一级/二级/三级标题分层\\n- 内容：搜索历史单条删除、搜索结果卡片化+分页、我的主题/搜索记忆滚动位置\\n- 设置：帖子正文字号独立调节、启动页首图、最近错误日志、收藏分组批量管理\\n- 稳定：弱网/失败提示统一化；单元测试 146 个、冒烟 9/9 通过",
-                   "apk":  "https://gh-proxy.com/https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/canary/MCE-starlight-v0.4.7-beta.apk"
+                   "notes":  "0.4.8-beta 内测内容：\n- 安全与隐私：FileProvider 只暴露附件目录、Android 12+ 数据提取规则、通知拆成「私信/提醒」双频道、提醒去重键加密、应用锁（系统锁屏凭据解锁，启动/回前台验证）\n- 新功能：隐藏内容提示与密码帖解锁、非图片附件下载、好友请求处理、提醒分类筛选、勋章领取、个人空间（日志/相册/留言/访客）、在线会员统计、活动/悬赏/交易帖识别、搜索筛选增强\n- 发帖页重排：底部悬浮工具栏、发布设置折叠、标题字数计数、可见性与附加选项分组；图片上传前压缩、弱网发布自动重试、草稿自动保存\n- 平板三栏（自动/双栏/三栏 + 楼层目录）、帖子内目录、媒体播放卡片、关注板块聚合、崩溃日志、缓存管理（含已下载附件清理）、通知分类开关\n- 修复：草稿箱草稿打开正文空白（BBCode 引擎只隐藏完整标签）、赞赏悬浮按钮回归\n- 工程：单元测试 192 个、冒烟 26 项全通过；APK 2.73MB → 2.40MB",
+                   "apk":  "https://gh-proxy.com/https://raw.githubusercontent.com/guiktydftfk/mce-android/main/release/canary/MCE-starlight-v0.4.8-beta.apk"
                }
 }
