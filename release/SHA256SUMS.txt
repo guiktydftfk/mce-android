@@ -1,14 +1,16 @@
 MCE 星光班 Android 客户端 · 稳定版归档
 =====================================
-版本: 0.4.7 (versionCode 53)
+版本: 0.4.7.1 (versionCode 54) —— 紧急修复版（emergency=true，应用内自动下载）
 包名: cn.mce.starlight
 签名: 与全部历史版本相同（SHA-256 证书指纹 089ebd7851397257e085e17086203794dbc7ba2e88b245d070107ffa7a78fc8c）
-文件: MCE-starlight-v0.4.7-stable.apk（与 release/MCE-latest.apk 同内容，内含自研 Baseline Profile）
-SHA256: 646466F2FD70F8E514448C8EC1CC2587E5F68856C75E3E9E1292FB196EC9D6B1
+文件: MCE-starlight-v0.4.7.1-stable.apk（与 release/MCE-latest.apk 同内容）
+本次变更: 仅恢复 0.4.7 中误删的「赞赏」悬浮按钮，无其他功能变更
+SHA256: 973A1B1DB56C2A8F3976F988DC0767CC31186598C14E3333CD7F73C3ED4943D9
 最小系统: Android 8.0 (API 26)
 
-历史归档（仓库保留全部稳定版）
+历史归档（仓库保留稳定版）
 --------
+- 0.4.7 (versionCode 53): MCE-starlight-v0.4.7-stable.apk
 - 0.4.6 (versionCode 50): MCE-starlight-v0.4.6-stable.apk
 - 0.4.5 (versionCode 49): MCE-starlight-v0.4.5-stable.apk
 - 0.4.4 (versionCode 48): MCE-starlight-v0.4.4-stable.apk
@@ -18,10 +20,9 @@ SHA256: 646466F2FD70F8E514448C8EC1CC2587E5F68856C75E3E9E1292FB196EC9D6B1
 --------
 - 直接安装即可；已装任意历史版本均可覆盖升级，无需卸载（包名与签名一致，数据保留）
 - 校验完整性（Windows PowerShell）:
-  Get-FileHash .\MCE-starlight-v0.4.7-stable.apk -Algorithm SHA256
+  Get-FileHash .\MCE-starlight-v0.4.7.1-stable.apk -Algorithm SHA256
   结果应为上面的 SHA256
 
 长期可用性
 ----------
-- 已归档到：仓库 release/ 与仓库根、dist/、项目工作区根目录、桌面
-- 自动更新清单：release/MCE-latest.apk（版本号只增不减）
+- 自动更新清单：release/MCE-latest.apk（versionCode 只增不减）
