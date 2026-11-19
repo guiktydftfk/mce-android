@@ -59,4 +59,21 @@ class ProfileStatsParseTest {
         val doc = org.jsoup.Jsoup.parse(html)
         assertEquals("1", ProfileCommon.statsFromDoc(doc, listOf("积分"))["积分"])
     }
+
+    /** v0.4.8：他人主页「积分 2.3万」被整页正则截成「2」的回归用例 */
+    @Test
+    fun statsFromDoc_wansUnitInOtherProfile() {
+        val html = """
+            <html><body>
+              <div class="tip">积分 2 可以兑换</div>
+              <ul class="user_data">
+                <li><a href="home.php?mod=space&amp;uid=3106&amp;do=thread&amp;view=me"><p>主题 172</p></a></li>
+                <li><i class="vt-gift"></i><p>积分 2.3万</p></li>
+              </ul>
+            </body></html>
+        """.trimIndent()
+        val stats = ProfileCommon.statsFromDoc(org.jsoup.Jsoup.parse(html), listOf("主题", "积分"))
+        assertEquals("23000", stats["积分"])
+        assertEquals("172", stats["主题"])
+    }
 }

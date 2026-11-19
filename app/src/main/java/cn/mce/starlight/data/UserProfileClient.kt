@@ -77,10 +77,11 @@ object UserProfileClient {
 
             val name = ProfileCommon.username(doc) ?: "用户$realUid"
             val group = ProfileCommon.group(doc, text)
-            val stats = ProfileCommon.stats(
-                text,
-                listOf("主题", "回帖", "积分", "好友", "威望", "在线时间"),
-            )
+            // v0.4.8 修复：他人主页「积分 2.3万」被旧整页正则截成「2」（用户反馈星光值显示错误）。
+            // 改用结构化解析（元素文本以标签开头 + 支持 万/千 单位），失败再退回旧正则。
+            val statLabels = listOf("主题", "回帖", "积分", "好友", "威望", "在线时间")
+            val stats = ProfileCommon.statsFromDoc(doc, statLabels)
+                .ifEmpty { ProfileCommon.stats(text, statLabels) }
             // v0.4.1：优先按 ul.user_box 结构化字段解析（旧正则把「QQ号」截成「号」）
             val fields = ProfileCommon.fieldsFromBox(doc, text, FIELD_LABELS)
 
