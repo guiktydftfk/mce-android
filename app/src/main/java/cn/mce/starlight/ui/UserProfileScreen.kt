@@ -154,7 +154,7 @@ fun UserProfileScreen(
                                     .padding(vertical = 14.dp),
                                 horizontalArrangement = Arrangement.SpaceEvenly,
                             ) {
-                                val preferred = listOf("主题", "回帖", "积分")
+                                val preferred = listOf("主题", "帖子", "回帖", "积分")
                                 val ordered = preferred.mapNotNull { key ->
                                     p.stats[key]?.let { key to it }
                                 }.ifEmpty { p.stats.entries.take(3).map { it.key to it.value } }

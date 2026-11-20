@@ -79,8 +79,12 @@ object UserProfileClient {
             val group = ProfileCommon.group(doc, text)
             // v0.4.8 修复：他人主页「积分 2.3万」被旧整页正则截成「2」（用户反馈星光值显示错误）。
             // 改用结构化解析（元素文本以标签开头 + 支持 万/千 单位），失败再退回旧正则。
-            val statLabels = listOf("主题", "回帖", "积分", "好友", "威望", "在线时间")
-            val stats = ProfileCommon.statsFromDoc(doc, statLabels)
+            val statLabels = listOf(
+                "主题", "主题数", "回帖", "回帖数", "帖子", "帖子数",
+                "积分", "好友", "好友数", "威望", "在线时间",
+            )
+            // v0.4.8：手机版统计（可能是「2.3万」四舍五入文本），电脑版精确值会覆盖
+            val mobileStats = ProfileCommon.statsFromDoc(doc, statLabels)
                 .ifEmpty { ProfileCommon.stats(text, statLabels) }
             // v0.4.1：优先按 ul.user_box 结构化字段解析（旧正则把「QQ号」截成「号」）
             val fields = ProfileCommon.fieldsFromBox(doc, text, FIELD_LABELS)
@@ -92,16 +96,29 @@ object UserProfileClient {
                 if (title.length < 4) null else tid to title
             }.distinctBy { it.first }.take(10)
 
-            // v0.4.1：自己的“我的资料”补抓电脑版详情页（手机模板没有活跃概况/签名/头衔）
             val selfUid = cn.mce.starlight.core.SessionStore.uid
             val isSelf = (uid == null || uid == selfUid) && (text.contains("\u9000\u51fa") || html.contains("action=logout"))
             var detailText = text
-            if (isSelf && realUid > 0) {
+            // v0.4.8：所有用户都补抓电脑版资料页——手机版统计是「2.3万」这种四舍五入文本，
+            // 电脑版「统计信息」给的是精确整数（如 23001），和网页版看到的一致。
+            var desktopStats: Map<String, String> = emptyMap()
+            if (realUid > 0) {
                 val desktopUrl = "${Net.BASE}/home.php?mod=space&uid=$realUid&do=profile&mobile=no"
                 runCatching {
                     GenericPageClient.get(desktopUrl, userAgent = Net.DESKTOP_UA, isolateCookies = true)
                 }.getOrNull()?.let { desktopHtml ->
-                    detailText = Jsoup.parse(desktopHtml, desktopUrl).text()
+                    val desktopDoc = Jsoup.parse(desktopHtml, desktopUrl)
+                    detailText = desktopDoc.text()
+                    // 电脑版统计：标签可能是「主题数 / 帖子数 / 积分」，统一归一化
+                    desktopStats = ProfileCommon.statsFromDoc(desktopDoc, statLabels)
+                        .mapKeys { (k, _) -> when {
+                            k.startsWith("主题") -> "主题"
+                            k.startsWith("帖子") -> "帖子"
+                            k.startsWith("回帖") -> "回帖"
+                            k.startsWith("好友") -> "好友"
+                            else -> k
+                        }
+                    }
                 }
             }
             val active = ACTIVE_LABELS.mapNotNull { label ->
@@ -114,6 +131,12 @@ object UserProfileClient {
                 .find(detailText)?.groupValues?.get(1)?.trim()
             val emailStatus = Regex("""邮箱状态\s*[:：]?\s*(\S{1,10})""")
                 .find(detailText)?.groupValues?.get(1)
+
+            // v0.4.8：电脑版精确统计优先于手机版四舍五入值
+            val stats: Map<String, String> = LinkedHashMap<String, String>().apply {
+                putAll(mobileStats)
+                putAll(desktopStats)
+            }
 
             Profile(
                 uid = realUid,

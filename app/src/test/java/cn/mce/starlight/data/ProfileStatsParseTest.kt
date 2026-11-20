@@ -76,4 +76,21 @@ class ProfileStatsParseTest {
         assertEquals("23000", stats["积分"])
         assertEquals("172", stats["主题"])
     }
+
+    /** v0.4.8：电脑版统计块 <li><em>积分</em>23345</li>（标签与数字无空格） */
+    @Test
+    fun statsFromDoc_desktopNoSpace() {
+        val html = """
+            <html><body>
+              <div class="tip">积分 : 6787（navbar 里的另一处积分）</div>
+              <ul class="pf_l">
+                <li><em>主题数</em>172</li>
+                <li><em>积分</em>23345</li>
+              </ul>
+            </body></html>
+        """.trimIndent()
+        val stats = ProfileCommon.statsFromDoc(org.jsoup.Jsoup.parse(html), listOf("主题数", "积分"))
+        assertEquals("23345", stats["积分"])
+        assertEquals("172", stats["主题数"])
+    }
 }
