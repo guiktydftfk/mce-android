@@ -103,6 +103,8 @@ data class ThreadDetail(
     val attachments: List<Attachment> = emptyList(),
     /** v0.4.8：活动 / 悬赏 / 交易等特殊帖信息（只读展示 + 网页参与兜底） */
     val special: SpecialThread? = null,
+    /** v0.4.8：当前用户是否已收藏该帖（null=无法判断） */
+    val favorited: Boolean? = null,
 )
 
 /** 帖子评分/打赏汇总 */

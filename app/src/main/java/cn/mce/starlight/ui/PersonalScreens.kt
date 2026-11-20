@@ -154,7 +154,10 @@ fun MyRepliesScreen(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { onOpenThread(item.tid, item.title) }
+                            .clickable {
+                                    cn.mce.starlight.core.FavState.set(item.tid, true)
+                                    onOpenThread(item.tid, item.title)
+                                }
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
@@ -205,6 +208,9 @@ fun FavoritesScreen(
 ) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<PState<PersonalClient.FavoriteItem>>(PState.Loading) }
+    // v0.4.8：取消收藏（每行可删，服务端 + 本地备注一起清）
+    var busyTid by remember { mutableStateOf<Int?>(null) }
+    val favCtx = androidx.compose.ui.platform.LocalContext.current
 
     suspend fun load() {
         runCatching { PersonalClient.loadFavorites(1) }
@@ -239,7 +245,10 @@ fun FavoritesScreen(
                     Column(
                         Modifier
                             .fillMaxWidth()
-                            .clickable { onOpenThread(item.tid, item.title) }
+                            .clickable {
+                                    cn.mce.starlight.core.FavState.set(item.tid, true)
+                                    onOpenThread(item.tid, item.title)
+                                }
                             .padding(horizontal = 18.dp, vertical = 14.dp),
                     ) {
                         Text(item.title, style = MaterialTheme.typography.bodyLarge,
@@ -262,6 +271,30 @@ fun FavoritesScreen(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
+                    TextButton(
+                        enabled = busyTid != item.tid,
+                        onClick = {
+                            scope.launch {
+                                busyTid = item.tid
+                                val r = cn.mce.starlight.data.PostActions.unfavorite(item.tid)
+                                android.widget.Toast.makeText(
+                                    favCtx, r.message ?: "已取消收藏", android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                                if (r.ok) {
+                                    cn.mce.starlight.core.FavState.set(item.tid, false)
+                                    cn.mce.starlight.core.PostFavoriteStore.remove(item.tid)
+                                    state = PState.Content(s.items.filterNot { it.tid == item.tid })
+                                }
+                                busyTid = null
+                            }
+                        },
+                    ) {
+                        Text(
+                            if (busyTid == item.tid) "取消中…" else "取消收藏",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     HorizontalDivider()
                 }
             }

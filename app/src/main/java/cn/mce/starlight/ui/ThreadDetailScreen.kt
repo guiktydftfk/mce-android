@@ -145,6 +145,8 @@ fun ThreadDetailScreen(
     var showFavDialog by remember { mutableStateOf(false) }
     // v0.4.7：分享面板（复制文案 / 分享卡片 / 分享链接）
     var showShare by remember { mutableStateOf(false) }
+    // v0.4.8：收藏状态（详情页解析 + 操作后本地覆盖，支持「取消收藏」）
+    var favOverride by remember(tid) { mutableStateOf<Boolean?>(null) }
     var favGroup by remember { mutableStateOf("") }
     var favNote by remember { mutableStateOf("") }
     var searchText by remember { mutableStateOf("") }
@@ -556,12 +558,24 @@ fun ThreadDetailScreen(
                     ScrollableActionRow(
                         horizontalPadding = 16,
                     ) {
+                        // v0.4.8：收藏 / 取消收藏（按详情页解析的真实状态切换）
+                        val isFav = favOverride ?: cn.mce.starlight.core.FavState.get(tid) ?: s.detail.favorited
                         TextButton(onClick = {
                             scope.launch {
-                                val r = PostActions.favorite(tid)
-                                toast = r.message
+                                if (isFav == true) {
+                                    val r = PostActions.unfavorite(tid)
+                                    toast = r.message
+                                    if (r.ok) {
+                                        favOverride = false
+                                        cn.mce.starlight.core.PostFavoriteStore.remove(tid)
+                                    }
+                                } else {
+                                    val r = PostActions.favorite(tid)
+                                    toast = r.message
+                                    if (r.ok) favOverride = true
+                                }
                             }
-                        }) { Text("收藏") }
+                        }) { Text(if (isFav == true) "取消收藏" else "收藏") }
                         TextButton(onClick = { showShare = true }) { Text("分享") }
                         TextButton(onClick = {
                             val cur = cn.mce.starlight.core.PostFavoriteStore.items()

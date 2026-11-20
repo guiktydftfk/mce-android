@@ -526,6 +526,17 @@ object ThreadDetailParser {
      * v0.4.8：活动 / 悬赏 / 交易帖识别（只读展示关键信息 + 网页参与兜底）。
      * 判断依据：页面文本关键词 + 常见插件容器 class。
      */
+    /** v0.4.8：已收藏时页面有 op=delete&favid=... 链接；否则有 ac=favorite&type=thread&id= 链接 */
+    private fun parseFavorited(doc: Document): Boolean? {
+        val links = doc.select("a[href*=ac=favorite]").map { it.attr("href") }
+        if (links.isEmpty()) return null
+        return when {
+            links.any { it.contains("op=delete") } -> true
+            links.any { it.contains("type=thread") } -> false
+            else -> null
+        }
+    }
+
     private fun parseSpecial(doc: Document, baseUrl: String): SpecialThread? {
         val text = doc.text()
         val links = doc.select("a[href]").map { it.attr("href").replace("&amp;", "&") }

@@ -387,6 +387,45 @@ object PostActions {
         }.getOrElse { Result(false, it.message) }
     }
 
+
+    /**
+     * v0.4.8：取消收藏。
+     * 手机版帖子页在「已收藏」时会给取消链接：
+     *   home.php?mod=spacecp&ac=favorite&op=delete&favid=3926&formhash=xxx
+     * 这里从页面里取真实链接（favid 每次不同），GET 失败再用 ajax 的 deletesubmit POST 兜底。
+     */
+    suspend fun unfavorite(tid: Int): Result = withContext(Dispatchers.IO) {
+        runCatching {
+            val page = GenericPageClient.get("$BASE/forum.php?mod=viewthread&tid=$tid")
+            val href = Regex("""href="([^"]*ac=favorite[^"]*op=delete[^"]*)"""")
+                .find(page)?.groupValues?.get(1)?.replace("&amp;", "&")
+            val favid = Regex("""favid=(\d+)""").find(page)?.groupValues?.get(1)
+            val hash = formhash(page)
+            val target = when {
+                href != null -> Net.absolutize(href)
+                favid != null && hash.isNotEmpty() ->
+                    "$BASE/home.php?mod=spacecp&ac=favorite&op=delete&favid=$favid&formhash=$hash"
+                else -> return@runCatching Result(false, "没有找到收藏记录（可能未收藏或未登录）")
+            }
+            val resp = runCatching { GenericPageClient.get(target, retryOnFailure = false) }.getOrNull()
+            val ok = resp != null && (
+                DiscuzResponse.isSuccess(resp) || resp.contains("取消收藏") ||
+                    resp.contains("删除成功") || resp.contains("\"msg\"")
+                )
+            if (ok) {
+                Result(true, "已取消收藏")
+            } else {
+                // ajaxdelfav 走 deletesubmit POST 的兜底
+                val post = runCatching {
+                    GenericPageClient.httpPost(target, "deletesubmit=true&formhash=$hash", null)
+                }.getOrNull().orEmpty()
+                val ok2 = DiscuzResponse.isSuccess(post) || post.contains("取消收藏") ||
+                    post.contains("删除成功") || post.contains("\"msg\"")
+                Result(ok2, if (ok2) "已取消收藏" else "取消收藏失败，请稍后重试")
+            }
+        }.getOrElse { Result(false, it.message) }
+    }
+
     /** v0.4.5：删除自己的帖子/回复（Discuz: forum.php?mod=post&action=delete + formhash） */
     suspend fun deletePost(tid: Int, pid: Int): Result = withContext(Dispatchers.IO) {
         runCatching {
