@@ -3,7 +3,7 @@
      低版本（API 26–30）没有系统启动图标，用 windowBackground 展示；
      Android 12+ 系统启动画面另用 windowSplashScreenAnimatedIcon。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/splash_background" />
+    <item android:drawable="@color/splash_bg_solid" />
     <item>
         <bitmap
             android:gravity="center"

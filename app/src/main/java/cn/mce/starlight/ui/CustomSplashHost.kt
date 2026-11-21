@@ -75,7 +75,7 @@ fun CustomSplashHost(content: @Composable () -> Unit) {
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
+                        .background(Color(0xFF0E0F11)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(
@@ -91,13 +91,13 @@ fun CustomSplashHost(content: @Composable () -> Unit) {
                         Text(
                             "MCE 星光班",
                             style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
+                            color = Color.White,
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
                             "赋能星未来，有爱星光班",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = Color(0xFFB0B3B8),
                         )
                     }
                 }

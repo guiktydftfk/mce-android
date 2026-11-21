@@ -57,12 +57,8 @@ class MainActivity : ComponentActivity() {
             }
         }
         val darkNow = resolveDark()
-        // v0.4.0：窗口背景与即将渲染的 Compose 主题背景保持一致（深色 #0E0F11 / 浅色 #F7F8FA）。
-        // 系统深色（values-night）已覆盖「系统深色」场景，这里再兜住「应用设置深色但系统浅色」的情况。
-        window.setBackgroundDrawable(
-            ColorDrawable(if (darkNow) 0xFF0E0F11.toInt() else 0xFFF7F8FA.toInt()),
-        )
-        // 状态栏/导航栏图标明暗也按当前主题决定，避免启动瞬间白底黑图标或黑底黑图标
+        // v0.4.8：启动窗口固定深色——应用内深色模式（系统仍浅色）时不再白屏闪一下
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0xFF0E0F11.toInt()))
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { darkNow },
             navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { darkNow },
