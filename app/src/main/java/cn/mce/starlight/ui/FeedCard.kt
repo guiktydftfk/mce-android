@@ -17,6 +17,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -135,23 +139,66 @@ fun FeedCard(
         if (!SettingsStore.lowDataMode && !thumbUrl.isNullOrBlank()) {
             // v0.4.4：请求对象只在 URL 变化时重建（旧实现每次重组都 new 一个 ImageRequest）
             val ctx = androidx.compose.ui.platform.LocalContext.current
-            val thumbRequest = androidx.compose.runtime.remember(thumbUrl, ctx) {
+            // v0.4.8：加载失败可点「重新加载」；底层 OkHttp 已带 2 次自动重试
+            var retryTick by androidx.compose.runtime.remember(thumbUrl) {
+                androidx.compose.runtime.mutableStateOf(0)
+            }
+            var failed by androidx.compose.runtime.remember(thumbUrl) {
+                androidx.compose.runtime.mutableStateOf(false)
+            }
+            val thumbRequest = androidx.compose.runtime.remember(thumbUrl, ctx, retryTick) {
+                // v0.4.8：论坛图片代理会按 URL 里的 size=宽x高 返回原尺寸大图（3000x0 ≈ 数 MB），
+                // 首页缩略图不需要那么大 → 强制改小，显著加快首屏加载并避免大图流被取消
+                val effectiveUrl = thumbUrl.replace(
+                    Regex("""([?&])size=\d+x\d+"""),
+                    "$1size=720x0",
+                )
                 coil.request.ImageRequest.Builder(ctx)
-                    .data(thumbUrl)
+                    .data(effectiveUrl)
                     .size(720)
                     .crossfade(false)
-                    .memoryCacheKey(thumbUrl)
+                    .memoryCacheKey(effectiveUrl)
                     .build()
             }
-            AsyncImage(
-                model = thumbRequest,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
+            Box(
+                Modifier
                     .fillMaxWidth()
                     .height(170.dp)
-                    .clip(RoundedCornerShape(10.dp)),
-            )
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = thumbRequest,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    onState = { st ->
+                        when (st) {
+                            is coil.compose.AsyncImagePainter.State.Error -> {
+                                failed = true
+                            }
+                            is coil.compose.AsyncImagePainter.State.Success -> failed = false
+                            else -> Unit
+                        }
+                    },
+                )
+                if (failed) {
+                    Text(
+                        "重新加载",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .clickable {
+                                failed = false
+                                retryTick += 1
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             thread.replies?.let {
