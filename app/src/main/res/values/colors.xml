@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- v0.4.8：启动图标底板（原为全透明 PNG，部分桌面会显示成黑色圆/方底，用户反馈诡异） -->
+    <color name="ic_launcher_plate">#FFFFFF</color>
     <!-- aMCE 品牌色（与 Compose 主题 primary 一致） -->
     <color name="ic_launcher_background">#1B6FF1</color>
     <!-- 启动窗口背景（v0.4.0：与 Compose 主题背景一致，避免暗色模式启动白屏闪一下） -->
