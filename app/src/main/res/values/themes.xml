@@ -2,7 +2,7 @@
 <resources>
     <!-- v0.4.0：启动窗口背景跟随明暗（暗色模式见 values-night/themes.xml），修「暗色模式启动白屏」 -->
     <style name="Theme.MCE" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:windowBackground">@drawable/splash_bg</item>
         <item name="android:statusBarColor">@color/splash_status_bar</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>

@@ -2,7 +2,9 @@
 <resources>
     <style name="Theme.MCE" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowSplashScreenBackground">@color/splash_background</item>
-        <item name="android:windowBackground">@color/splash_background</item>
+        <!-- v0.4.8：启动画面 logo 明确指定品牌星星（不再用白底应用图标，避免启动页出现白色方块） -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowBackground">@drawable/splash_bg</item>
         <item name="android:statusBarColor">@color/splash_status_bar</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:navigationBarColor">@color/splash_background</item>

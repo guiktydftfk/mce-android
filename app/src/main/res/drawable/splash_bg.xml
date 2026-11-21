@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v0.4.8：启动窗口背景 = 品牌底色 + 居中「小胖星」logo。
+     低版本（API 26–30）没有系统启动图标，用 windowBackground 展示；
+     Android 12+ 系统启动画面另用 windowSplashScreenAnimatedIcon。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_background" />
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/ic_brand_star" />
+    </item>
+</layer-list>

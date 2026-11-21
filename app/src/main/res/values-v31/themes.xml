@@ -3,7 +3,9 @@
     <!-- v0.4.0：Android 12+ 系统启动画面背景（与应用背景一致，暗色见 values-night-v31） -->
     <style name="Theme.MCE" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowSplashScreenBackground">@color/splash_background</item>
-        <item name="android:windowBackground">@color/splash_background</item>
+        <!-- v0.4.8：启动画面 logo 明确指定品牌星星（不再用白底应用图标，避免启动页出现白色方块） -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowBackground">@drawable/splash_bg</item>
         <item name="android:statusBarColor">@color/splash_status_bar</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
