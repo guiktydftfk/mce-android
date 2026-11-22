@@ -41,9 +41,7 @@ class HttpForumRepository(
                 else -> ""
             }
             val url = "$baseHost/forum.php?mod=forumdisplay&fid=$fid&page=$page$extra&t=${System.currentTimeMillis()}"
-            val html = fetch(url)
-            cn.mce.starlight.core.DebugDump.dump("board_${fid}_p$page", html) // TEMP
-            MobileForumParser.parse(html, url, page)
+            MobileForumParser.parse(fetch(url), url, page)
         }
 
     override suspend fun loadGuide(view: String, page: Int): ForumPage =
