@@ -29,7 +29,6 @@ import coil.compose.AsyncImage
 import cn.mce.starlight.R
 import cn.mce.starlight.core.SplashImageStore
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * v0.4.7：启动页宿主。
@@ -46,23 +45,17 @@ fun CustomSplashHost(content: @Composable () -> Unit) {
     val ctx = LocalContext.current
     val file = remember { SplashImageStore.current(ctx) }
     var visible by remember { mutableStateOf(!SplashImageStore.consumed) }
-    // v0.4.8：图片缓存为空（刚安装 / 刚清过缓存）时，启动页停留 2 秒并利用这段时间预热首页缩略图
-    val warmUpImages = remember {
-        file == null && cn.mce.starlight.core.ImageWarmup.isImageCacheEmpty(ctx)
-    }
+    // v0.4.8：刚安装 / 刚清过图片缓存时启动页多停留到 2 秒（只延时，不做网络预热）
+    val emptyImageCache = remember { file == null && cn.mce.starlight.core.ImageCacheInfo.isEmpty(ctx) }
 
     Box(Modifier.fillMaxSize()) {
         content()
         if (visible) {
             LaunchedEffect(Unit) {
-                if (warmUpImages) {
-                    // 后台预热，不阻塞计时：解析首图 + 预下载，结束后首屏通常已命中缓存
-                    launch { runCatching { cn.mce.starlight.core.ImageWarmup.prefetchHome(ctx) } }
-                }
                 delay(
                     when {
                         file != null -> 900
-                        warmUpImages -> 2000
+                        emptyImageCache -> 2000
                         else -> 520
                     },
                 )

@@ -103,27 +103,7 @@ class MceApplication : Application(), ImageLoaderFactory {
 
         // 只需要网络拦截器：它会跟随每次重定向重新加头（附件图常 301/302 跳转）。
         // 旧实现同时注册 application + network 两遍，每个请求白跑两遍。
-        // v0.4.8：图片请求失败自动重试（清缓存/弱网时避免缩略图一直转圈），并设置合理超时
-        val imageRetryInterceptor = Interceptor { chain ->
-            var attempt = 0
-            var response: okhttp3.Response? = null
-            var lastError: java.io.IOException? = null
-            while (response == null && attempt <= 2) {
-                try {
-                    response = chain.proceed(chain.request())
-                } catch (e: java.io.IOException) {
-                    lastError = e
-                    attempt++
-                    if (attempt <= 2) runCatching { Thread.sleep(300L * attempt) }
-                }
-            }
-            response ?: throw (lastError ?: java.io.IOException("image request failed"))
-        }
         val client = OkHttpClient.Builder()
-            .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
-            .addInterceptor(imageRetryInterceptor)
             .addNetworkInterceptor(cookieInterceptor)
             .followRedirects(true)
             .followSslRedirects(true)
@@ -132,9 +112,6 @@ class MceApplication : Application(), ImageLoaderFactory {
         val loader = ImageLoader.Builder(this)
             .okHttpClient(client)
             .crossfade(true)
-            // v0.4.8：禁用硬件位图解码——部分 ROM/模拟器（MuMu 等）硬件解码大图会失败，
-            // 表现为图片一直转圈 / "stream was reset"
-            .allowHardware(false)
             .memoryCache {
                 // v0.4.8：低内存设备降低图片内存缓存上限，减少被系统杀进程
                 val am = getSystemService(android.app.ActivityManager::class.java)
