@@ -23,6 +23,8 @@ data class ThreadSummary(
     val forumName: String? = null,
     /** v0.4.6：阅读数（列表 meta 里可能给出，也可能没有；放最后保持构造参数位置兼容） */
     val views: Int? = null,
+    /** v0.4.8：列表页自带的缩略图（论坛已给 200x180 小图，无需再抓帖子页） */
+    val thumbUrl: String? = null,
 )
 
 /** 列表页 */

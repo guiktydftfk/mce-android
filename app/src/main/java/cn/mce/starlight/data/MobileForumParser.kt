@@ -70,6 +70,15 @@ object MobileForumParser {
             ?.takeIf { it.isNotBlank() }
             ?.let { absolutize(it) }
 
+
+        // v0.4.8：列表页已内嵌缩略图（img.lazys[data-src] = forum.php?mod=image...200x180），
+        // 直接用它可省掉「每帖再抓一次完整页面解析首图」的开销（肇庆等图片板块慢的原因）
+        val thumb = li.selectFirst("img[data-src]")
+            ?.attr("data-src")
+            ?.takeIf { it.isNotBlank() }
+            ?.replace("&amp;", "&")
+            ?.substringBefore("&?")
+            ?.let { if (it.startsWith("http")) it else absolutize(it) }
         return ThreadSummary(
             id = tid,
             title = title.trim(),
@@ -81,6 +90,7 @@ object MobileForumParser {
             typeLabel = decodeEntities(li.selectFirst("span.threadtypes")?.text()?.trim())?.takeIf { it.isNotBlank() },
             summary = decodeEntities(li.selectFirst("a.th_item p")?.text()?.trim())?.takeIf { it.isNotBlank() },
             forumName = decodeEntities(li.selectFirst("a[href*=forumdisplay]")?.text()?.trim())?.takeIf { it.isNotBlank() },
+            thumbUrl = thumb,
         )
     }
 

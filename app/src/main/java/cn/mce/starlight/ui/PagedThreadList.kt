@@ -149,7 +149,9 @@ fun PagedThreadList(
         for (index in info.first().index..(info.last().index + THUMBNAIL_PREFETCH)) {
             val thread = st.items.getOrNull(index - headerOffset) ?: continue
             if (thumbs.containsKey(thread.id)) continue
-            val url = runCatching { ThreadImageCache.firstImage(thread.id) }.getOrNull()
+            // v0.4.8：列表页自带的缩略图直接用（快）；没有才回退到「抓帖子页解析首图」
+            val url = thread.thumbUrl
+                ?: runCatching { ThreadImageCache.firstImage(thread.id) }.getOrNull()
             thumbs[thread.id] = url.orEmpty() // 空串 = 已查过、该帖没有图
         }
     }
