@@ -243,21 +243,31 @@ object UpdateClient {
         }.getOrNull()
     }
 
-    /** 拉起系统安装器（普通应用需用户点“安装”） */
-    fun install(context: Context, apk: File): Boolean = runCatching {
-        val uri: Uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            apk,
-        )
-        val intent = Intent(Intent.ACTION_VIEW).apply {
+    /**
+     * 拉起系统安装器（普通应用需用户点“安装”）。
+     *
+     * v0.4.8：部分 ROM（vivo/iQOO 等）对 ACTION_VIEW 处理不完整，
+     * 失败时回退到旧版 ACTION_INSTALL_PACKAGE。
+     */
+    fun install(context: Context, apk: File): Boolean {
+        val uri: Uri = runCatching {
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
+        }.getOrNull() ?: return false
+
+        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(intent)
-        true
-    }.getOrDefault(false)
+        if (runCatching { context.startActivity(viewIntent) }.isSuccess) return true
+
+        val legacyIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            data = uri
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return runCatching { context.startActivity(legacyIntent) }.isSuccess
+    }
 
     /** 已下载但未安装的包 */
     fun pendingApk(context: Context): File? = SettingsStore.downloadedApkPath

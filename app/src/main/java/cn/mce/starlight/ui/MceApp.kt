@@ -285,9 +285,25 @@ fun MceApp() {
             updateDownloading = false
             if (file != null) {
                 updateRelease = null
+                // v0.4.8：vivo/iQOO 的 Super Care 会校验“应用注册”，未注册应用安装时被拦。
+                // 先确保「安装未知应用」权限，并提前提示点「authorize its installation」授权安装。
+                if (!cn.mce.starlight.core.InstallGate.canRequestInstalls(context)) {
+                    cn.mce.starlight.core.InstallGate.openUnknownSourcesSettings(context)
+                    updateRelease = release
+                    appToast = "请先允许「安装未知应用」，再回来点「立即更新」"
+                    return@launch
+                }
                 val started = UpdateClient.install(context, file)
                 if (!started) {
-                    appToast = "无法启动安装器，请在系统设置中允许安装未知应用"
+                    cn.mce.starlight.core.InstallGate.openUnknownSourcesSettings(context)
+                    appToast = if (cn.mce.starlight.core.InstallGate.isVivoDevice) {
+                        cn.mce.starlight.core.InstallGate.vivoInstallHint
+                    } else {
+                        "无法启动安装器，请在系统设置中允许安装未知应用"
+                    }
+                } else if (cn.mce.starlight.core.InstallGate.isVivoDevice) {
+                    // 安装器已拉起，但 vivo 可能随后弹 Super Care 校验 → 提示用户点授权
+                    appToast = cn.mce.starlight.core.InstallGate.vivoInstallHint
                 }
             } else {
                 updateError = "下载失败，请检查网络后重试"
@@ -1160,6 +1176,11 @@ fun MceApp() {
             downloading = updateDownloading,
             progress = updateProgress,
             downloadError = updateError,
+            vivoHint = cn.mce.starlight.core.InstallGate.isVivoDevice,
+            installPermissionMissing = !cn.mce.starlight.core.InstallGate.canRequestInstalls(context),
+            onOpenInstallSettings = {
+                cn.mce.starlight.core.InstallGate.openUnknownSourcesSettings(context)
+            },
             onUpdate = { startUpdate(release) },
             onSnooze = {
                 SettingsStore.snoozeUpdates(7)

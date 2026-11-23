@@ -575,6 +575,25 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (cn.mce.starlight.core.InstallGate.isVivoDevice) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    cn.mce.starlight.core.InstallGate.vivoInstallHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    "打开「安装未知应用」设置",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clickable {
+                            val ok = cn.mce.starlight.core.InstallGate.openUnknownSourcesSettings(context)
+                            message = if (ok) "已打开安装权限设置" else "请到系统设置 → 应用 → aMCE 中允许安装未知应用"
+                        }
+                        .padding(vertical = 8.dp),
+                )
+            }
             Spacer(Modifier.height(8.dp))
             // v0.4.7：灰度测试开关（仅在 version.json 灰度名单内的 UID 生效）
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
