@@ -162,24 +162,64 @@ fun PmChatScreen(
                                         modifier = Modifier.padding(bottom = 3.dp),
                                     )
                                 }
-                                Text(
-                                    m.text,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (m.incoming) MaterialTheme.colorScheme.onSurface
-                                    else MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier
-                                        .widthIn(max = bubbleMax)
-                                        .background(
-                                            if (m.incoming) MaterialTheme.colorScheme.surfaceVariant
-                                            else MaterialTheme.colorScheme.primaryContainer,
-                                            if (m.incoming) {
-                                                RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
-                                            } else {
-                                                RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
-                                            },
-                                        )
-                                        .padding(horizontal = 12.dp, vertical = 9.dp),
-                                )
+                                // v0.4.8：私信里的网址可点击，点击用系统浏览器打开
+                                val pmLinks = androidx.compose.runtime.remember(m.text) {
+                                    cn.mce.starlight.core.PmLinkify.find(m.text)
+                                }
+                                val bubbleModifier = Modifier
+                                    .widthIn(max = bubbleMax)
+                                    .background(
+                                        if (m.incoming) MaterialTheme.colorScheme.surfaceVariant
+                                        else MaterialTheme.colorScheme.primaryContainer,
+                                        if (m.incoming) {
+                                            RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
+                                        } else {
+                                            RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
+                                        },
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 9.dp)
+                                val bubbleColor = if (m.incoming) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                }
+                                if (pmLinks.isEmpty()) {
+                                    Text(
+                                        m.text,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = bubbleColor,
+                                        modifier = bubbleModifier,
+                                    )
+                                } else {
+                                    val linkColor = MaterialTheme.colorScheme.primary
+                                    val annotated = androidx.compose.runtime.remember(m.text, bubbleColor) {
+                                        androidx.compose.ui.text.buildAnnotatedString {
+                                            append(m.text)
+                                            pmLinks.forEach { link ->
+                                                addStringAnnotation("PM_LINK", link.url, link.start, link.endExclusive)
+                                                addStyle(
+                                                    androidx.compose.ui.text.SpanStyle(
+                                                        color = linkColor,
+                                                        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                                                    ),
+                                                    link.start,
+                                                    link.endExclusive,
+                                                )
+                                            }
+                                        }
+                                    }
+                                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                                    androidx.compose.foundation.text.ClickableText(
+                                        text = annotated,
+                                        style = MaterialTheme.typography.bodyMedium.copy(color = bubbleColor),
+                                        modifier = bubbleModifier,
+                                        onClick = { offset ->
+                                            annotated.getStringAnnotations("PM_LINK", offset, offset)
+                                                .firstOrNull()
+                                                ?.let { a -> runCatching { uriHandler.openUri(a.item) } }
+                                        },
+                                    )
+                                }
                             }
                             if (!m.incoming) {
                                 Spacer(Modifier.width(8.dp))
