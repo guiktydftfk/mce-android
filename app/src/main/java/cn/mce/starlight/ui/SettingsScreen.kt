@@ -113,6 +113,17 @@ fun SettingsScreen(
         }
     }
 
+
+    /** v0.4.8：清除自定义背景时删除本地图片文件（含历史 background_*.jpg 遗留） */
+    fun clearBackgroundFiles() {
+        runCatching {
+            context.filesDir.listFiles()?.forEach { f ->
+                if (f.isFile && (f.name == "background.jpg" || (f.name.startsWith("background_") && f.name.endsWith(".jpg")))) {
+                    f.delete()
+                }
+            }
+        }
+    }
     // v0.4.7：下拉刷新（替代顶栏刷新按钮）
     var pullRefreshing by remember { mutableStateOf(false) }
     androidx.compose.material3.pulltorefresh.PullToRefreshBox(
@@ -314,19 +325,22 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (SettingsStore.backgroundPath != null) {
-                    Text(
-                        "清除",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier
-                            .clickable {
-                                SettingsStore.updateBackground(null)
-                                message = "背景已清除"
-                            }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                    )
-                }
+                Text(
+                    "清除",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (SettingsStore.backgroundPath != null) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    },
+                    modifier = Modifier
+                        .clickable(enabled = SettingsStore.backgroundPath != null) {
+                            clearBackgroundFiles()
+                            SettingsStore.updateBackground(null)
+                            message = "自定义背景已清除（本地图片已删除）"
+                        }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                )
                 Text(
                     "选择图片",
                     style = MaterialTheme.typography.bodyMedium,
@@ -390,20 +404,28 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (splashFile != null) {
-                    Text(
-                        "清除",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier
-                            .clickable {
-                                cn.mce.starlight.core.SplashImageStore.clear(context)
-                                splashTick++
-                                message = "启动页首图已清除"
+                Text(
+                    "清除",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (splashFile != null) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    },
+                    modifier = Modifier
+                        .clickable(enabled = splashFile != null) {
+                            cn.mce.starlight.core.SplashImageStore.clear(context)
+                            // 顺带清掉 splash 目录里可能残留的其它图片
+                            runCatching {
+                                java.io.File(context.filesDir, "splash").listFiles()?.forEach { f ->
+                                    if (f.isFile) f.delete()
+                                }
                             }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                    )
-                }
+                            splashTick++
+                            message = "启动页首图已清除"
+                        }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                )
                 Text(
                     "选择图片",
                     style = MaterialTheme.typography.bodyMedium,
