@@ -1,15 +1,25 @@
 MCE 星光班 Android 客户端 · 稳定版归档
 =====================================
-版本: 0.4.7.1 (versionCode 54) —— 紧急修复版（emergency=true，应用内自动下载）
+版本: 0.4.8 (versionCode 57) —— 正式版（应用内可自动更新）
 包名: cn.mce.starlight
 签名: 与全部历史版本相同（SHA-256 证书指纹 089ebd7851397257e085e17086203794dbc7ba2e88b245d070107ffa7a78fc8c）
-文件: MCE-starlight-v0.4.7.1-stable.apk（与 release/MCE-latest.apk 同内容）
-本次变更: 仅恢复 0.4.7 中误删的「赞赏」悬浮按钮，无其他功能变更
-SHA256: 973A1B1DB56C2A8F3976F988DC0767CC31186598C14E3333CD7F73C3ED4943D9
+文件: MCE-starlight-v0.4.8-stable.apk（与 release/MCE-latest.apk、根目录 MCE-starlight.apk 同内容）
+本次变更:
+  - 取消收藏（详情页 + 我的收藏）
+  - 他人主页星光值精确值
+  - 小胖星图标（透明抠图、保留五官、缩小占位）
+  - 内置品牌启动页；夜间固定深色不白屏
+  - 清图片缓存后启动页 2 秒（首页背后同时加载）
+  - 板块列表缩略图改用列表页 200x180 小图（肇庆等图片板块提速）
+  - 设置：清除自定义背景 / 启动页首图（真正删除本地文件）
+  - vivo/iQOO 安装拦截引导（authorize its installation / 安装未知应用快捷入口）
+  - 私信气泡内网址可点击，跳系统浏览器
+SHA256: 81B624F7A675016F831D96AE0905F27D2B617FD17825AF5126195DC7C142C864
 最小系统: Android 8.0 (API 26)
 
 历史归档（仓库保留稳定版）
 --------
+- 0.4.7.1 (versionCode 54): MCE-starlight-v0.4.7.1-stable.apk
 - 0.4.7 (versionCode 53): MCE-starlight-v0.4.7-stable.apk
 - 0.4.6 (versionCode 50): MCE-starlight-v0.4.6-stable.apk
 - 0.4.5 (versionCode 49): MCE-starlight-v0.4.5-stable.apk
@@ -20,7 +30,7 @@ SHA256: 973A1B1DB56C2A8F3976F988DC0767CC31186598C14E3333CD7F73C3ED4943D9
 --------
 - 直接安装即可；已装任意历史版本均可覆盖升级，无需卸载（包名与签名一致，数据保留）
 - 校验完整性（Windows PowerShell）:
-  Get-FileHash .\MCE-starlight-v0.4.7.1-stable.apk -Algorithm SHA256
+  Get-FileHash .\MCE-starlight-v0.4.8-stable.apk -Algorithm SHA256
   结果应为上面的 SHA256
 
 长期可用性
