@@ -29,7 +29,7 @@
 
 备用位置：`release/MCE-latest.apk`（自动更新下载用的同一文件）、`release/MCE-starlight-v0.4.8-stable.apk`（正式版归档）。国内网络下载不便时，可用 `version.json` 里的 gh-proxy 地址。
 
-**0.4.8 正式版已发布**：所有用户可在应用内「设置 → 更新」直接升级；历史内测包见 `release/canary/`（灰度测试通道保留，后续 beta 仍可通过「参与灰度测试」接收）。
+**0.4.8 正式版已发布**：所有用户可在应用内「设置 → 更新」直接升级；历史版本可在 Git 提交历史中找回（仓库只保留当前正式版安装包；灰度测试通道保留，后续 beta 仍可通过「参与灰度测试」接收）。
 
 ---
 
@@ -211,8 +211,8 @@
 
 - **覆盖安装**：包名固定 `cn.mce.starlight`、签名证书固定（仓库内 `keystore/debug.keystore`），任意历史版本都可直接覆盖升级，数据保留
 - **版本只增不减**：`versionCode` 单调递增，旧版可通过应用内更新升到最新
-- **稳定版归档**：`release/MCE-starlight-v0.4.7.1-stable.apk`（与 `MCE-latest.apk` 同内容），根目录 `MCE-starlight.apk` 指向最新包
-- **完整性校验**：`release/SHA256SUMS.txt` 记录版本 / 包名 / 签名指纹 / SHA256，可用 `Get-FileHash .\MCE-starlight-v0.4.7.1-stable.apk -Algorithm SHA256` 核对
+- **稳定版归档**：`release/MCE-starlight-v0.4.8-stable.apk`（与 `MCE-latest.apk` 同内容），根目录 `MCE-starlight.apk` 指向最新包
+- **完整性校验**：`release/SHA256SUMS.txt` 记录版本 / 包名 / 签名指纹 / SHA256，可用 `Get-FileHash .\MCE-starlight-v0.4.8-stable.apk -Algorithm SHA256` 核对
 - **离线可用**：已打开过的帖子有磁盘缓存，断网仍可阅读
 - **更新来源**：`version.json` 的 `apk` 指向 `release/MCE-latest.apk`（多镜像自动回退）
 
